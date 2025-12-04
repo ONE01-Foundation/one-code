@@ -1,34 +1,44 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
+const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const text = body.text ?? body.message ?? "";
 
-    if (!text) {
+    if (!text || typeof text !== "string") {
       return NextResponse.json(
-        { error: "Missing 'text' field in body" },
+        { error: "Missing 'text' in request body" },
         { status: 400 }
       );
     }
 
-    const result = await openai.responses.create({
+    const result = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: `You are the One01 brain. Answer shortly.\nUser: ${text}`,
+      input: `You are the One01 brain. Reply shortly.\nUser: ${text}`,
     });
 
-    // מגרד טקסט פשוט מהתשובה
-    const output = result.output[0].content[0];
-    const reply =
-      output.type === "output_text" ? output.text : "Got response, but no text.";
+    // לעקוף את הטייפים בעדינות
+    const anyResult = result as any;
+    const firstOutput = anyResult.output?.[0];
+    const firstContent = firstOutput?.content?.[0];
+
+    let reply = "No text in response";
+
+    if (firstContent?.type === "output_text") {
+      // ספרייה חדשה של OpenAI – לפעמים זה תחת text / value
+      reply = firstContent.text?.value ?? firstContent.text ?? reply;
+    } else if (firstContent) {
+      reply = JSON.stringify(firstContent);
+    }
 
     return NextResponse.json({ reply });
   } catch (err) {
-    console.error("Brain error:", err);
+    console.error("Brain API error:", err);
     return NextResponse.json(
       { error: "Brain failed, check server logs." },
       { status: 500 }
