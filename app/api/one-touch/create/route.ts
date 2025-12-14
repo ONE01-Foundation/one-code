@@ -21,25 +21,18 @@ function getBaseUrl(request: NextRequest): string {
     return process.env.NEXT_PUBLIC_APP_URL;
   }
 
-  // Temporary: Use Vercel preview URL until main domain is connected
   // Check if we're on Vercel and use the preview URL
-  const vercelUrl = request.headers.get("x-vercel-url");
-  if (vercelUrl && !vercelUrl.includes("localhost")) {
-    return `https://${vercelUrl}`;
-  }
-
-  // Fallback to request origin (host + protocol)
   const host = request.headers.get("host");
   const protocol = request.headers.get("x-forwarded-proto") || 
                    (request.nextUrl.protocol === "https:" ? "https" : "http");
   
-  if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+  // If on Vercel preview URL, use it directly
+  if (host && host.includes("vercel.app") && !host.includes("localhost")) {
     return `${protocol}://${host}`;
   }
 
-  // Last resort: use Vercel preview URL pattern if available
-  // This will work for one-code-pi.vercel.app
-  if (host && host.includes("vercel.app")) {
+  // Fallback to request origin (but skip localhost)
+  if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
     return `${protocol}://${host}`;
   }
 
