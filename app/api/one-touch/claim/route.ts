@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!session) {
+    if (!session || typeof session !== "object" || !("status" in session)) {
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404 }
