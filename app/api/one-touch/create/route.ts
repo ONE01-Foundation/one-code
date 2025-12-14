@@ -21,21 +21,29 @@ function getBaseUrl(request: NextRequest): string {
     return process.env.NEXT_PUBLIC_APP_URL;
   }
 
+  // Temporary: Use Vercel preview URL until main domain is connected
+  // Check if we're on Vercel and use the preview URL
+  const vercelUrl = request.headers.get("x-vercel-url");
+  if (vercelUrl && !vercelUrl.includes("localhost")) {
+    return `https://${vercelUrl}`;
+  }
+
   // Fallback to request origin (host + protocol)
   const host = request.headers.get("host");
   const protocol = request.headers.get("x-forwarded-proto") || 
                    (request.nextUrl.protocol === "https:" ? "https" : "http");
   
-  if (host) {
-    const fallbackUrl = `${protocol}://${host}`;
-    // Warn if fallback is localhost
-    if (fallbackUrl.includes("localhost") || fallbackUrl.includes("127.0.0.1")) {
-      console.warn("WARNING: Using localhost fallback. Set NEXT_PUBLIC_APP_URL for production.");
-    }
-    return fallbackUrl;
+  if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+    return `${protocol}://${host}`;
   }
 
-  // Last resort: use nextUrl origin (but warn if it's localhost)
+  // Last resort: use Vercel preview URL pattern if available
+  // This will work for one-code-pi.vercel.app
+  if (host && host.includes("vercel.app")) {
+    return `${protocol}://${host}`;
+  }
+
+  // Final fallback: use nextUrl origin (but warn if it's localhost)
   const origin = request.nextUrl.origin;
   if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
     console.warn("WARNING: Using localhost origin. Set NEXT_PUBLIC_APP_URL for production.");
