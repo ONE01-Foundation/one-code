@@ -39,6 +39,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!session) {
+      return NextResponse.json(
+        { error: "Session not found" },
+        { status: 404 }
+      );
+    }
+
     // Validate status
     if (session.status !== "pending") {
       return NextResponse.json(

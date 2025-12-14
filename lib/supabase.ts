@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const supabase = createClient(
+// Use placeholder values during build, will be replaced at runtime
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+export const supabase = createClient(url, key);

@@ -5,25 +5,17 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-}
+// Use placeholder values during build, will be replaced at runtime
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key";
 
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-}
-
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-    db: {
-      schema: "public",
-    },
-  }
-);
+export const supabase = createClient(url, key, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+  db: {
+    schema: "public",
+  },
+});
 
