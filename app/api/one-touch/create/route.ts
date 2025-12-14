@@ -46,6 +46,21 @@ function getBaseUrl(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate environment variables first
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json(
+        { error: "Missing NEXT_PUBLIC_SUPABASE_URL environment variable" },
+        { status: 500 }
+      );
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: "Missing SUPABASE_SERVICE_ROLE_KEY environment variable" },
+        { status: 500 }
+      );
+    }
+
     const code = generateCode();
     const baseUrl = getBaseUrl(request);
     const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes from now
@@ -83,8 +98,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Unexpected error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        details: errorMessage,
+        ...(process.env.NODE_ENV === "development" && errorStack ? { stack: errorStack } : {})
+      },
       { status: 500 }
     );
   }
