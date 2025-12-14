@@ -4,7 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase/server";
 
 function generateCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -61,11 +60,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create Supabase client with validated env vars
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
     const code = generateCode();
     const baseUrl = getBaseUrl(request);
     const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes from now
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("one_touch_sessions")
       .insert({
         code,

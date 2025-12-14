@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,8 +18,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: "Missing Supabase configuration" },
+        { status: 500 }
+      );
+    }
+
+    // Create Supabase client
+    const supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
     // First, check if session exists and is valid
-    const { data: session, error: fetchError } = await supabase
+    const { data: session, error: fetchError } = await supabaseClient
       .from("one_touch_sessions")
       .select("status, expires_at, claimed_at")
       .eq("code", code)
@@ -66,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update session
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseClient
       .from("one_touch_sessions")
       .update({
         status: "claimed",
