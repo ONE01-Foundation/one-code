@@ -18,7 +18,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    // Validate environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: "Missing Supabase configuration" },
+        { status: 500 }
+      );
+    }
+
+    // Create Supabase client
+    const supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    const { data, error } = await supabaseClient
       .from("one_touch_sessions")
       .select("status, expires_at, claimed_at")
       .eq("code", code)
