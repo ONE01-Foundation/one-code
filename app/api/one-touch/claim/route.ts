@@ -39,15 +39,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!session || typeof session !== "object" || !("status" in session)) {
+    if (!session) {
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404 }
       );
     }
 
+    // Type assertion for session data
+    const sessionData = session as { status: string; expires_at: string | null; claimed_at: string | null };
+
     // Validate status
-    if (session.status !== "pending") {
+    if (sessionData.status !== "pending") {
       return NextResponse.json(
         { error: "Session already claimed or invalid" },
         { status: 400 }
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate expiration
-    if (session.expires_at && new Date(session.expires_at) < new Date()) {
+    if (sessionData.expires_at && new Date(sessionData.expires_at) < new Date()) {
       return NextResponse.json(
         { error: "Session expired" },
         { status: 400 }
