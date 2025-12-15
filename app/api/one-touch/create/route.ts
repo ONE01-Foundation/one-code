@@ -15,32 +15,22 @@ function generateCode(): string {
 }
 
 function getBaseUrl(request: NextRequest): string {
-  // Prefer NEXT_PUBLIC_APP_URL env var (never hardcode localhost)
+  // Prefer NEXT_PUBLIC_APP_URL env var (production: https://one01.io, local: http://localhost:3000)
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL;
   }
 
-  // Check if we're on Vercel and use the preview URL
+  // Fallback: use request origin
   const host = request.headers.get("host");
   const protocol = request.headers.get("x-forwarded-proto") || 
                    (request.nextUrl.protocol === "https:" ? "https" : "http");
   
-  // If on Vercel preview URL, use it directly
-  if (host && host.includes("vercel.app") && !host.includes("localhost")) {
+  if (host) {
     return `${protocol}://${host}`;
   }
 
-  // Fallback to request origin (but skip localhost)
-  if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
-    return `${protocol}://${host}`;
-  }
-
-  // Final fallback: use nextUrl origin (but warn if it's localhost)
-  const origin = request.nextUrl.origin;
-  if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
-    console.warn("WARNING: Using localhost origin. Set NEXT_PUBLIC_APP_URL for production.");
-  }
-  return origin;
+  // Last resort: use nextUrl origin
+  return request.nextUrl.origin;
 }
 
 export async function POST(request: NextRequest) {
