@@ -80,7 +80,10 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { text, makeEasier } = body;
+    const { text, makeEasier, lang } = body;
+    
+    // Language: default to "en" if not provided or invalid
+    const uiLang = lang && ["en", "he", "ar", "es", "fr"].includes(lang) ? lang : "en";
 
     // Validate input
     if (!text || typeof text !== "string") {
@@ -98,9 +101,22 @@ export async function POST(req: NextRequest) {
     // Call OpenAI
     const openai = getOpenAIClient();
     
+    // Language-specific instructions
+    const langInstructions: Record<string, string> = {
+      en: "Respond in English.",
+      he: "Respond in Hebrew (עברית). Use Hebrew characters for title and why.",
+      ar: "Respond in Arabic (العربية). Use Arabic characters for title and why.",
+      es: "Respond in Spanish (Español). Use Spanish for title and why.",
+      fr: "Respond in French (Français). Use French for title and why.",
+    };
+    
+    const langInstruction = langInstructions[uiLang] || langInstructions.en;
+
     const systemPrompt = `You are Nobody, a calm system that helps people take one small step forward.
 
 Your job: Compress the user's intent into ONE actionable next step.
+
+${langInstruction}
 
 Return ONLY valid JSON in this exact format:
 {
@@ -122,7 +138,7 @@ Strict rules:
 - durationMinutes: Must be realistic and short (5, 10, 15, 20, or 30)
 - energy: Choose based on what the step requires (low = minimal effort, high = more effort)
 - domain: Choose the most relevant category
-- buttons: Always return these exact 3 buttons with these IDs
+- buttons: Always return these exact 3 buttons with these IDs (button labels will be translated by the UI, so keep them in English here)
 
 ${makeEasier ? "IMPORTANT: The user asked to change this. Make the step EASIER, shorter, or lower energy." : ""}
 

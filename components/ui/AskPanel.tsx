@@ -11,6 +11,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { UILang } from "@/lib/lang";
+import { t } from "@/lib/ui-text";
 
 export type AskPhase = "idle" | "echo" | "thinking" | "result";
 
@@ -21,6 +23,7 @@ interface AskPanelProps {
   onSubmit: (text: string) => void;
   onClose?: () => void;
   isGenerating?: boolean;
+  uiLang?: UILang;
 }
 
 export function AskPanel({
@@ -30,6 +33,7 @@ export function AskPanel({
   onSubmit,
   onClose,
   isGenerating = false,
+  uiLang = "en",
 }: AskPanelProps) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,7 +109,7 @@ export function AskPanel({
                 className="block text-sm opacity-60 mb-2"
                 style={{ color: "var(--foreground)" }}
               >
-                What do you need?
+                {t(uiLang, "whatDoYouNeed")}
               </label>
               <input
                 ref={inputRef}
@@ -113,7 +117,7 @@ export function AskPanel({
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Tell me what you need…"
+                placeholder={t(uiLang, "placeholder")}
                 disabled={isSubmitting || isGenerating}
                 maxLength={280}
                 autoFocus
@@ -135,7 +139,7 @@ export function AskPanel({
                   color: "var(--background)",
                 }}
               >
-                {isSubmitting || isGenerating ? "..." : "Ask"}
+                {isSubmitting || isGenerating ? "..." : t(uiLang, "ask")}
               </button>
               {onClose && (
                 <button
@@ -148,7 +152,7 @@ export function AskPanel({
                     color: "var(--foreground)",
                   }}
                 >
-                  Cancel
+                  {t(uiLang, "cancel")}
                 </button>
               )}
             </div>
@@ -192,7 +196,7 @@ export function AskPanel({
               className="text-sm opacity-60"
               style={{ color: "var(--foreground)" }}
             >
-              Thinking...
+              {t(uiLang, "thinking")}
             </p>
           </div>
         ) : null}

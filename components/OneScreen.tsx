@@ -106,6 +106,7 @@ import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
 import { AskPanel } from "@/components/ui/AskPanel";
+import { UILang, detectLangFromText } from "@/lib/lang";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -239,6 +240,9 @@ export default function OneScreen() {
   const [askBusy, setAskBusy] = useState(false);
   const [askEcho, setAskEcho] = useState("");
   const [askPhase, setAskPhase] = useState<"idle" | "echo" | "thinking" | "result">("idle");
+  
+  // Auto Language v0.1 state
+  const [uiLang, setUiLang] = useState<UILang>(loadUILang());
   
   // Step Card state (persisted)
   const [activeStepCard, setActiveStepCard] = useState<any>(null);
@@ -872,6 +876,11 @@ export default function OneScreen() {
     const trimmed = text.trim();
     if (trimmed.length === 0 || trimmed.length > 280) return;
 
+    // Auto Language v0.1: Detect language from input
+    const detectedLang = detectLangFromText(trimmed);
+    setUiLang(detectedLang);
+    saveUILang(detectedLang);
+
     // Phase 1: Echo (show user text)
     setAskEcho(trimmed);
     setLastUserText(trimmed);
@@ -890,7 +899,7 @@ export default function OneScreen() {
       const response = await fetch("/api/nobody/step", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed }),
+        body: JSON.stringify({ text: trimmed, lang: detectedLang }),
       });
 
       if (!response.ok) {
@@ -1425,6 +1434,7 @@ export default function OneScreen() {
         onSubmit={handleAskNobodySubmit}
         onClose={handleCloseAsk}
         isGenerating={isGeneratingStep}
+        uiLang={uiLang}
       />
 
       {/* Name Path Modal */}

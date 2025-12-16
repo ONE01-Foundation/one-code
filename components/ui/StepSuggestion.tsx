@@ -6,15 +6,18 @@
  */
 
 import { OneNextStep } from "@/app/api/nobody/step/route";
+import { UILang } from "@/lib/lang";
+import { t } from "@/lib/ui-text";
 
 interface StepSuggestionProps {
   step: OneNextStep;
   onDo: () => void;
   onNotNow: () => void;
   onChange: () => void;
+  uiLang?: UILang;
 }
 
-export function StepSuggestion({ step, onDo, onNotNow, onChange }: StepSuggestionProps) {
+export function StepSuggestion({ step, onDo, onNotNow, onChange, uiLang = "en" }: StepSuggestionProps) {
   const energyColors: Record<string, string> = {
     low: "opacity-40",
     medium: "opacity-60",
@@ -75,7 +78,7 @@ export function StepSuggestion({ step, onDo, onNotNow, onChange }: StepSuggestio
             color: "var(--background)",
           }}
         >
-          {step.buttons.find((b) => b.id === "do")?.label || "Do it"}
+          {t(uiLang, "doIt")}
         </button>
         <div className="flex gap-3">
           <button
@@ -87,7 +90,7 @@ export function StepSuggestion({ step, onDo, onNotNow, onChange }: StepSuggestio
               color: "var(--foreground)",
             }}
           >
-            {step.buttons.find((b) => b.id === "not_now")?.label || "Not now"}
+            {t(uiLang, "notNow")}
           </button>
           <button
             onClick={onChange}
@@ -98,7 +101,7 @@ export function StepSuggestion({ step, onDo, onNotNow, onChange }: StepSuggestio
               color: "var(--foreground)",
             }}
           >
-            {step.buttons.find((b) => b.id === "change")?.label || "Change"}
+            {t(uiLang, "change")}
           </button>
         </div>
       </div>

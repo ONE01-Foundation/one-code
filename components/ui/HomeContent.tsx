@@ -19,6 +19,8 @@ import { AskNobodyInput } from "./AskNobodyInput";
 import { StepSuggestion } from "./StepSuggestion";
 import { OneNextStep } from "@/app/api/nobody/step/route";
 import { StepCard } from "@/lib/step-card";
+import { UILang } from "@/lib/lang";
+import { t } from "@/lib/ui-text";
 
 interface HomeContentProps {
   state: HomeState;
@@ -29,6 +31,7 @@ interface HomeContentProps {
   isGenerating?: boolean;
   scope?: "private" | "global";
   nextIntent?: "show_active" | "show_step" | "ask_nobody" | "silence";
+  uiLang?: UILang;
   // Active
   activeStepCard?: StepCard | null;
   onStepDone?: () => void;
@@ -51,6 +54,7 @@ export function HomeContent({
   isGenerating = false,
   scope = "private",
   nextIntent = "ask_nobody",
+  uiLang = "en",
   activeStepCard,
   onStepDone,
   stepSuggestion,
@@ -126,7 +130,7 @@ export function HomeContent({
                 color: "var(--background)",
               }}
             >
-              Done
+              {t(uiLang, "done")}
             </button>
           </div>
         ) : state === "suggestion" && stepSuggestion ? (
@@ -136,6 +140,7 @@ export function HomeContent({
             onDo={onStepDo || (() => {})}
             onNotNow={onStepNotNow || (() => {})}
             onChange={onStepChange || (() => {})}
+            uiLang={uiLang}
           />
         ) : state === "empty" ? (
           /* EMPTY: Show button + input (private) or view-only message (global) or silence */
@@ -144,7 +149,7 @@ export function HomeContent({
               /* SILENCE: Calm empty center, no CTA */
               <div className="text-center py-12">
                 <p className="text-base opacity-60" style={{ color: "var(--foreground)" }}>
-                  Silence.
+                  {t(uiLang, "silence")}
                 </p>
               </div>
             ) : scope === "private" ? (
@@ -159,7 +164,7 @@ export function HomeContent({
                       color: "var(--background)",
                     }}
                   >
-                    {isGenerating ? "Generating..." : "Find next step"}
+                    {isGenerating ? t(uiLang, "generating") : t(uiLang, "findStep")}
                   </button>
                 </div>
                 {onAskNobodySubmit && (
@@ -173,7 +178,7 @@ export function HomeContent({
               /* Global scope: view-only */
               <div className="text-center py-12">
                 <p className="text-base opacity-60" style={{ color: "var(--foreground)" }}>
-                  Global is view-only
+                  {t(uiLang, "globalViewOnly")}
                 </p>
               </div>
             )}
