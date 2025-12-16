@@ -1,5 +1,7 @@
 /**
  * Hook for scope management (Global ↔ Private Mirror)
+ * 
+ * Prevents hydration flicker with mounted guard
  */
 
 import { useState, useEffect } from "react";
@@ -18,18 +20,26 @@ function saveScope(scope: Scope) {
   localStorage.setItem("one_scope", scope);
 }
 
-// Hook for scope state
+// Hook for scope state (with hydration guard)
 export function useScope() {
-  const [scope, setScope] = useState<Scope>(loadScope());
+  const [mounted, setMounted] = useState(false);
+  const [scope, setScope] = useState<Scope>("private"); // Default, will update on mount
   
   useEffect(() => {
-    saveScope(scope);
-  }, [scope]);
+    setMounted(true);
+    setScope(loadScope());
+  }, []);
+  
+  useEffect(() => {
+    if (mounted) {
+      saveScope(scope);
+    }
+  }, [scope, mounted]);
   
   const toggleScope = () => {
     setScope((prev) => (prev === "private" ? "global" : "private"));
   };
   
-  return { scope, setScope, toggleScope };
+  return { scope, setScope, toggleScope, mounted };
 }
 

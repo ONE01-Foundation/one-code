@@ -82,6 +82,8 @@ import { useCards } from "@/hooks/useCards";
 import { CenterCard } from "@/components/ui/CenterCard";
 import { useNobody } from "@/hooks/useNobody";
 import { NobodyPrompt } from "@/components/ui/NobodyPrompt";
+import { determineHomeState, HomeState } from "@/lib/home-state";
+import { handleResetParam } from "@/lib/reset";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -186,13 +188,30 @@ export default function OneScreen() {
   const context: LifeContext = isPrivate ? "private" : "global";
   
   // Scope layer (Global ↔ Private Mirror)
-  const { scope, toggleScope } = useScope();
+  const { scope, toggleScope, mounted: scopeMounted } = useScope();
   
   // Cards Lifecycle v0.1
   const { activeCard, visibleCards, completeCard, deferCard, refresh: refreshCards } = useCards(scope);
   
   // Nobody Interaction v0.1
   const { showPrompt, promptData, promptState, handleChoice, openPrompt, retryPrompt, useLastPrompt } = useNobody();
+  
+  // Handle reset param on mount
+  useEffect(() => {
+    handleResetParam();
+  }, []);
+  
+  // Determine home state (strict state machine)
+  const hasSuggestion = (actionLoopPlan && actionLoopState === "prompt") || showPrompt;
+  const homeState: HomeState = determineHomeState({
+    hasActiveCard: !!activeCard,
+    hasSuggestion,
+    hasPrompt: showPrompt,
+    isLoading: promptState === "loading" || isGenerating,
+  });
+  
+  // Debug markers (dev only)
+  const isDev = process.env.NODE_ENV === "development";
 
   // Initialize OWO and Step Engine on mount
   useEffect(() => {
@@ -772,69 +791,54 @@ export default function OneScreen() {
             {themeOverride === "auto" ? "○" : activeTheme === "light" ? "●" : "○"}
           </button>
 
-          {/* Scope Toggle (single control, no layout change) */}
-          <button
-            onClick={toggleScope}
-            className="px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 hover:opacity-70"
-            style={{
-              backgroundColor: scope === "private" ? "var(--foreground)" : "transparent",
-              color: scope === "private" ? "var(--background)" : "var(--foreground)",
-              border: "1px solid var(--border)",
-            }}
-          >
-            {scope === "private" ? "Private" : "Global"}
-          </button>
+          {/* Scope Toggle (only render when mounted to prevent flicker) */}
+          {scopeMounted && (
+            <button
+              onClick={toggleScope}
+              className="px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 hover:opacity-70"
+              style={{
+                backgroundColor: scope === "private" ? "var(--foreground)" : "transparent",
+                color: scope === "private" ? "var(--background)" : "var(--foreground)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {scope === "private" ? "Private" : "Global"}
+            </button>
+          )}
+
+          {/* Dev menu (development only) */}
+          {isDev && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (confirm("Reset all app data?")) {
+                    const { clearAppData } = require("@/lib/reset");
+                    clearAppData();
+                    window.location.reload();
+                  }
+                }}
+                className="text-xs opacity-30 hover:opacity-60 transition-opacity"
+                style={{ color: "var(--foreground)" }}
+                title="Reset (dev only)"
+              >
+                Reset
+              </button>
+              {/* Debug state marker */}
+              <span className="text-xs opacity-20" style={{ color: "var(--foreground)" }}>
+                [{homeState.toUpperCase()}]
+              </span>
+            </div>
+          )}
 
           {/* Spacer for balance */}
           <div className="w-8" />
         </div>
       )}
 
-      {/* Center: Focus Zone */}
+      {/* Center: Focus Zone - Strict State Machine (ONE state only) */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-        {/* Side Bubbles (next/context/last done - max 3) */}
-        <SideBubbles cards={visibleCards} />
-        
-        {/* Nobody Prompt / Cards Lifecycle - Primary UI (z-20 to be above old UI) */}
-        <div className="relative z-20 w-full max-w-md text-center">
-          {showPrompt ? (
-            <NobodyPrompt
-              response={promptData}
-              state={promptState}
-              onChoice={(choiceId) => {
-                handleChoice(choiceId);
-                // Refresh cards to show newly created card
-                setTimeout(() => refreshCards(), 100);
-              }}
-              onRetry={retryPrompt}
-              onUseLast={useLastPrompt}
-            />
-          ) : activeCard ? (
-            /* Center Card (active card) */
-            <CenterCard
-              card={activeCard}
-              onComplete={() => completeCard(activeCard.id)}
-              onDefer={() => deferCard(activeCard.id)}
-            />
-          ) : (
-            /* No active card - show "Ask Nobody" button */
-            <div className="text-center space-y-4">
-              <div className="opacity-50 mb-4">
-                <p className="text-lg">What matters for you right now?</p>
-              </div>
-              <button
-                onClick={openPrompt}
-                className="px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-                style={{
-                  backgroundColor: "var(--foreground)",
-                  color: "var(--background)",
-                }}
-              >
-                Ask Nobody
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Side Bubbles (next/context/last done - max 3) - Only show in active state */}
+        {homeState === "active" && <SideBubbles cards={visibleCards} />}
         
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -847,316 +851,176 @@ export default function OneScreen() {
           />
         </div>
 
-        {/* Center Content - Hide when Nobody prompt or Cards Lifecycle is active */}
-        {!showPrompt && !activeCard && (
-        <div className="relative z-10 w-full max-w-md text-center">
-          {/* Signal UI (subtle, no popups/banners) - only when no active user action */}
-          {activeSignal && signalVisible && !showSteps && !currentLifeAction && (
-            <div className="mb-6 transition-all duration-500">
-              <div
-                className="p-4 rounded-lg text-center"
-                style={{
-                  backgroundColor: "var(--neutral-50)",
-                  border: "1px solid var(--border)",
-                  opacity: 0.8,
-                }}
-              >
-                <p className="text-sm leading-relaxed mb-2" style={{ color: "var(--foreground)" }}>
-                  {activeSignal.message}
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <button
-                    onClick={handleCompleteSignal}
-                    className="text-xs px-3 py-1 rounded opacity-70 hover:opacity-100 transition-opacity"
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    Act
-                  </button>
-                  <button
-                    onClick={() => handleDismissSignal("not now")}
-                    className="text-xs px-3 py-1 rounded opacity-50 hover:opacity-70 transition-opacity"
-                    style={{ color: "var(--neutral-500)" }}
-                  >
-                    Later
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+        {/* Strict State Machine - Only ONE state renders */}
+        <div className="relative z-20 w-full max-w-md text-center">
+          {homeState === "loading" ? (
+            /* LOADING: Show nothing else */
+            isDev && <div className="text-xs opacity-20">[LOADING]</div>
+          ) : homeState === "active" ? (
+            /* ACTIVE: Active card view */
+            <>
+              {isDev && <div className="text-xs opacity-20 mb-2">[ACTIVE]</div>}
+              <CenterCard
+                card={activeCard!}
+                onComplete={() => completeCard(activeCard!.id)}
+                onDefer={() => deferCard(activeCard!.id)}
+              />
+            </>
+          ) : homeState === "suggestion" ? (
+            /* SUGGESTION: Show one suggested card + buttons */
+            <>
+              {isDev && <div className="text-xs opacity-20 mb-2">[SUGGESTION]</div>}
+              {showPrompt ? (
+                <NobodyPrompt
+                  response={promptData}
+                  state={promptState}
+                  onChoice={(choiceId) => {
+                    handleChoice(choiceId);
+                    setTimeout(() => refreshCards(), 100);
+                  }}
+                  onRetry={retryPrompt}
+                  onUseLast={useLastPrompt}
+                />
+              ) : actionLoopPlan && actionLoopState === "prompt" ? (
+                (() => {
+                  const currentStep = getCurrentActionStep(actionLoopPlan);
+                  if (!currentStep) return null;
+                  
+                  return (
+                    <div className="space-y-6">
+                      {/* Prompt: single clear suggestion */}
+                      <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
+                        <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
+                          {currentStep.prompt}
+                        </div>
+                        <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
+                          {currentStep.action}
+                        </div>
+                        {currentStep.estimatedTime && (
+                          <div className="text-xs mt-4 opacity-50" style={{ color: "var(--neutral-500)" }}>
+                            {currentStep.estimatedTime} min
+                          </div>
+                        )}
+                      </div>
 
-          {showSteps && currentStep ? (
-            /* Step Engine Flow */
-            <div className="space-y-8 transition-all duration-500">
-              {isPausing ? (
-                /* Subtle pause (no spinner) */
-                <div className="space-y-4">
-                  <p className="text-2xl sm:text-3xl leading-relaxed font-normal opacity-50" style={{ color: "var(--foreground)" }}>
-                    {currentStep.message.split("\n")[0]}
-                  </p>
-                </div>
-              ) : (
-                /* Current Step */
-                <div className="space-y-8">
-                  {/* Step message (1-2 lines max) */}
-                  <div className="space-y-2">
-                    {currentStep.message.split("\n").map((line, idx) => (
-                      <p
-                        key={idx}
-                        className={`${idx === 0 ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl"} leading-relaxed font-normal`}
-                        style={{ color: "var(--foreground)" }}
-                      >
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-
-                  {/* Step actions (1 primary or up to 2 choices) */}
-                  <div className="space-y-4">
-                    {currentStep.actions.map((action) => (
-                      <button
-                        key={action.id}
-                        onClick={() => handleStepAction(action.id)}
-                        disabled={isPausing}
-                        className={`w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 ${
-                          action.type === "choice" ? "text-left" : ""
-                        } disabled:opacity-50`}
-                        style={{
-                          backgroundColor: "var(--foreground)",
-                          color: "var(--background)",
-                        }}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : isGlobal ? (
-            /* Global Mode: View Only */
-            <div className="space-y-4">
-              <p className="text-lg mb-4" style={{ color: "var(--neutral-600)" }}>
-                {globalData
-                  ? `${globalData.completedActions} actions completed today`
-                  : "Anonymous aggregates"}
-              </p>
-            </div>
+                      {/* Choice: minimal interaction (Do it / Not now / Change) */}
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => handleActionLoopChoice("yes")}
+                          disabled={isGenerating || !isActionSmall(currentStep.estimatedTime)}
+                          className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                          style={{
+                            backgroundColor: "var(--foreground)",
+                            color: "var(--background)",
+                          }}
+                        >
+                          Do it
+                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleActionLoopChoice("not_now")}
+                            disabled={isGenerating}
+                            className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                            style={{
+                              backgroundColor: "var(--background)",
+                              border: "2px solid var(--border)",
+                              color: "var(--foreground)",
+                            }}
+                          >
+                            Not now
+                          </button>
+                          <button
+                            onClick={() => handleActionLoopChoice("change")}
+                            disabled={isGenerating}
+                            className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                            style={{
+                              backgroundColor: "var(--background)",
+                              border: "2px solid var(--border)",
+                              color: "var(--foreground)",
+                            }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : null}
+            </>
           ) : (
-            /* Private Mode: Life Loop Engine */
-            /* Hide Action Loop when Nobody prompt or Cards Lifecycle is active */
-            !showPrompt && !activeCard ? (
-            <div className="space-y-6">
-              {/* Nobody message (calm, short) */}
-              {nobodyMessage && (
-                <p className="text-lg sm:text-xl leading-relaxed opacity-70" style={{ color: "var(--foreground)" }}>
-                  {nobodyMessage}
-                </p>
-              )}
-
-              {/* Contextual Card (Card System v0.1) - appears when relevant */}
-              {contextualCard && !currentLifeAction && (
-                <div
-                  className={`p-4 rounded-lg text-left transition-all duration-500 ${
-                    cardHighlight ? "opacity-100" : "opacity-60"
-                  }`}
+            /* EMPTY: No active card + CTA "Find next step" */
+            <>
+              {isDev && <div className="text-xs opacity-20 mb-2">[EMPTY]</div>}
+              <div className="text-center space-y-4">
+                <button
+                  onClick={openPrompt}
+                  disabled={isGenerating}
+                  className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
                   style={{
-                    border: "1px solid var(--border)",
-                    backgroundColor: cardHighlight ? "var(--neutral-50)" : "transparent",
+                    backgroundColor: "var(--foreground)",
+                    color: "var(--background)",
                   }}
                 >
-                  <div className="text-xs mb-1 opacity-50" style={{ color: "var(--neutral-500)" }}>
-                    {contextualCard.type}
-                  </div>
-                  <div className="text-base leading-relaxed" style={{ color: "var(--foreground)" }}>
-                    {contextualCard.content}
-                  </div>
-                </div>
-              )}
-
-              {/* Action Loop v0.1 - ONE suggestion at a time */}
-              {actionLoopPlan && actionLoopState === "prompt" && (() => {
-                const currentStep = getCurrentActionStep(actionLoopPlan);
-                if (!currentStep) return null;
-                
-                return (
-                  <div className="space-y-6">
-                    {/* Prompt: single clear suggestion */}
-                    <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
-                      <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
-                        {currentStep.prompt}
-                      </div>
-                      <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
-                        {currentStep.action}
-                      </div>
-                      {currentStep.estimatedTime && (
-                        <div className="text-xs mt-4 opacity-50" style={{ color: "var(--neutral-500)" }}>
-                          {currentStep.estimatedTime} min
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Choice: minimal interaction (Yes / Not now / Change) */}
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => handleActionLoopChoice("yes")}
-                        disabled={isGenerating || !isActionSmall(currentStep.estimatedTime)}
-                        className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                        style={{
-                          backgroundColor: "var(--foreground)",
-                          color: "var(--background)",
-                        }}
-                      >
-                        Yes
-                      </button>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => handleActionLoopChoice("not_now")}
-                          disabled={isGenerating}
-                          className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                          style={{
-                            backgroundColor: "var(--background)",
-                            border: "2px solid var(--border)",
-                            color: "var(--foreground)",
-                          }}
-                        >
-                          Not now
-                        </button>
-                        <button
-                          onClick={() => handleActionLoopChoice("change")}
-                          disabled={isGenerating}
-                          className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                          style={{
-                            backgroundColor: "var(--background)",
-                            border: "2px solid var(--border)",
-                            color: "var(--foreground)",
-                          }}
-                        >
-                          Change
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Action phase: immediate, simple */}
-              {actionLoopPlan && actionLoopState === "action" && actionInProgress && (() => {
-                const currentStep = getCurrentActionStep(actionLoopPlan);
-                if (!currentStep) return null;
-                
-                return (
-                  <div className="space-y-6">
-                    <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
-                      <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
-                        {currentStep.prompt}
-                      </div>
-                      <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
-                        {currentStep.action}
-                      </div>
-                    </div>
-
-                    {/* Complete button */}
-                    <button
-                      onClick={handleActionComplete}
-                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-                      style={{
-                        backgroundColor: "var(--foreground)",
-                        color: "var(--background)",
-                      }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {/* Closure: confirm completion, then silence */}
-              {actionLoopPlan && actionLoopState === "closure" && (
-                <div className="space-y-4">
-                  <p className="text-lg opacity-60" style={{ color: "var(--foreground)" }}>
-                    ✓
-                  </p>
-                </div>
-              )}
-
-              {/* Legacy LifeAction display (fallback) */}
-              {!actionLoopPlan && currentLifeAction ? (
-                <div className="space-y-6">
-                  <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
-                    <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
-                      {currentLifeAction.title}
-                    </div>
-                    <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
-                      {currentLifeAction.description}
-                    </div>
-                    {currentLifeState && (
-                      <div className="text-xs mt-4 opacity-50" style={{ color: "var(--neutral-500)" }}>
-                        {currentLifeState.focus}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Legacy action buttons */}
-                  <div className="space-y-3">
-                    <button
-                      onClick={handleAccept}
-                      disabled={isGenerating}
-                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                      style={{
-                        backgroundColor: "var(--foreground)",
-                        color: "var(--background)",
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleSkip}
-                        disabled={isGenerating}
-                        className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                        style={{
-                          backgroundColor: "var(--background)",
-                          border: "2px solid var(--border)",
-                          color: "var(--foreground)",
-                        }}
-                      >
-                        Skip
-                      </button>
-                      <button
-                        onClick={handleAskAnother}
-                        disabled={isGenerating}
-                        className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                        style={{
-                          backgroundColor: "var(--background)",
-                          border: "2px solid var(--border)",
-                          color: "var(--foreground)",
-                        }}
-                      >
-                        Another
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : !actionLoopPlan && (
-                /* No action - ask Nobody to generate */
-                <div className="space-y-6">
-                  <button
-                    onClick={handleAskAnother}
-                    disabled={isGenerating}
-                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                    style={{
-                      backgroundColor: "var(--foreground)",
-                      color: "var(--background)",
-                    }}
-                  >
-                    {isGenerating ? "Generating..." : "Find next step"}
-                  </button>
-                </div>
-              )}
-            </div>
-            ) : null
+                  {isGenerating ? "Generating..." : "Find next step"}
+                </button>
+              </div>
+            </>
           )}
         </div>
+
+        {/* Step Engine Flow - Only renders during onboarding */}
+        {showSteps && currentStep && (
+          <div className="relative z-20 w-full max-w-md text-center space-y-8 transition-all duration-500">
+            {isPausing ? (
+              <div className="space-y-4">
+                <p className="text-2xl sm:text-3xl leading-relaxed font-normal opacity-50" style={{ color: "var(--foreground)" }}>
+                  {currentStep.message.split("\n")[0]}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                <div className="space-y-2">
+                  {currentStep.message.split("\n").map((line, idx) => (
+                    <p
+                      key={idx}
+                      className={`${idx === 0 ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl"} leading-relaxed font-normal`}
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      {line}
+                    </p>
+                  ))}
+                </div>
+                <div className="space-y-4">
+                  {currentStep.actions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleStepAction(action.id)}
+                      disabled={isPausing}
+                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 disabled:opacity-50"
+                      style={{
+                        backgroundColor: "var(--foreground)",
+                        color: "var(--background)",
+                      }}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Global Mode - View Only */}
+        {isGlobal && !showSteps && (
+          <div className="relative z-20 w-full max-w-md text-center space-y-4">
+            <p className="text-lg mb-4" style={{ color: "var(--neutral-600)" }}>
+              {globalData
+                ? `${globalData.completedActions} actions completed today`
+                : "Anonymous aggregates"}
+            </p>
+          </div>
         )}
       </div>
 
@@ -1171,10 +1035,10 @@ export default function OneScreen() {
           >
             State
           </button>
-          
+
           {/* "Keep this path" offer (only when eligible) */}
           {showKeepPath && canKeepPath() && (
-            <button
+          <button
               onClick={handleKeepPath}
               className="text-xs px-3 py-1 rounded opacity-60 hover:opacity-100 transition-opacity"
               style={{
@@ -1184,9 +1048,9 @@ export default function OneScreen() {
               }}
             >
               Keep this path
-            </button>
-          )}
-          
+          </button>
+        )}
+
           <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
         </div>
       )}
@@ -1207,19 +1071,19 @@ export default function OneScreen() {
               <h3 className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
                 State
               </h3>
-              <button
+        <button
                 onClick={handleToggleStatePanel}
                 className="text-xs opacity-50 hover:opacity-100 transition-opacity"
                 style={{ color: "var(--foreground)" }}
-              >
+        >
                 Close
-              </button>
-            </div>
+        </button>
+      </div>
             
             {/* Activity summary (neutral, no personal data) */}
             {(() => {
               const summary = getActivitySummary();
-              return (
+    return (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
@@ -1228,7 +1092,7 @@ export default function OneScreen() {
                     <span className="text-sm" style={{ color: "var(--foreground)" }}>
                       {summary.totalActivities}
                     </span>
-                  </div>
+      </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
                       Days active
@@ -1244,8 +1108,8 @@ export default function OneScreen() {
                     <span className="text-sm capitalize" style={{ color: "var(--foreground)" }}>
                       {summary.currentTier}
                     </span>
-                  </div>
-                  
+        </div>
+
                   {/* Path ID eligibility indicator */}
                   {summary.pathEligible && (
                     <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
@@ -1280,11 +1144,11 @@ export default function OneScreen() {
         }))}
         dataSource="useCards()"
       />
-    </div>
+          </div>
   );
 })()}
           </div>
-        </div>
+          </div>
       )}
 
       {/* Debug Panel (dev only) */}
