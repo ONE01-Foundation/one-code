@@ -20,9 +20,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardState, State } from "@/lib/types";
+import { Card, CardState, State, ClosureType } from "@/lib/types";
 
-type AppState = "entry" | "processing" | "action" | "resolved";
+type AppState = "entry" | "processing" | "action" | "closure";
 
 interface DistillationResult {
   intent: string;
@@ -89,6 +89,8 @@ export default function OneScreen() {
   const [distillationResult, setDistillationResult] = useState<DistillationResult | null>(null);
   const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
   const [memoryState, setMemoryState] = useState<State>(loadState());
+  const [closureType, setClosureType] = useState<ClosureType | null>(null);
+  const [closureMessage, setClosureMessage] = useState<string | null>(null);
 
   // Load session and state from localStorage
   useEffect(() => {
@@ -99,6 +101,45 @@ export default function OneScreen() {
     // Load state on mount
     setMemoryState(loadState());
   }, []);
+
+  // Closure: DONE
+  const applyDoneClosure = () => {
+    const newState: State = {
+      openThread: null,
+      lastSuggestedAction: null,
+      pendingQuestion: null,
+      updatedAt: new Date().toISOString(),
+    };
+    saveState(newState);
+    setMemoryState(newState);
+    setClosureType("DONE");
+    setClosureMessage("Action completed.");
+  };
+
+  // Closure: PAUSED
+  const applyPausedClosure = () => {
+    const newState = { ...memoryState };
+    newState.pendingQuestion = null;
+    // Keep lastSuggestedAction (don't clear it)
+    saveState(newState);
+    setMemoryState(newState);
+    setClosureType("PAUSED");
+    setClosureMessage("Action paused.");
+  };
+
+  // Closure: REDIRECTED
+  const applyRedirectedClosure = (newThread: string) => {
+    const newState: State = {
+      openThread: newThread,
+      lastSuggestedAction: null,
+      pendingQuestion: null,
+      updatedAt: new Date().toISOString(),
+    };
+    saveState(newState);
+    setMemoryState(newState);
+    setClosureType("REDIRECTED");
+    setClosureMessage("Topic changed.");
+  };
 
   // Handle option selection
   const handleOptionSelect = async (optionLabel: string) => {
@@ -165,12 +206,26 @@ export default function OneScreen() {
         return;
       }
 
+      // Check for REDIRECTED closure before updating state
+      const hadOpenThread = newState.openThread !== null;
+      let shouldShowRedirected = false;
+
       // If desire/request, set openThread (unless switching topic)
       if (result.isDesireOrRequest && !isSwitchingTopic) {
+        // Check if thread changed
+        if (hadOpenThread && newState.openThread !== result.intent) {
+          shouldShowRedirected = true;
+        }
         newState.openThread = result.intent;
       } else if (isSwitchingTopic) {
-        // Topic changed, clear openThread
-        newState.openThread = null;
+        // Topic changed
+        if (result.isDesireOrRequest && hadOpenThread) {
+          // New topic with desire/request - REDIRECTED
+          shouldShowRedirected = true;
+          newState.openThread = result.intent;
+        } else {
+          newState.openThread = null;
+        }
       }
 
       // Clear lastSuggestedAction (user responded)
@@ -197,7 +252,20 @@ export default function OneScreen() {
 
       setCurrentCard(card);
       setDistillationResult(result);
-      setState("action");
+      
+      // If REDIRECTED closure should be shown, display it briefly before action
+      if (shouldShowRedirected) {
+        setClosureType("REDIRECTED");
+        setClosureMessage("Topic changed.");
+        setState("closure");
+        setTimeout(() => {
+          setClosureType(null);
+          setClosureMessage(null);
+          setState("action");
+        }, 1500);
+      } else {
+        setState("action");
+      }
     } catch (error) {
       console.error("Error processing input:", error);
       // Fallback: create simple card
@@ -228,16 +296,20 @@ export default function OneScreen() {
     );
     localStorage.setItem("one_cards", JSON.stringify(updated));
 
-    // Update state: clear lastSuggestedAction (user responded)
-    const newState = { ...memoryState };
-    newState.lastSuggestedAction = null;
-    saveState(newState);
-    setMemoryState(newState);
+    // Apply DONE closure
+    applyDoneClosure();
 
-    // Return to entry
+    // Show closure, then return to entry
     setCurrentCard(null);
     setDistillationResult(null);
-    setState("entry");
+    setState("closure");
+    
+    // Auto-return to entry after showing closure
+    setTimeout(() => {
+      setClosureType(null);
+      setClosureMessage(null);
+      setState("entry");
+    }, 1500);
   };
 
   const handleNotNow = () => {
@@ -250,16 +322,20 @@ export default function OneScreen() {
     );
     localStorage.setItem("one_cards", JSON.stringify(updated));
 
-    // Update state: clear lastSuggestedAction (user ignored)
-    const newState = { ...memoryState };
-    newState.lastSuggestedAction = null;
-    saveState(newState);
-    setMemoryState(newState);
+    // Apply PAUSED closure
+    applyPausedClosure();
 
-    // Return to entry
+    // Show closure, then return to entry
     setCurrentCard(null);
     setDistillationResult(null);
-    setState("entry");
+    setState("closure");
+    
+    // Auto-return to entry after showing closure
+    setTimeout(() => {
+      setClosureType(null);
+      setClosureMessage(null);
+      setState("entry");
+    }, 1500);
   };
 
   // Handle clearing pending question (user ignores it)
@@ -284,6 +360,8 @@ export default function OneScreen() {
             ? "Processing..."
             : state === "action"
             ? "Do you want to do this now?"
+            : state === "closure"
+            ? ""
             : "Next step available."}
         </h1>
       </div>
@@ -421,17 +499,11 @@ export default function OneScreen() {
             </div>
           )}
 
-          {state === "resolved" && (
+          {state === "closure" && closureMessage && (
             <div className="space-y-4">
               <p className="text-lg text-neutral-700 leading-relaxed">
-                Next step available.
+                {closureMessage}
               </p>
-              <button
-                onClick={() => setState("entry")}
-                className="px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90"
-              >
-                Continue
-              </button>
             </div>
           )}
         </div>

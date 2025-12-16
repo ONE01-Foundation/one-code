@@ -27,6 +27,9 @@ export interface Card {
   createdAt: string;
 }
 
+// Closure Types - Every interaction must end in ONE of these
+export type ClosureType = "DONE" | "PAUSED" | "REDIRECTED";
+
 // State Memory - Minimal session-based state
 export interface State {
   openThread: string | null; // Set when DESIRE/REQUEST intent appears
