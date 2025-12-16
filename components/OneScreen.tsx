@@ -963,6 +963,11 @@ export default function OneScreen() {
 
   const globalData = isGlobal ? getGlobalData() : null;
 
+  // Compute state panel data before return (no IIFE in JSX)
+  const summary = getActivitySummary();
+  const canShowPath = summary.pathEligible && canKeepPath();
+  const showDebug = process.env.NODE_ENV === "development";
+
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
       {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps, OWO, and action loop */}
@@ -1221,99 +1226,82 @@ export default function OneScreen() {
               <h3 className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
                 State
               </h3>
-        <button
+              <button
                 onClick={handleToggleStatePanel}
                 className="text-xs opacity-50 hover:opacity-100 transition-opacity"
                 style={{ color: "var(--foreground)" }}
-        >
+              >
                 Close
-        </button>
+              </button>
       </div>
             
             {/* Activity summary (neutral, no personal data) */}
-            {(() => {
-              const summary = getActivitySummary();
-    return (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
-                      Activities
-                    </span>
-                    <span className="text-sm" style={{ color: "var(--foreground)" }}>
-                      {summary.totalActivities}
-                    </span>
-      </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
-                      Days active
-                    </span>
-                    <span className="text-sm" style={{ color: "var(--foreground)" }}>
-                      {summary.daysActive}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
-                      Tier
-                    </span>
-                    <span className="text-sm capitalize" style={{ color: "var(--foreground)" }}>
-                      {summary.currentTier}
-                    </span>
-        </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
+                  Activities
+                </span>
+                <span className="text-sm" style={{ color: "var(--foreground)" }}>
+                  {summary.totalActivities}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
+                  Days active
+                </span>
+                <span className="text-sm" style={{ color: "var(--foreground)" }}>
+                  {summary.daysActive}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
+                  Tier
+                </span>
+                <span className="text-sm capitalize" style={{ color: "var(--foreground)" }}>
+                  {summary.currentTier}
+                </span>
+              </div>
 
-                  {/* Path ID eligibility indicator */}
-                  {summary.pathEligible && (
-                    <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-                      <p className="text-xs opacity-60 mb-2" style={{ color: "var(--foreground)" }}>
-                        Path available
-                      </p>
-                      {canKeepPath() && (
-                        <button
-                          onClick={handleKeepPath}
-                          className="w-full px-4 py-2 rounded text-sm transition-opacity hover:opacity-90"
-                          style={{
-                            backgroundColor: "var(--foreground)",
-                            color: "var(--background)",
-                          }}
-                        >
-                          Keep this path
-                        </button>
-          )}
+              {/* Path ID eligibility indicator */}
+              {summary.pathEligible && (
+                <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                  <p className="text-xs opacity-60 mb-2" style={{ color: "var(--foreground)" }}>
+                    Path available
+                  </p>
+                  {canShowPath && (
+                    <button
+                      onClick={handleKeepPath}
+                      className="w-full px-4 py-2 rounded text-sm transition-opacity hover:opacity-90"
+                      style={{
+                        backgroundColor: "var(--foreground)",
+                        color: "var(--background)",
+                      }}
+                    >
+                      Keep this path
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Debug Panel (dev only) */}
-      <DebugPanel
-        scope={scope}
-        cards={visibleCards.map((c) => ({
-          id: c.id,
-          title: c.title,
-          subtitle: c.intent || "",
-          status: c.state === "done" ? "completed" : "active",
-          createdAt: c.createdAt,
-          scope: c.scope as Scope,
-        }))}
-        dataSource="useCards()"
-      />
-          </div>
-  );
-})()}
-          </div>
-          </div>
+      {/* Debug Panel (dev only) - Single instance */}
+      {showDebug && (
+        <DebugPanel
+          scope={scope}
+          cards={visibleCards.map((c) => ({
+            id: c.id,
+            title: c.title,
+            subtitle: c.intent || "",
+            status: c.state === "done" ? "completed" : "active",
+            createdAt: c.createdAt,
+            scope: c.scope as Scope,
+          }))}
+          dataSource="useCards()"
+        />
       )}
-
-      {/* Debug Panel (dev only) */}
-      <DebugPanel
-        scope={scope}
-        cards={visibleCards.map((c) => ({
-          id: c.id,
-          title: c.title,
-          subtitle: c.intent || "",
-          status: c.state === "done" ? "completed" : "active",
-          createdAt: c.createdAt,
-          scope: c.scope as Scope,
-        }))}
-        dataSource="useCards()"
-      />
     </div>
   );
 }
