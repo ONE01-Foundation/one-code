@@ -1,17 +1,18 @@
 /**
- * Side Bubbles Component - Recent StepCards
+ * Side Bubbles Component - One Bubble System v0.1
  * 
- * Renders up to 3 recent StepCards with status dots
+ * Renders 3 bubbles: NEXT, LATER, DONE
+ * Navigation/preview only, not a state source
  */
 
-import { StepCard } from "@/lib/step-card";
+import { Bubble } from "@/lib/bubbles";
 
 interface SideBubblesProps {
-  cards: StepCard[];
-  onCardClick?: (card: StepCard) => void;
+  bubbles: Bubble[];
+  onBubbleClick?: (bubble: Bubble) => void;
 }
 
-export function SideBubbles({ cards, onCardClick }: SideBubblesProps) {
+export function SideBubbles({ bubbles, onBubbleClick }: SideBubblesProps) {
   // Position 3 bubbles around the center
   const positions = [
     { top: "20%", left: "10%", transform: "translate(-50%, -50%)" },
@@ -19,13 +20,13 @@ export function SideBubbles({ cards, onCardClick }: SideBubblesProps) {
     { bottom: "20%", left: "50%", transform: "translate(-50%, 50%)" },
   ];
   
-  const getStatusDotColor = (status: StepCard["status"]) => {
-    switch (status) {
+  const getKindDotColor = (kind: Bubble["kind"]) => {
+    switch (kind) {
       case "done":
         return "var(--neutral-400)"; // Subtle gray
-      case "skipped":
+      case "later":
         return "var(--neutral-300)"; // Lighter gray
-      case "active":
+      case "next":
         return "var(--foreground)"; // Foreground color
       default:
         return "var(--neutral-200)";
@@ -34,14 +35,14 @@ export function SideBubbles({ cards, onCardClick }: SideBubblesProps) {
   
   return (
     <>
-      {cards.slice(0, 3).map((card, index) => {
+      {bubbles.slice(0, 3).map((bubble, index) => {
         const position = positions[index];
         if (!position) return null;
         
         return (
           <div
-            key={card.id}
-            onClick={() => onCardClick?.(card)}
+            key={bubble.id}
+            onClick={() => onBubbleClick?.(bubble)}
             className="absolute w-20 h-20 rounded-full flex flex-col items-center justify-center transition-all duration-300 opacity-30 hover:opacity-70 cursor-pointer"
             style={{
               ...position,
@@ -49,17 +50,23 @@ export function SideBubbles({ cards, onCardClick }: SideBubblesProps) {
               border: "1px solid var(--border)",
               color: "var(--foreground)",
             }}
-            title={`${card.title} (${card.status})`}
+            title={`${bubble.title} (${bubble.kind})`}
           >
-            {/* Status dot */}
+            {/* Kind dot */}
             <div
               className="w-2 h-2 rounded-full mb-1"
-              style={{ backgroundColor: getStatusDotColor(card.status) }}
+              style={{ backgroundColor: getKindDotColor(bubble.kind) }}
             />
             {/* Title */}
             <div className="text-xs text-center px-2 truncate w-full">
-              {card.title}
+              {bubble.title}
             </div>
+            {/* Meta (optional) */}
+            {bubble.meta && (
+              <div className="text-[10px] opacity-60 mt-0.5">
+                {bubble.meta}
+              </div>
+            )}
           </div>
         );
       })}

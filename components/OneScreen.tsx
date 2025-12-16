@@ -100,6 +100,7 @@ import {
   getActiveCardId,
   createStepCardFromSuggestion,
 } from "@/lib/step-card";
+import { buildBubbles, Bubble } from "@/lib/bubbles";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
@@ -213,8 +214,8 @@ export default function OneScreen() {
   // Scope layer (Global ↔ Private Mirror)
   const { scope, toggleScope, mounted: scopeMounted } = useScope();
   
-  // Recent StepCards for SideBubbles (continuity layer)
-  const [recentStepCards, setRecentStepCards] = useState<StepCard[]>([]);
+  // Bubbles for SideBubbles (ONE source of truth)
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
   
   // Nobody Interaction v0.1
   const { showPrompt, promptData, promptState, handleChoice, openPrompt, retryPrompt, useLastPrompt } = useNobody();
@@ -249,14 +250,24 @@ export default function OneScreen() {
         setActiveCardId(null);
       }
     }
-    // Load recent cards for SideBubbles
-    setRecentStepCards(getRecentStepCards(3));
+    // Build bubbles on mount
+    updateBubbles();
   }, []);
   
-  // Update recent cards when activeStepCard changes
+  // Update bubbles when activeStepCard, stepSuggestion, or stepCards change
+  const updateBubbles = () => {
+    const allStepCards = loadStepCards();
+    const newBubbles = buildBubbles({
+      activeStepCard,
+      stepSuggestion,
+      stepCards: allStepCards,
+    });
+    setBubbles(newBubbles);
+  };
+  
   useEffect(() => {
-    setRecentStepCards(getRecentStepCards(3));
-  }, [activeStepCard]);
+    updateBubbles();
+  }, [activeStepCard, stepSuggestion]);
   
   // Handle reset param on mount
   useEffect(() => {
@@ -284,7 +295,7 @@ export default function OneScreen() {
         setActionLoopPlan(null);
         setActionLoopState("prompt");
         setActionInProgress(false);
-        setRecentStepCards(getRecentStepCards(3));
+        updateBubbles();
       }, 2000); // 2 second confirmation
       return () => clearTimeout(timer);
     }
@@ -867,8 +878,8 @@ export default function OneScreen() {
     setActiveCardId(card.id);
     setActiveStepCard(card);
     setStepSuggestion(null);
-    // Refresh recent cards
-    setRecentStepCards(getRecentStepCards(3));
+    // Refresh bubbles
+    updateBubbles();
   };
 
   const handleStepNotNow = () => {
@@ -876,8 +887,8 @@ export default function OneScreen() {
     const card = createStepCardFromSuggestion(stepSuggestion, "skipped");
     saveStepCard(card);
     setStepSuggestion(null);
-    // Refresh recent cards
-    setRecentStepCards(getRecentStepCards(3));
+    // Refresh bubbles
+    updateBubbles();
   };
 
   const handleStepChange = async () => {
@@ -927,12 +938,42 @@ export default function OneScreen() {
     setActiveCardId(null);
     setActiveStepCard(null);
     setShowCompletedMessage(true);
-    // Refresh recent cards
-    setRecentStepCards(getRecentStepCards(3));
+    // Refresh bubbles
+    updateBubbles();
     // Auto-return to empty after 1500ms (between 1200-2000ms)
     setTimeout(() => {
       setShowCompletedMessage(false);
     }, 1500);
+  };
+  
+  // Handle bubble click
+  const handleBubbleClick = (bubble: Bubble) => {
+    if (bubble.kind === "next") {
+      // NEXT bubble clicked
+      if (bubble.id === "next_suggestion" && stepSuggestion) {
+        // stepSuggestion exists -> show it in center (HomeContent will handle)
+        // No action needed, stepSuggestion is already set
+      } else {
+        // NEXT is a suggested card -> promote to active
+        const cardId = bubble.id.replace("next_", "");
+        const allCards = loadStepCards();
+        const card = allCards.find((c) => c.id === cardId);
+        if (card && card.status === "suggested") {
+          updateStepCardStatus(cardId, "active");
+          setActiveCardId(cardId);
+          setActiveStepCard(card);
+          updateBubbles();
+        }
+      }
+    } else if (bubble.kind === "done" || bubble.kind === "later") {
+      // DONE or LATER -> open CardDetailView (read-only)
+      const cardId = bubble.id.replace(`${bubble.kind}_`, "");
+      const allCards = loadStepCards();
+      const card = allCards.find((c) => c.id === cardId);
+      if (card) {
+        setSelectedCard(card);
+      }
+    }
   };
 
   // Step Engine handlers
@@ -1073,11 +1114,11 @@ export default function OneScreen() {
 
       {/* Center: Focus Zone - Strict State Machine (ONE state only) */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-        {/* Side Bubbles (recent StepCards - max 3) - Only show in active state */}
+        {/* Side Bubbles (NEXT, LATER, DONE - max 3) - Only show in active state */}
         {homeState === "active" && (
           <SideBubbles
-            cards={recentStepCards}
-            onCardClick={(card) => setSelectedCard(card)}
+            bubbles={bubbles}
+            onBubbleClick={handleBubbleClick}
           />
         )}
         
@@ -1305,15 +1346,15 @@ export default function OneScreen() {
       {showDebug && (
         <DebugPanel
           scope={scope}
-          cards={recentStepCards.map((c) => ({
-            id: c.id,
-            title: c.title,
-            subtitle: c.why || "",
-            status: c.status === "done" ? "completed" : "active",
-            createdAt: c.createdAt,
+          cards={bubbles.map((b) => ({
+            id: b.id,
+            title: b.title,
+            subtitle: b.meta || "",
+            status: b.kind === "done" ? "completed" : "active",
+            createdAt: new Date().toISOString(),
             scope: scope,
           }))}
-          dataSource="getRecentStepCards()"
+          dataSource="buildBubbles()"
         />
       )}
 
