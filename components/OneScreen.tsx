@@ -192,7 +192,7 @@ export default function OneScreen() {
   const { activeCard, visibleCards, completeCard, deferCard, refresh: refreshCards } = useCards(scope);
   
   // Nobody Interaction v0.1
-  const { showPrompt, promptData, isLoading: nobodyLoading, handleChoice, openPrompt, refreshPrompt } = useNobody();
+  const { showPrompt, promptData, promptState, handleChoice, openPrompt, retryPrompt, useLastPrompt } = useNobody();
 
   // Initialize OWO and Step Engine on mount
   useEffect(() => {
@@ -797,17 +797,17 @@ export default function OneScreen() {
         
         {/* Nobody Prompt / Cards Lifecycle - Primary UI (z-20 to be above old UI) */}
         <div className="relative z-20 w-full max-w-md text-center">
-          {showPrompt && promptData ? (
+          {showPrompt ? (
             <NobodyPrompt
-              say={promptData.say}
-              choices={promptData.choices}
+              response={promptData}
+              state={promptState}
               onChoice={(choiceId) => {
                 handleChoice(choiceId);
                 // Refresh cards to show newly created card
                 setTimeout(() => refreshCards(), 100);
               }}
-              onRefresh={refreshPrompt}
-              isLoading={nobodyLoading}
+              onRetry={retryPrompt}
+              onUseLast={useLastPrompt}
             />
           ) : activeCard ? (
             /* Center Card (active card) */
