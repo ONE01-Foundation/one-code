@@ -116,6 +116,11 @@ export type OWOChoice = "my_life" | "the_world";
 export type IdentityTier = "presence" | "path" | "anchor";
 export type IdentityStatus = "active" | "pending" | "available";
 
+// Action Loop v0.1
+export type ActionLoopState = "prompt" | "choice" | "action" | "closure";
+export type ActionChoice = "yes" | "not_now" | "change";
+export type ActionClosure = "completed" | "skipped" | "changed";
+
 export interface Identity {
   presenceId: string; // Auto-generated anonymous session ID (always exists)
   pathId?: string; // Created when user shows consistent activity

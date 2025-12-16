@@ -12,7 +12,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card, Signal } from "@/lib/types";
+import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card, Signal, ActionLoopState, ActionChoice, ActionClosure } from "@/lib/types";
 import {
   getOrCreateOneID,
   getActiveLifeState,
@@ -64,6 +64,17 @@ import {
   shouldOfferIdentity,
   getCurrentTier,
 } from "@/lib/iwe-engine";
+import {
+  ActionLoopPlan,
+  createActionLoopPlan,
+  getCurrentActionStep,
+  handleActionChoice,
+  completeAction,
+  moveToNextStep,
+  isActionSmall,
+  saveActionLoopPlan,
+  loadActionLoopPlan,
+} from "@/lib/action-loop-engine";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -157,6 +168,11 @@ export default function OneScreen() {
   // Identity Without Exposure (IWE) state
   const [showStatePanel, setShowStatePanel] = useState(false);
   const [showKeepPath, setShowKeepPath] = useState(false);
+  
+  // Action Loop v0.1 state
+  const [actionLoopPlan, setActionLoopPlan] = useState<ActionLoopPlan | null>(null);
+  const [actionLoopState, setActionLoopState] = useState<ActionLoopState>("prompt");
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
@@ -481,9 +497,42 @@ export default function OneScreen() {
     saveMode(newMode);
   };
 
-  // Handle Accept action
-  const handleAccept = () => {
-    if (!currentLifeAction || !currentLifeState) return;
+  // Action Loop v0.1 handlers
+  const handleActionLoopChoice = async (choice: ActionChoice) => {
+    if (!actionLoopPlan || !currentLifeState) return;
+    
+    // Track activity (IWE)
+    trackActivity();
+    
+    const { plan, closure } = handleActionChoice(actionLoopPlan, choice);
+    setActionLoopPlan(plan);
+    saveActionLoopPlan(plan);
+    
+    if (closure === "skipped") {
+      // User skipped - close loop with silence
+      setActionLoopState("prompt");
+      setActionLoopPlan(null);
+      setCurrentLifeAction(null);
+      setNobodyMessage(NOBODY_MESSAGES.noAction);
+      return;
+    }
+    
+    if (closure === "changed") {
+      // User wants different action - regenerate
+      const newPlan = await createActionLoopPlan(currentLifeState, contextualCard || undefined);
+      setActionLoopPlan(newPlan);
+      saveActionLoopPlan(newPlan);
+      setActionLoopState("prompt");
+      return;
+    }
+    
+    // User accepted - move to action phase
+    setActionLoopState("action");
+    setActionInProgress(true);
+  };
+
+  const handleActionComplete = async () => {
+    if (!actionLoopPlan || !currentLifeState) return;
     
     // Track activity (IWE)
     trackActivity();
@@ -493,19 +542,67 @@ export default function OneScreen() {
       setShowKeepPath(true);
     }
     
-    // Mark action as done
+    // Complete action and close loop
+    const { plan, closure } = completeAction(actionLoopPlan);
+    const { plan: updatedPlan, hasMore } = await moveToNextStep(plan, closure);
+    
+    setActionLoopPlan(updatedPlan);
+    saveActionLoopPlan(updatedPlan);
+    setActionInProgress(false);
+    
+    if (hasMore) {
+      // Move to closure, then next prompt
+      setActionLoopState("closure");
+      setTimeout(() => {
+        setActionLoopState("prompt");
+      }, 1000); // Brief closure, then silence
+    } else {
+      // No more steps - close loop with silence
+      setActionLoopState("prompt");
+      setActionLoopPlan(null);
+      setCurrentLifeAction(null);
+      setNobodyMessage(NOBODY_MESSAGES.noAction);
+    }
+  };
+
+  // Initialize Action Loop when LifeAction is available
+  useEffect(() => {
+    if (!currentLifeAction || !currentLifeState || actionLoopPlan) return;
+    
+    // Create action loop plan
+    createActionLoopPlan(currentLifeState, contextualCard || undefined).then((plan) => {
+      setActionLoopPlan(plan);
+      saveActionLoopPlan(plan);
+      setActionLoopState("prompt");
+    });
+  }, [currentLifeAction, currentLifeState, contextualCard]);
+
+  // Legacy Accept handler (for backward compatibility)
+  const handleAccept = async () => {
+    if (!currentLifeAction || !currentLifeState) return;
+    
+    // Use Action Loop if available
+    if (actionLoopPlan) {
+      await handleActionLoopChoice("yes");
+      return;
+    }
+    
+    // Fallback to legacy behavior
+    trackActivity();
+    
+    if (shouldOfferIdentity() && canKeepPath()) {
+      setShowKeepPath(true);
+    }
+    
     updateLifeActionStatus(currentLifeAction.id, currentLifeState.id, "done");
     
-    // Update state to active if it was suggested
     if (currentLifeState.status === "suggested") {
       updateLifeStateStatus(currentLifeState.id, context, "active");
       setCurrentLifeState({ ...currentLifeState, status: "active" });
     }
     
-    // Clear current action and find next
     setCurrentLifeAction(null);
     
-    // Find next pending action or generate new one
     const allActions = loadLifeActions(currentLifeState.id);
     const nextPending = allActions.find((a) => a.status === "pending");
     
@@ -513,25 +610,26 @@ export default function OneScreen() {
       setCurrentLifeAction(nextPending);
       setNobodyMessage(NOBODY_MESSAGES.actionReady);
     } else {
-      // Generate new action
       generateActionForState(currentLifeState);
     }
   };
 
-  // Handle Skip action
-  const handleSkip = () => {
+  // Legacy Skip handler (for backward compatibility)
+  const handleSkip = async () => {
     if (!currentLifeAction || !currentLifeState) return;
     
-    // Track activity (IWE)
+    // Use Action Loop if available
+    if (actionLoopPlan) {
+      await handleActionLoopChoice("not_now");
+      return;
+    }
+    
+    // Fallback to legacy behavior
     trackActivity();
     
-    // Mark action as skipped
     updateLifeActionStatus(currentLifeAction.id, currentLifeState.id, "skipped");
-    
-    // Clear current action and find next
     setCurrentLifeAction(null);
     
-    // Find next pending action or generate new one
     const allActions = loadLifeActions(currentLifeState.id);
     const nextPending = allActions.find((a) => a.status === "pending");
     
@@ -539,7 +637,6 @@ export default function OneScreen() {
       setCurrentLifeAction(nextPending);
       setNobodyMessage(NOBODY_MESSAGES.actionReady);
     } else {
-      // Generate new action
       generateActionForState(currentLifeState);
     }
   };
@@ -646,8 +743,8 @@ export default function OneScreen() {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
-      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps and OWO */}
-      {!showSteps && !showOwo && (
+      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps, OWO, and action loop */}
+      {!showSteps && !showOwo && actionLoopState !== "action" && (
         <div className="flex items-center justify-between pt-4 pb-2 px-4">
           {/* Theme Toggle (minimal, top-left) */}
           <button
@@ -832,8 +929,114 @@ export default function OneScreen() {
                 </div>
               )}
 
-              {/* ONE active LifeAction in center */}
-              {currentLifeAction ? (
+              {/* Action Loop v0.1 - ONE suggestion at a time */}
+              {actionLoopPlan && actionLoopState === "prompt" && (() => {
+                const currentStep = getCurrentActionStep(actionLoopPlan);
+                if (!currentStep) return null;
+                
+                return (
+                  <div className="space-y-6">
+                    {/* Prompt: single clear suggestion */}
+                    <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
+                      <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
+                        {currentStep.prompt}
+                      </div>
+                      <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
+                        {currentStep.action}
+                      </div>
+                      {currentStep.estimatedTime && (
+                        <div className="text-xs mt-4 opacity-50" style={{ color: "var(--neutral-500)" }}>
+                          {currentStep.estimatedTime} min
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Choice: minimal interaction (Yes / Not now / Change) */}
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => handleActionLoopChoice("yes")}
+                        disabled={isGenerating || !isActionSmall(currentStep.estimatedTime)}
+                        className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                        style={{
+                          backgroundColor: "var(--foreground)",
+                          color: "var(--background)",
+                        }}
+                      >
+                        Yes
+                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleActionLoopChoice("not_now")}
+                          disabled={isGenerating}
+                          className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                          style={{
+                            backgroundColor: "var(--background)",
+                            border: "2px solid var(--border)",
+                            color: "var(--foreground)",
+                          }}
+                        >
+                          Not now
+                        </button>
+                        <button
+                          onClick={() => handleActionLoopChoice("change")}
+                          disabled={isGenerating}
+                          className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                          style={{
+                            backgroundColor: "var(--background)",
+                            border: "2px solid var(--border)",
+                            color: "var(--foreground)",
+                          }}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Action phase: immediate, simple */}
+              {actionLoopPlan && actionLoopState === "action" && actionInProgress && (() => {
+                const currentStep = getCurrentActionStep(actionLoopPlan);
+                if (!currentStep) return null;
+                
+                return (
+                  <div className="space-y-6">
+                    <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
+                      <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
+                        {currentStep.prompt}
+                      </div>
+                      <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
+                        {currentStep.action}
+                      </div>
+                    </div>
+
+                    {/* Complete button */}
+                    <button
+                      onClick={handleActionComplete}
+                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                      style={{
+                        backgroundColor: "var(--foreground)",
+                        color: "var(--background)",
+                      }}
+                    >
+                      Done
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* Closure: confirm completion, then silence */}
+              {actionLoopPlan && actionLoopState === "closure" && (
+                <div className="space-y-4">
+                  <p className="text-lg opacity-60" style={{ color: "var(--foreground)" }}>
+                    ✓
+                  </p>
+                </div>
+              )}
+
+              {/* Legacy LifeAction display (fallback) */}
+              {!actionLoopPlan && currentLifeAction ? (
                 <div className="space-y-6">
                   <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
                     <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
@@ -849,7 +1052,7 @@ export default function OneScreen() {
                     )}
                   </div>
 
-                  {/* Action buttons: Accept, Skip, Ask for another */}
+                  {/* Legacy action buttons */}
                   <div className="space-y-3">
                     <button
                       onClick={handleAccept}
@@ -890,7 +1093,7 @@ export default function OneScreen() {
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : !actionLoopPlan && (
                 /* No action - ask Nobody to generate */
                 <div className="space-y-6">
                   <button
@@ -911,8 +1114,8 @@ export default function OneScreen() {
         </div>
       </div>
 
-      {/* Bottom: State Panel toggle and "Keep this path" - Hidden during steps and OWO */}
-      {!showSteps && !showOwo && (
+      {/* Bottom: State Panel toggle and "Keep this path" - Hidden during steps, OWO, and action loop */}
+      {!showSteps && !showOwo && actionLoopState !== "action" && (
         <div className="flex items-center justify-center pb-6 pt-4 gap-4">
           {/* State Panel toggle */}
           <button
@@ -942,8 +1145,8 @@ export default function OneScreen() {
         </div>
       )}
 
-      {/* State Panel (neutral progress indicators) */}
-      {showStatePanel && !showSteps && !showOwo && (
+      {/* State Panel (neutral progress indicators) - Hidden during action loop */}
+      {showStatePanel && !showSteps && !showOwo && actionLoopState !== "action" && (
         <div
           className="fixed inset-x-0 bottom-0 p-6 rounded-t-lg transition-all duration-300"
           style={{
