@@ -1236,7 +1236,20 @@ export default function OneScreen() {
 
       {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps, OWO, and action loop */}
       {!hideTopBar && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-auto flex items-center justify-between pt-4 pb-2 px-4" style={{ backgroundColor: "var(--background)" }}>
+        <div 
+          className="fixed top-0 left-0 right-0 z-[9999] pointer-events-auto flex items-center justify-between pt-4 pb-2 px-4" 
+          style={{ 
+            backgroundColor: "var(--background)",
+            border: showDebug ? "2px solid green" : "none", // Dev-only outline to verify positioning
+          }}
+        >
+          {/* Dev-only debug text (top bar conditions) */}
+          {showDebug && (
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 text-[8px] opacity-50 font-mono whitespace-nowrap" style={{ color: "var(--foreground)" }}>
+              showSteps={showSteps ? "true" : "false"}, showOwo={showOwo ? "true" : "false"}, actionLoopState={actionLoopState}
+            </div>
+          )}
+
           {/* Theme Toggle (minimal, top-left) */}
           <button
             onClick={handleThemeToggle}
@@ -1311,7 +1324,7 @@ export default function OneScreen() {
         )}
         
         {/* Nobody Presence - Subtle Light Movement */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl"
             style={{
