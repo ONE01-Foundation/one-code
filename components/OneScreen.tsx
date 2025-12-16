@@ -104,6 +104,10 @@ import { buildBubbles, BubbleSlots, BubbleSlot, BubbleItem } from "@/lib/bubbles
 import { getNextIntent, NextIntent } from "@/lib/flow-lock";
 import { Deck, loadDecks, saveDeck, updateDeck, setActiveDeckId, getActiveDeck, createDeckFromSuggestion } from "@/lib/deck";
 import { DoingStep } from "@/components/ui/DoingStep";
+import { getGlobalSnapshot, GlobalSnapshot } from "@/lib/global-engine";
+import { GlobalView } from "@/components/ui/GlobalView";
+import { GlobalNeedBucket, GlobalOfferBucket, GlobalMission } from "@/lib/global-types";
+import { createStepCardFromSuggestion } from "@/lib/step-card";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
@@ -283,6 +287,9 @@ export default function OneScreen() {
   // Deck state
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null);
   const [isDoing, setIsDoing] = useState(false);
+
+  // Global state
+  const [globalSnapshot, setGlobalSnapshot] = useState<GlobalSnapshot | null>(null);
   
   // Hydrate cards and deck on mount
   useEffect(() => {
@@ -307,6 +314,16 @@ export default function OneScreen() {
     // Build bubbles on mount
     updateBubbles();
   }, []);
+
+  // Load global snapshot when scope changes to global
+  useEffect(() => {
+    if (scope === "global") {
+      const snapshot = getGlobalSnapshot();
+      setGlobalSnapshot(snapshot);
+    } else {
+      setGlobalSnapshot(null);
+    }
+  }, [scope]);
   
   // Update bubbles when activeStepCard, stepSuggestion, or stepCards change
   const updateBubbles = useCallback(() => {
