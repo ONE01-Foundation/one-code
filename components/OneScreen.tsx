@@ -1212,6 +1212,7 @@ export default function OneScreen() {
             isGenerating={isGeneratingStep}
             scope={scope}
             nextIntent={nextIntent}
+            uiLang={uiLang}
             stepSuggestion={stepSuggestion}
             onStepDo={handleStepDo}
             onStepNotNow={handleStepNotNow}
