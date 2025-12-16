@@ -22,12 +22,30 @@ export function loadCards(scope?: CardScope): Card[] {
   try {
     const cards: Card[] = JSON.parse(stored);
     
+    // Migrate legacy cards to new format
+    const migrated = cards.map((c) => {
+      // If card has old format, migrate it
+      if (!c.title) {
+        return {
+          ...c,
+          title: c.content || "Untitled",
+          intent: c.type || c.category || c.intent || "other",
+        };
+      }
+      // Ensure required fields exist
+      return {
+        ...c,
+        title: c.title || "Untitled",
+        intent: c.intent || c.type || c.category || "other",
+      };
+    });
+    
     // Filter by scope if provided
     if (scope) {
-      return cards.filter((c) => c.scope === scope);
+      return migrated.filter((c) => c.scope === scope);
     }
     
-    return cards;
+    return migrated;
   } catch {
     return [];
   }

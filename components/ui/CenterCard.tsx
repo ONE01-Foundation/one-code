@@ -26,7 +26,7 @@ export function CenterCard({ card, onComplete, onDefer }: CenterCardProps) {
         }}
         onClick={onComplete}
       >
-        <div className="text-2xl font-bold text-center mb-2">{card.title}</div>
+        <div className="text-2xl font-bold text-center mb-2">{card.title || "Untitled"}</div>
         {card.intent && (
           <div className="text-sm opacity-60 text-center">{card.intent}</div>
         )}

@@ -36,10 +36,10 @@ export function SideBubbles({ cards }: SideBubblesProps) {
               border: "1px solid var(--border)",
               color: "var(--foreground)",
             }}
-            title={`${card.title} (${card.state})`}
+            title={`${card.title || "Untitled"} (${card.state})`}
           >
             <div className="text-xs text-center px-2 truncate w-full">
-              {card.title}
+              {card.title || "Untitled"}
             </div>
           </div>
         );

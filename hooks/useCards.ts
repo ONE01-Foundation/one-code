@@ -100,16 +100,23 @@ export function useCards(scope: Scope): UseCardsResult {
   
   // Load cards and enforce single active rule
   const refresh = useCallback(() => {
-    const loaded = loadCards();
-    const enforced = enforceSingleActive(loaded, scope);
-    if (JSON.stringify(enforced) !== JSON.stringify(loaded)) {
-      saveCards(enforced);
+    try {
+      const loaded = loadCards();
+      const enforced = enforceSingleActive(loaded, scope);
+      if (JSON.stringify(enforced) !== JSON.stringify(loaded)) {
+        saveCards(enforced);
+      }
+      
+      setCards(enforced);
+      const active = getActiveCardForScope(enforced, scope);
+      setActiveCard(active);
+      setVisibleCards(getVisibleCards(enforced, scope, active));
+    } catch (error) {
+      console.error("Error loading cards:", error);
+      setCards([]);
+      setActiveCard(null);
+      setVisibleCards([]);
     }
-    
-    setCards(enforced);
-    const active = getActiveCardForScope(enforced, scope);
-    setActiveCard(active);
-    setVisibleCards(getVisibleCards(enforced, scope, active));
   }, [scope]);
   
   // Initial load
