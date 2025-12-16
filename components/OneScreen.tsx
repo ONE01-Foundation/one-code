@@ -77,6 +77,30 @@ function saveMode(mode: Mode) {
   localStorage.setItem("one_mode", mode);
 }
 
+// Welcome flow management
+type WelcomeStep = "initial" | "choice" | "completed";
+
+function hasCompletedWelcome(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("one_welcome_completed") === "true";
+}
+
+function markWelcomeCompleted() {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("one_welcome_completed", "true");
+}
+
+function getWelcomeChoice(): "want" | "offer" | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("one_welcome_choice");
+  return (stored as "want" | "offer") || null;
+}
+
+function saveWelcomeChoice(choice: "want" | "offer") {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("one_welcome_choice", choice);
+}
+
 export default function OneScreen() {
   const [mode, setMode] = useState<Mode>(loadMode());
   const [currentLifeState, setCurrentLifeState] = useState<LifeState | null>(null);
@@ -85,6 +109,10 @@ export default function OneScreen() {
   const [nobodyMessage, setNobodyMessage] = useState<string>(NOBODY_MESSAGES.noAction);
   const [themeOverride, setThemeOverride] = useState<ThemeOverride>(loadThemeOverride());
   const [activeTheme, setActiveTheme] = useState<ActiveTheme>(getActiveTheme(themeOverride));
+  const [welcomeStep, setWelcomeStep] = useState<WelcomeStep>(
+    hasCompletedWelcome() ? "completed" : "initial"
+  );
+  const [showWelcome, setShowWelcome] = useState(!hasCompletedWelcome());
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
@@ -129,7 +157,10 @@ export default function OneScreen() {
   };
 
   // Load active LifeState and LifeAction on mount and when mode changes
+  // Skip if welcome flow is active
   useEffect(() => {
+    if (showWelcome) return; // Don't load main state during welcome
+    
     if (isGlobal) {
       // Global mode: view only, no actions
       setCurrentLifeState(null);
@@ -156,7 +187,7 @@ export default function OneScreen() {
       setCurrentLifeAction(null);
       setNobodyMessage(NOBODY_MESSAGES.noAction);
     }
-  }, [mode, isPrivate, isGlobal, context]);
+  }, [mode, isPrivate, isGlobal, context, showWelcome]);
 
   // Update theme when override changes
   useEffect(() => {
@@ -267,6 +298,41 @@ export default function OneScreen() {
     }
   };
 
+  // Welcome flow handlers
+  const handleWelcomeContinue = () => {
+    setWelcomeStep("choice");
+  };
+
+  const handleWelcomeChoice = (choice: "want" | "offer") => {
+    saveWelcomeChoice(choice);
+    markWelcomeCompleted();
+    
+    // Smooth transition to main state
+    setTimeout(() => {
+      setShowWelcome(false);
+      setWelcomeStep("completed");
+      
+      // Initialize main state after welcome
+      if (!isGlobal) {
+        const activeState = getActiveLifeState(context);
+        if (activeState) {
+          setCurrentLifeState(activeState);
+          const activeAction = getActiveLifeAction(activeState.id);
+          if (activeAction) {
+            setCurrentLifeAction(activeAction);
+            setNobodyMessage(NOBODY_MESSAGES.actionReady);
+          } else {
+            generateActionForState(activeState);
+          }
+        } else {
+          setCurrentLifeState(null);
+          setCurrentLifeAction(null);
+          setNobodyMessage(NOBODY_MESSAGES.noAction);
+        }
+      }
+    }, 300); // Calm transition delay
+  };
+
   // Get global data (aggregated, anonymous)
   const getGlobalData = () => {
     // TODO: Aggregate LifeStates and LifeActions across all users
@@ -281,53 +347,55 @@ export default function OneScreen() {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
-      {/* Top: Theme Toggle (subtle corner) + Mode Toggle */}
-      <div className="flex items-center justify-between pt-4 pb-2 px-4">
-        {/* Theme Toggle (minimal, top-left) */}
-        <button
-          onClick={handleThemeToggle}
-          className="w-8 h-8 flex items-center justify-center text-xs opacity-40 hover:opacity-100 transition-opacity rounded-full"
-          style={{ color: "var(--foreground)" }}
-          title={themeOverride === "auto" ? "Auto (tap to override)" : themeOverride === "light" ? "Light (tap for dark)" : "Dark (tap for auto)"}
-        >
-          {themeOverride === "auto" ? "○" : activeTheme === "light" ? "●" : "○"}
-        </button>
+      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during welcome */}
+      {!showWelcome && (
+        <div className="flex items-center justify-between pt-4 pb-2 px-4">
+          {/* Theme Toggle (minimal, top-left) */}
+          <button
+            onClick={handleThemeToggle}
+            className="w-8 h-8 flex items-center justify-center text-xs opacity-40 hover:opacity-100 transition-opacity rounded-full"
+            style={{ color: "var(--foreground)" }}
+            title={themeOverride === "auto" ? "Auto (tap to override)" : themeOverride === "light" ? "Light (tap for dark)" : "Dark (tap for auto)"}
+          >
+            {themeOverride === "auto" ? "○" : activeTheme === "light" ? "●" : "○"}
+          </button>
 
-        {/* Mode Toggle (center) */}
-        <div className="flex gap-1 rounded-full px-1 py-1" style={{ border: "1px solid var(--border)" }}>
-          <button
-            onClick={() => handleModeSwitch("private")}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
-              isPrivate
-                ? "text-white"
-                : "hover:opacity-70"
-            }`}
-            style={{
-              backgroundColor: isPrivate ? "var(--foreground)" : "transparent",
-              color: isPrivate ? "var(--background)" : "var(--foreground)",
-            }}
-          >
-            Private
-          </button>
-          <button
-            onClick={() => handleModeSwitch("global")}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
-              isGlobal
-                ? "text-white"
-                : "hover:opacity-70"
-            }`}
-            style={{
-              backgroundColor: isGlobal ? "var(--foreground)" : "transparent",
-              color: isGlobal ? "var(--background)" : "var(--foreground)",
-            }}
-          >
-            Global
-          </button>
+          {/* Mode Toggle (center) */}
+          <div className="flex gap-1 rounded-full px-1 py-1" style={{ border: "1px solid var(--border)" }}>
+            <button
+              onClick={() => handleModeSwitch("private")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
+                isPrivate
+                  ? "text-white"
+                  : "hover:opacity-70"
+              }`}
+              style={{
+                backgroundColor: isPrivate ? "var(--foreground)" : "transparent",
+                color: isPrivate ? "var(--background)" : "var(--foreground)",
+              }}
+            >
+              Private
+            </button>
+            <button
+              onClick={() => handleModeSwitch("global")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
+                isGlobal
+                  ? "text-white"
+                  : "hover:opacity-70"
+              }`}
+              style={{
+                backgroundColor: isGlobal ? "var(--foreground)" : "transparent",
+                color: isGlobal ? "var(--background)" : "var(--foreground)",
+              }}
+            >
+              Global
+            </button>
+          </div>
+
+          {/* Spacer for balance */}
+          <div className="w-8" />
         </div>
-
-        {/* Spacer for balance */}
-        <div className="w-8" />
-      </div>
+      )}
 
       {/* Center: Focus Zone */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
@@ -344,7 +412,65 @@ export default function OneScreen() {
 
         {/* Center Content */}
         <div className="relative z-10 w-full max-w-md text-center">
-          {isGlobal ? (
+          {showWelcome ? (
+            /* Welcome Flow */
+            <div className="space-y-8 transition-all duration-500">
+              {welcomeStep === "initial" && (
+                /* Step 1: Initial Welcome */
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <p className="text-3xl sm:text-4xl leading-relaxed font-normal" style={{ color: "var(--foreground)" }}>
+                      Welcome.
+                    </p>
+                    <p className="text-xl sm:text-2xl leading-relaxed opacity-80" style={{ color: "var(--foreground)" }}>
+                      This is a space to act — not to scroll.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleWelcomeContinue}
+                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300"
+                    style={{
+                      backgroundColor: "var(--foreground)",
+                      color: "var(--background)",
+                    }}
+                  >
+                    Continue
+                  </button>
+                </div>
+              )}
+
+              {welcomeStep === "choice" && (
+                /* Step 2: Choice */
+                <div className="space-y-8">
+                  <p className="text-2xl sm:text-3xl leading-relaxed font-normal" style={{ color: "var(--foreground)" }}>
+                    What brings you here right now?
+                  </p>
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => handleWelcomeChoice("want")}
+                      className="w-full px-6 py-5 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 text-left"
+                      style={{
+                        backgroundColor: "var(--foreground)",
+                        color: "var(--background)",
+                      }}
+                    >
+                      I want something
+                    </button>
+                    <button
+                      onClick={() => handleWelcomeChoice("offer")}
+                      className="w-full px-6 py-5 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 text-left"
+                      style={{
+                        backgroundColor: "var(--foreground)",
+                        color: "var(--background)",
+                      }}
+                    >
+                      I can offer something
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : isGlobal ? (
             /* Global Mode: View Only */
             <div className="space-y-4">
               <p className="text-lg mb-4" style={{ color: "var(--neutral-600)" }}>
@@ -442,10 +568,12 @@ export default function OneScreen() {
         </div>
       </div>
 
-      {/* Bottom: Minimal anchor */}
-      <div className="flex items-center justify-center pb-6 pt-4">
-        <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
-      </div>
+      {/* Bottom: Minimal anchor - Hidden during welcome */}
+      {!showWelcome && (
+        <div className="flex items-center justify-center pb-6 pt-4">
+          <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
+        </div>
+      )}
     </div>
   );
 }
