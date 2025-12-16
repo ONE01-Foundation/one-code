@@ -1628,30 +1628,39 @@ export default function OneScreen() {
                 );
               })()}
               
-              <HomeContent
-            state={homeState}
-            isLoading={isGeneratingStep}
-            onFindNextStep={() => {
-              // Live Ask v0.1: Open AskPanel instead of focusing input
-              if (nextIntent === "ask_nobody" && scope === "private") {
-                handleOpenAsk();
-              }
-            }}
-            isGenerating={isGeneratingStep}
-            scope={scope}
-            nextIntent={nextIntent}
-            uiLang={uiLang}
-            timePhase={timePhase}
-            stepSuggestion={stepSuggestion}
-            onStepDo={handleStepDo}
-            onStepNotNow={handleStepNotNow}
-            onStepChange={handleStepChange}
-            onAskNobodySubmit={undefined} // Removed - using AskPanel instead
-            activeStepCard={activeStepCard || undefined}
-            onStepDone={handleStepDone}
-            completedMessage="Done"
-            isDev={isDev}
-          />
+              {/* Global View or Private HomeContent */}
+              {scope === "global" && globalSnapshot ? (
+                <GlobalView
+                  snapshot={globalSnapshot}
+                  onBringToPrivate={handleBringToPrivate}
+                  uiLang={uiLang}
+                />
+              ) : (
+                <HomeContent
+                  state={homeState}
+                  isLoading={isGeneratingStep}
+                  onFindNextStep={() => {
+                    // Live Ask v0.1: Open AskPanel instead of focusing input
+                    if (nextIntent === "ask_nobody" && scope === "private") {
+                      handleOpenAsk();
+                    }
+                  }}
+                  isGenerating={isGeneratingStep}
+                  scope={scope}
+                  nextIntent={nextIntent}
+                  uiLang={uiLang}
+                  timePhase={timePhase}
+                  stepSuggestion={stepSuggestion}
+                  onStepDo={handleStepDo}
+                  onStepNotNow={handleStepNotNow}
+                  onStepChange={handleStepChange}
+                  onAskNobodySubmit={undefined} // Removed - using AskPanel instead
+                  activeStepCard={activeStepCard || undefined}
+                  onStepDone={handleStepDone}
+                  completedMessage="Done"
+                  isDev={isDev}
+                />
+              )}
             </>
           )}
         </div>
