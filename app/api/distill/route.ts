@@ -15,6 +15,7 @@
 
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { State } from "@/lib/types";
 
 function getOpenAIClient() {
   // Allow build to pass even if key is not set, will fail at runtime if used
@@ -31,12 +32,15 @@ interface DistillationResult {
   action_text: string; // ONE short imperative sentence
   needs_clarification?: boolean;
   clarification_question?: string;
+  isDesireOrRequest?: boolean; // For setting openThread
+  shouldSetPendingQuestion?: boolean; // For setting pendingQuestion
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const userInput = body.input || body.text || "";
+    const currentState: State | null = body.state || null;
 
     if (!userInput || typeof userInput !== "string" || userInput.trim().length === 0) {
       return NextResponse.json(
@@ -60,9 +64,19 @@ export async function POST(req: Request) {
       });
     }
 
+    // Build context from state (quiet continuity only)
+    let contextNote = "";
+    if (currentState) {
+      if (currentState.pendingQuestion) {
+        contextNote = `\n\nContext: There is a pending question: "${currentState.pendingQuestion}". If the user's input answers it, continue that thread. Otherwise, treat as new topic.`;
+      } else if (currentState.openThread) {
+        contextNote = `\n\nContext: There is an open thread about: "${currentState.openThread}". If the user's input relates to it, continue naturally. If it's a different topic, start fresh.`;
+      }
+    }
+
     const prompt = `You are the ONE01 distillation engine. Your job is to reduce user input into a single, clear intent and generate ONE actionable step.
 
-User input: "${trimmedInput}"
+User input: "${trimmedInput}"${contextNote}
 
 Rules:
 1. Reduce the input to a single, clear intent (one sentence max)
@@ -70,6 +84,7 @@ Rules:
 3. Generate ONE action only (short imperative sentence, max 10 words)
 4. Prefer physical, real-world actions when possible
 5. If the input is unclear or ambiguous, set needs_clarification to true and provide a short clarifying question (one sentence max)
+6. If continuing a thread, maintain continuity naturally but don't reference past explicitly
 
 Return ONLY valid JSON in this exact format:
 {
@@ -77,7 +92,10 @@ Return ONLY valid JSON in this exact format:
   "category": "health|money|work|relationship|self|other",
   "action_text": "ONE short imperative sentence",
   "needs_clarification": false,
-  "clarification_question": null
+  "clarification_question": null,
+  "isDesireOrRequest": false,
+  // true if input expresses a desire or request (e.g., "I want...", "I need...", "Can you...")
+  "shouldSetPendingQuestion": false  // true if you asked a clarification question
 }
 
 If clarification is needed:
@@ -86,7 +104,9 @@ If clarification is needed:
   "category": "other",
   "action_text": "",
   "needs_clarification": true,
-  "clarification_question": "one clarifying question"
+  "clarification_question": "one clarifying question",
+  "isDesireOrRequest": false,
+  "shouldSetPendingQuestion": true
 }`;
 
     const completion = await client.chat.completions.create({
@@ -132,7 +152,20 @@ If clarification is needed:
         category: "other",
         action_text: `Complete: ${trimmedInput}`,
         needs_clarification: false,
+        isDesireOrRequest: false,
+        shouldSetPendingQuestion: false,
       };
+    }
+
+    // Ensure flags are set
+    if (result.needs_clarification === undefined) result.needs_clarification = false;
+    if (result.isDesireOrRequest === undefined) {
+      // Simple heuristic: check if input contains desire/request keywords
+      const lower = trimmedInput.toLowerCase();
+      result.isDesireOrRequest = /(want|need|wish|desire|request|can you|could you|would you|please)/.test(lower);
+    }
+    if (result.shouldSetPendingQuestion === undefined) {
+      result.shouldSetPendingQuestion = result.needs_clarification || false;
     }
 
     return NextResponse.json(result);

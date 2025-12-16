@@ -20,7 +20,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardState } from "@/lib/types";
+import { Card, CardState, State } from "@/lib/types";
 
 type AppState = "entry" | "processing" | "action" | "resolved";
 
@@ -30,6 +30,8 @@ interface DistillationResult {
   action_text: string;
   needs_clarification?: boolean;
   clarification_question?: string;
+  isDesireOrRequest?: boolean;
+  shouldSetPendingQuestion?: boolean;
 }
 
 // Generate 2 suggested options based on context
@@ -41,6 +43,44 @@ function getSuggestedOptions(): { id: string; label: string }[] {
   ];
 }
 
+// State management functions
+function loadState(): State {
+  if (typeof window === "undefined") {
+    // SSR: return default state
+    return {
+      openThread: null,
+      lastSuggestedAction: null,
+      pendingQuestion: null,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  const stored = localStorage.getItem("one_state");
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      // Invalid state, return default
+    }
+  }
+  return {
+    openThread: null,
+    lastSuggestedAction: null,
+    pendingQuestion: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveState(state: State) {
+  if (typeof window === "undefined") return; // SSR: skip
+  state.updatedAt = new Date().toISOString();
+  localStorage.setItem("one_state", JSON.stringify(state));
+}
+
+function clearState() {
+  if (typeof window === "undefined") return; // SSR: skip
+  localStorage.removeItem("one_state");
+}
+
 export default function OneScreen() {
   const [state, setState] = useState<AppState>("entry");
   const [userInput, setUserInput] = useState("");
@@ -48,13 +88,16 @@ export default function OneScreen() {
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [distillationResult, setDistillationResult] = useState<DistillationResult | null>(null);
   const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
+  const [memoryState, setMemoryState] = useState<State>(loadState());
 
-  // Load session from localStorage
+  // Load session and state from localStorage
   useEffect(() => {
     const sessionId = localStorage.getItem("one_session_id");
     if (!sessionId) {
       localStorage.setItem("one_session_id", `session_${Date.now()}`);
     }
+    // Load state on mount
+    setMemoryState(loadState());
   }, []);
 
   // Handle option selection
@@ -76,11 +119,31 @@ export default function OneScreen() {
     setShowTextInput(false);
     setUserInput("");
 
+    // Check if user is switching topic (ignore pending question)
+    const isSwitchingTopic = memoryState.pendingQuestion && 
+      !input.toLowerCase().includes(memoryState.pendingQuestion.toLowerCase().split(' ')[0]);
+
+    // Update state: clear pendingQuestion if answered or switching topic
+    const currentState = { ...memoryState };
+    if (memoryState.pendingQuestion) {
+      if (isSwitchingTopic) {
+        // User switched topic, clear thread
+        currentState.pendingQuestion = null;
+        currentState.openThread = null;
+      } else {
+        // User answered, clear pending question
+        currentState.pendingQuestion = null;
+      }
+    }
+
     try {
       const response = await fetch("/api/distill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({ 
+          input,
+          state: currentState.openThread || currentState.pendingQuestion ? currentState : null,
+        }),
       });
 
       if (!response.ok) {
@@ -89,12 +152,32 @@ export default function OneScreen() {
 
       const result: DistillationResult = await response.json();
 
-      // If clarification needed, show question
+      // Update state based on result
+      const newState = { ...currentState };
+
+      // If clarification needed, set pendingQuestion
       if (result.needs_clarification && result.clarification_question) {
+        newState.pendingQuestion = result.clarification_question;
+        saveState(newState);
+        setMemoryState(newState);
         setClarificationQuestion(result.clarification_question);
         setState("entry");
         return;
       }
+
+      // If desire/request, set openThread (unless switching topic)
+      if (result.isDesireOrRequest && !isSwitchingTopic) {
+        newState.openThread = result.intent;
+      } else if (isSwitchingTopic) {
+        // Topic changed, clear openThread
+        newState.openThread = null;
+      }
+
+      // Clear lastSuggestedAction (user responded)
+      newState.lastSuggestedAction = null;
+
+      saveState(newState);
+      setMemoryState(newState);
 
       // Create card
       const card: Card = {
@@ -145,6 +228,12 @@ export default function OneScreen() {
     );
     localStorage.setItem("one_cards", JSON.stringify(updated));
 
+    // Update state: clear lastSuggestedAction (user responded)
+    const newState = { ...memoryState };
+    newState.lastSuggestedAction = null;
+    saveState(newState);
+    setMemoryState(newState);
+
     // Return to entry
     setCurrentCard(null);
     setDistillationResult(null);
@@ -161,10 +250,25 @@ export default function OneScreen() {
     );
     localStorage.setItem("one_cards", JSON.stringify(updated));
 
+    // Update state: clear lastSuggestedAction (user ignored)
+    const newState = { ...memoryState };
+    newState.lastSuggestedAction = null;
+    saveState(newState);
+    setMemoryState(newState);
+
     // Return to entry
     setCurrentCard(null);
     setDistillationResult(null);
     setState("entry");
+  };
+
+  // Handle clearing pending question (user ignores it)
+  const handleClearPendingQuestion = () => {
+    const newState = { ...memoryState };
+    newState.pendingQuestion = null;
+    saveState(newState);
+    setMemoryState(newState);
+    setClarificationQuestion(null);
   };
 
   const suggestedOptions = getSuggestedOptions();
@@ -207,7 +311,7 @@ export default function OneScreen() {
                     {clarificationQuestion}
                   </p>
                   <button
-                    onClick={() => setClarificationQuestion(null)}
+                    onClick={handleClearPendingQuestion}
                     className="text-sm text-neutral-500 hover:text-black"
                   >
                     Clear

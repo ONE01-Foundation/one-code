@@ -27,6 +27,14 @@ export interface Card {
   createdAt: string;
 }
 
+// State Memory - Minimal session-based state
+export interface State {
+  openThread: string | null; // Set when DESIRE/REQUEST intent appears
+  lastSuggestedAction: string | null; // Set when suggestion is explicitly made
+  pendingQuestion: string | null; // Set when system asks a question
+  updatedAt: string; // ISO timestamp
+}
+
 // Legacy types (kept for compatibility, will be removed later)
 export type CardStatus = "pending" | "done" | "delayed"; // @deprecated - use CardState
 
