@@ -1145,10 +1145,42 @@ export default function OneScreen() {
     setShowCompletedMessage(true);
     // Refresh bubbles
     updateBubbles();
+    
+    // Refresh global snapshot if in global scope
+    if (scope === "global") {
+      const snapshot = getGlobalSnapshot();
+      setGlobalSnapshot(snapshot);
+    }
+    
     // Auto-return to empty after 1500ms (between 1200-2000ms)
     setTimeout(() => {
       setShowCompletedMessage(false);
     }, 1500);
+  };
+
+  // Global: Bring to Private handler
+  const handleBringToPrivate = (item: GlobalNeedBucket | GlobalOfferBucket | GlobalMission) => {
+    // Create a private card from the global item
+    const card = createStepCardFromSuggestion(
+      {
+        title: "mission" in item ? item.title : item.label,
+        why: "why" in item ? item.why : `Join ${item.label}`,
+        durationMinutes: "estimatedMinutes" in item ? item.estimatedMinutes : 15,
+        energy: "difficulty" in item && item.difficulty === "hard" ? "high" : "medium",
+        domain: item.domain,
+      },
+      "active"
+    );
+    saveStepCard(card);
+    setActiveCardId(card.id);
+    setActiveStepCard(card);
+    
+    // Switch to private scope
+    setScope("private");
+    
+    // Refresh global snapshot
+    const snapshot = getGlobalSnapshot();
+    setGlobalSnapshot(snapshot);
   };
   
   // Handle bubble slot selection (3-slot navigation)
