@@ -12,7 +12,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card, Signal, ActionLoopState, ActionChoice, ActionClosure } from "@/lib/types";
+import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card, Signal, ActionLoopState, ActionChoice, ActionClosure, Scope } from "@/lib/types";
 import {
   getOrCreateOneID,
   getActiveLifeState,
@@ -76,9 +76,10 @@ import {
   loadActionLoopPlan,
 } from "@/lib/action-loop-engine";
 import { useScope } from "@/hooks/useScope";
-import { getCardsByScope } from "@/data/cards";
 import { SideBubbles } from "@/components/ui/SideBubbles";
 import { DebugPanel } from "@/components/ui/DebugPanel";
+import { useCards } from "@/hooks/useCards";
+import { CenterCard } from "@/components/ui/CenterCard";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -184,7 +185,9 @@ export default function OneScreen() {
   
   // Scope layer (Global ↔ Private Mirror)
   const { scope, toggleScope } = useScope();
-  const scopeCards = getCardsByScope(scope);
+  
+  // Cards Lifecycle v0.1
+  const { activeCard, visibleCards, completeCard, deferCard } = useCards(scope);
 
   // Initialize OWO and Step Engine on mount
   useEffect(() => {
@@ -784,8 +787,23 @@ export default function OneScreen() {
 
       {/* Center: Focus Zone */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-        {/* Side Bubbles (4 cards from active scope) */}
-        <SideBubbles cards={scopeCards} />
+        {/* Side Bubbles (next/context/last done - max 3) */}
+        <SideBubbles cards={visibleCards} />
+        
+        {/* Center Card (active card) */}
+        {activeCard ? (
+          <CenterCard
+            card={activeCard}
+            onComplete={() => completeCard(activeCard.id)}
+            onDefer={() => deferCard(activeCard.id)}
+          />
+        ) : (
+          /* No active card - show placeholder or create prompt */
+          <div className="text-center opacity-50">
+            <p className="text-lg">No active card</p>
+            <p className="text-sm mt-2">Create one to begin</p>
+          </div>
+        )}
         
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -1216,8 +1234,15 @@ export default function OneScreen() {
       {/* Debug Panel (dev only) */}
       <DebugPanel
         scope={scope}
-        cards={scopeCards}
-        dataSource={scope === "private" ? "getPrivateCards()" : "getGlobalCards()"}
+        cards={visibleCards.map((c) => ({
+          id: c.id,
+          title: c.title,
+          subtitle: c.intent || "",
+          status: c.state === "done" ? "completed" : "active",
+          createdAt: c.createdAt,
+          scope: c.scope as Scope,
+        }))}
+        dataSource="useCards()"
       />
     </div>
   );
@@ -1229,8 +1254,15 @@ export default function OneScreen() {
       {/* Debug Panel (dev only) */}
       <DebugPanel
         scope={scope}
-        cards={scopeCards}
-        dataSource={scope === "private" ? "getPrivateCards()" : "getGlobalCards()"}
+        cards={visibleCards.map((c) => ({
+          id: c.id,
+          title: c.title,
+          subtitle: c.intent || "",
+          status: c.state === "done" ? "completed" : "active",
+          createdAt: c.createdAt,
+          scope: c.scope as Scope,
+        }))}
+        dataSource="useCards()"
       />
     </div>
   );

@@ -16,19 +16,19 @@ export function getPrivateCards(): ActionCard[] {
   
   // Convert to ActionCard format
   return cards
-    .filter((c) => c.state !== "archived")
+    .filter((c) => c.title) // Only cards with title
     .map((c) => {
       let status: ActionCardStatus = "active";
       if (c.state === "done") {
         status = "completed";
-      } else if (c.state === "active" || c.state === "progressing") {
+      } else if (c.state === "active") {
         status = "active";
       }
       
       return {
         id: c.id,
-        title: c.content.split(":")[0] || c.content,
-        subtitle: c.content.split(":")[1]?.trim() || "",
+        title: c.title || c.content || "Untitled",
+        subtitle: c.intent || "",
         status,
         createdAt: c.createdAt,
         scope: "private" as Scope,

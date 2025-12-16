@@ -39,24 +39,23 @@ export function saveCards(cards: Card[]) {
   localStorage.setItem("one_cards", JSON.stringify(cards));
 }
 
-// Create a new card
+// Create a new card (Cards Lifecycle v0.1)
 export function createCard(
-  type: CardType,
-  content: string,
+  title: string,
+  intent: string,
   scope: CardScope = "private",
-  originStepId?: string
+  source?: string
 ): Card {
   const now = new Date().toISOString();
   
   const card: Card = {
     id: `card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    type,
+    title,
+    intent,
     state: "draft",
     scope,
-    content,
-    originStepId,
     createdAt: now,
-    updatedAt: now,
+    source: source || "user",
   };
   
   // Save to localStorage
@@ -65,6 +64,16 @@ export function createCard(
   saveCards(cards);
   
   return card;
+}
+
+// Legacy createCard (for backward compatibility)
+export function createCardLegacy(
+  type: CardType,
+  content: string,
+  scope: CardScope = "private",
+  originStepId?: string
+): Card {
+  return createCard(content, type, scope, originStepId);
 }
 
 // Update card state (system action only)
@@ -101,17 +110,15 @@ export function updateCardContent(cardId: string, newContent: string): Card | nu
   return card;
 }
 
-// Archive card (no hard deletion)
+// Archive card (no hard deletion) - mark as done instead
 export function archiveCard(cardId: string): Card | null {
-  return updateCardState(cardId, "archived");
+  return updateCardState(cardId, "done");
 }
 
-// Get active cards (not archived, not done)
+// Get active cards (not done)
 export function getActiveCards(scope?: CardScope): Card[] {
   const cards = loadCards(scope);
-  return cards.filter(
-    (c) => c.state !== "archived" && c.state !== "done"
-  );
+  return cards.filter((c) => c.state !== "done");
 }
 
 // Get cards that need attention
@@ -121,7 +128,7 @@ export function getCardsNeedingAttention(scope?: CardScope): Card[] {
   const now = Date.now();
   
   return activeCards.filter((card) => {
-    const updatedAt = new Date(card.updatedAt).getTime();
+    const updatedAt = new Date(card.updatedAt || card.createdAt).getTime();
     const daysSinceUpdate = (now - updatedAt) / (1000 * 60 * 60 * 24);
     
     // Cards in "draft" state need attention if older than 1 day
@@ -131,11 +138,6 @@ export function getCardsNeedingAttention(scope?: CardScope): Card[] {
     
     // Cards in "active" state need attention if older than 3 days
     if (card.state === "active" && daysSinceUpdate > 3) {
-      return true;
-    }
-    
-    // Cards in "progressing" state need attention if older than 7 days
-    if (card.state === "progressing" && daysSinceUpdate > 7) {
       return true;
     }
     
@@ -150,21 +152,19 @@ export function getMostRelevantCard(scope?: CardScope): Card | null {
   
   if (activeCards.length === 0) return null;
   
-  // Prioritize: progressing > active > draft
+  // Prioritize: active > draft
   const sorted = activeCards.sort((a, b) => {
     const statePriority: Record<CardState, number> = {
-      progressing: 3,
       active: 2,
       draft: 1,
       done: 0,
-      archived: 0,
     };
     
     const priorityDiff = statePriority[b.state] - statePriority[a.state];
     if (priorityDiff !== 0) return priorityDiff;
     
-    // If same priority, prefer more recently updated
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    // If same priority, prefer more recently created/updated
+    return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
   });
   
   return sorted[0];

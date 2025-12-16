@@ -245,7 +245,7 @@ export function generateStateBasedSignal(card: Card, hasActiveAction: boolean = 
   
   // Draft card needs attention (older than 1 day)
   if (card.state === "draft") {
-    const updatedAt = new Date(card.updatedAt).getTime();
+    const updatedAt = new Date(card.updatedAt || card.createdAt).getTime();
     const daysSinceUpdate = (Date.now() - updatedAt) / (1000 * 60 * 60 * 24);
     
     if (daysSinceUpdate > 1) {
@@ -260,7 +260,7 @@ export function generateStateBasedSignal(card: Card, hasActiveAction: boolean = 
   
   // Active card needs progress (older than 3 days)
   if (card.state === "active") {
-    const updatedAt = new Date(card.updatedAt).getTime();
+    const updatedAt = new Date(card.updatedAt || card.createdAt).getTime();
     const daysSinceUpdate = (Date.now() - updatedAt) / (1000 * 60 * 60 * 24);
     
     if (daysSinceUpdate > 3) {

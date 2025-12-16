@@ -24,7 +24,8 @@ export interface ActionCard {
 
 // Card System v0.1
 export type CardType = "goal" | "step" | "insight" | "offer" | "need" | "action";
-export type CardState = "draft" | "active" | "progressing" | "done" | "archived";
+// Cards Lifecycle v0.1: draft → active → done
+export type CardState = "draft" | "active" | "done";
 export type CardScope = "private" | "global" | "bridge";
 export type IntentCategory = "health" | "money" | "work" | "relationship" | "self" | "other";
 
@@ -36,19 +37,22 @@ export interface Session {
 }
 
 // Card schema v0.1 - represents persistent truth or intent
+// Cards Lifecycle v0.1: create → act → complete → remember
 export interface Card {
   id: string;
-  type: CardType; // goal, step, insight, offer, need, action
-  state: CardState; // draft, active, progressing, done, archived
+  title: string; // Card title (required)
+  intent: string; // What this card represents (e.g., "health", "work", "relationship")
+  state: CardState; // draft, active, done
   scope: CardScope; // private, global, bridge
-  content: string; // Single concise sentence
-  originStepId?: string; // Step that created this card
   createdAt: string; // ISO timestamp
-  updatedAt: string; // ISO timestamp
+  nextAt?: string; // ISO timestamp - when to show next (for defer)
+  source?: string; // Where this card came from (e.g., "step", "signal", "user")
   
   // Legacy fields (for backward compatibility)
-  title?: string; // @deprecated - use content
-  action?: string; // @deprecated - use content
+  type?: CardType; // @deprecated - use intent
+  content?: string; // @deprecated - use title
+  originStepId?: string; // @deprecated - use source
+  updatedAt?: string; // @deprecated - use createdAt/nextAt
   status?: "ready" | "in_progress" | "done"; // @deprecated - use state
   time?: number; // Estimated time in minutes (optional)
   category?: IntentCategory;

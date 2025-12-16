@@ -1,29 +1,30 @@
 /**
- * Side Bubbles Component
+ * Side Bubbles Component (Cards Lifecycle v0.1)
  * 
- * Renders 4 cards from active scope in side positions
+ * Renders up to 3 cards: next/context/last done
  */
 
-import { ActionCard } from "@/lib/types";
+import { Card } from "@/lib/types";
 
 interface SideBubblesProps {
-  cards: ActionCard[];
+  cards: Card[];
 }
 
 export function SideBubbles({ cards }: SideBubblesProps) {
-  // Position 4 bubbles around the center
+  // Position 3 bubbles around the center
   const positions = [
     { top: "20%", left: "10%", transform: "translate(-50%, -50%)" },
     { top: "20%", right: "10%", transform: "translate(50%, -50%)" },
-    { bottom: "20%", left: "10%", transform: "translate(-50%, 50%)" },
-    { bottom: "20%", right: "10%", transform: "translate(50%, 50%)" },
+    { bottom: "20%", left: "50%", transform: "translate(-50%, 50%)" },
   ];
   
   return (
     <>
-      {cards.slice(0, 4).map((card, index) => {
+      {cards.slice(0, 3).map((card, index) => {
         const position = positions[index];
         if (!position) return null;
+        
+        const isDone = card.state === "done";
         
         return (
           <div
@@ -31,11 +32,11 @@ export function SideBubbles({ cards }: SideBubblesProps) {
             className="absolute w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 opacity-30 hover:opacity-60"
             style={{
               ...position,
-              backgroundColor: "var(--neutral-100)",
+              backgroundColor: isDone ? "var(--neutral-200)" : "var(--neutral-100)",
               border: "1px solid var(--border)",
               color: "var(--foreground)",
             }}
-            title={`${card.title}: ${card.subtitle}`}
+            title={`${card.title} (${card.state})`}
           >
             <div className="text-xs text-center px-2 truncate w-full">
               {card.title}
