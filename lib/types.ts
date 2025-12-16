@@ -56,6 +56,32 @@ export interface PrivateContext {
   userCards?: Card[]; // User's personal cards (never in Global)
 }
 
+// Life Loop Engine Models
+export type LifeContext = "private" | "global";
+export type LifeFocus = "health" | "money" | "work" | "relationships" | "self" | "other";
+export type LifeStateStatus = "idle" | "suggested" | "active" | "completed" | "dismissed";
+export type LifeActionType = "reflect" | "decide" | "do" | "connect";
+export type LifeActionStatus = "pending" | "done" | "skipped";
+
+export interface LifeState {
+  id: string;
+  context: LifeContext; // private | global
+  focus: LifeFocus; // e.g. "health", "money", "work", "relationships"
+  status: LifeStateStatus; // idle | suggested | active | completed | dismissed
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+}
+
+export interface LifeAction {
+  id: string;
+  lifeStateId: string;
+  title: string; // Short, human (e.g., "Lower friction")
+  description: string; // 1 sentence max
+  actionType: LifeActionType; // reflect | decide | do | connect
+  status: LifeActionStatus; // pending | done | skipped
+  createdAt: string; // ISO timestamp
+}
+
 // State Memory - Minimal session-based state with mode separation
 export interface State {
   mode: Mode; // "private" | "global"
