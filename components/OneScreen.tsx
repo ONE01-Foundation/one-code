@@ -979,7 +979,7 @@ export default function OneScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: trimmed,
-          lang: detectedLang,
+          lang: detectedUILang,
           answerStyle: style.answerStyle,
           stepDifficulty: style.stepDifficulty,
         }),
