@@ -41,3 +41,5 @@ If you want to keep RLS enabled, ensure you have these policies:
 
 Based on your screenshot, you have INSERT and SELECT policies, but you're missing the UPDATE policy which is needed for the `/api/one-touch/claim` endpoint.
 
+
+

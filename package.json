@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",
-    "framer-motion": "^12.23.26",
     "next": "16.0.7",
     "openai": "^6.9.1",
     "qrcode.react": "^4.2.0",
