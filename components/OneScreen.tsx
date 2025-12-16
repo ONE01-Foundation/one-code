@@ -55,6 +55,15 @@ import {
   initializeOWO,
   getOWOChoice,
 } from "@/lib/owo-engine";
+import {
+  initializeIdentity,
+  trackActivity,
+  canKeepPath,
+  keepPath,
+  getActivitySummary,
+  shouldOfferIdentity,
+  getCurrentTier,
+} from "@/lib/iwe-engine";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -144,6 +153,10 @@ export default function OneScreen() {
   const [owoInput, setOwoInput] = useState("");
   const [showOwo, setShowOwo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Identity Without Exposure (IWE) state
+  const [showStatePanel, setShowStatePanel] = useState(false);
+  const [showKeepPath, setShowKeepPath] = useState(false);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
@@ -155,6 +168,9 @@ export default function OneScreen() {
     const initialTheme = getActiveTheme(themeOverride);
     setActiveTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
+    
+    // Initialize Identity Without Exposure (IWE)
+    initializeIdentity();
     
     // Initialize OWO (Onboarding Without Onboarding)
     const { userId, needsOWO } = initializeOWO();
@@ -469,6 +485,14 @@ export default function OneScreen() {
   const handleAccept = () => {
     if (!currentLifeAction || !currentLifeState) return;
     
+    // Track activity (IWE)
+    trackActivity();
+    
+    // Check if Path ID should be offered
+    if (shouldOfferIdentity() && canKeepPath()) {
+      setShowKeepPath(true);
+    }
+    
     // Mark action as done
     updateLifeActionStatus(currentLifeAction.id, currentLifeState.id, "done");
     
@@ -498,6 +522,9 @@ export default function OneScreen() {
   const handleSkip = () => {
     if (!currentLifeAction || !currentLifeState) return;
     
+    // Track activity (IWE)
+    trackActivity();
+    
     // Mark action as skipped
     updateLifeActionStatus(currentLifeAction.id, currentLifeState.id, "skipped");
     
@@ -519,6 +546,9 @@ export default function OneScreen() {
 
   // Handle Ask for another action
   const handleAskAnother = async () => {
+    // Track activity (IWE)
+    trackActivity();
+    
     if (!currentLifeState) {
       // No state - create one with default focus
       // TODO: AI integration - Determine focus based on context
@@ -529,6 +559,18 @@ export default function OneScreen() {
       // Generate new action for current state
       await generateActionForState(currentLifeState);
     }
+  };
+
+  // Handle "Keep this path" (IWE)
+  const handleKeepPath = () => {
+    keepPath();
+    setShowKeepPath(false);
+    // No success message - identity emerges from action
+  };
+
+  // Handle State Panel toggle
+  const handleToggleStatePanel = () => {
+    setShowStatePanel(!showStatePanel);
   };
 
   // Step Engine handlers
@@ -869,10 +911,116 @@ export default function OneScreen() {
         </div>
       </div>
 
-      {/* Bottom: Minimal anchor - Hidden during steps and OWO */}
+      {/* Bottom: State Panel toggle and "Keep this path" - Hidden during steps and OWO */}
       {!showSteps && !showOwo && (
-        <div className="flex items-center justify-center pb-6 pt-4">
+        <div className="flex items-center justify-center pb-6 pt-4 gap-4">
+          {/* State Panel toggle */}
+          <button
+            onClick={handleToggleStatePanel}
+            className="text-xs opacity-40 hover:opacity-100 transition-opacity"
+            style={{ color: "var(--neutral-400)" }}
+          >
+            State
+          </button>
+          
+          {/* "Keep this path" offer (only when eligible) */}
+          {showKeepPath && canKeepPath() && (
+            <button
+              onClick={handleKeepPath}
+              className="text-xs px-3 py-1 rounded opacity-60 hover:opacity-100 transition-opacity"
+              style={{
+                backgroundColor: "var(--neutral-100)",
+                color: "var(--foreground)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              Keep this path
+            </button>
+          )}
+          
           <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
+        </div>
+      )}
+
+      {/* State Panel (neutral progress indicators) */}
+      {showStatePanel && !showSteps && !showOwo && (
+        <div
+          className="fixed inset-x-0 bottom-0 p-6 rounded-t-lg transition-all duration-300"
+          style={{
+            backgroundColor: "var(--background)",
+            borderTop: "1px solid var(--border)",
+            maxHeight: "40vh",
+            overflowY: "auto",
+          }}
+        >
+          <div className="max-w-md mx-auto space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
+                State
+              </h3>
+              <button
+                onClick={handleToggleStatePanel}
+                className="text-xs opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: "var(--foreground)" }}
+              >
+                Close
+              </button>
+            </div>
+            
+            {/* Activity summary (neutral, no personal data) */}
+            {(() => {
+              const summary = getActivitySummary();
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
+                      Activities
+                    </span>
+                    <span className="text-sm" style={{ color: "var(--foreground)" }}>
+                      {summary.totalActivities}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
+                      Days active
+                    </span>
+                    <span className="text-sm" style={{ color: "var(--foreground)" }}>
+                      {summary.daysActive}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs opacity-60" style={{ color: "var(--foreground)" }}>
+                      Tier
+                    </span>
+                    <span className="text-sm capitalize" style={{ color: "var(--foreground)" }}>
+                      {summary.currentTier}
+                    </span>
+                  </div>
+                  
+                  {/* Path ID eligibility indicator */}
+                  {summary.pathEligible && (
+                    <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                      <p className="text-xs opacity-60 mb-2" style={{ color: "var(--foreground)" }}>
+                        Path available
+                      </p>
+                      {canKeepPath() && (
+                        <button
+                          onClick={handleKeepPath}
+                          className="w-full px-4 py-2 rounded text-sm transition-opacity hover:opacity-90"
+                          style={{
+                            backgroundColor: "var(--foreground)",
+                            color: "var(--background)",
+                          }}
+                        >
+                          Keep this path
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
     </div>

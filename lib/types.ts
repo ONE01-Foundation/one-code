@@ -112,6 +112,21 @@ export interface Signal {
 export type OWOState = "loading" | "presence" | "choice" | "input" | "complete";
 export type OWOChoice = "my_life" | "the_world";
 
+// Identity Without Exposure (IWE) v0.1
+export type IdentityTier = "presence" | "path" | "anchor";
+export type IdentityStatus = "active" | "pending" | "available";
+
+export interface Identity {
+  presenceId: string; // Auto-generated anonymous session ID (always exists)
+  pathId?: string; // Created when user shows consistent activity
+  anchorId?: string; // Optional, only when cross-device or economic action required
+  createdAt: string; // ISO timestamp
+  lastActivityAt: string; // ISO timestamp
+  activityCount: number; // Track activity for Path ID creation
+  pathEligible: boolean; // Whether user is eligible for Path ID
+  anchorEligible: boolean; // Whether user is eligible for Anchor ID
+}
+
 // Step Engine Models
 export type StepActionType = "primary" | "choice";
 export type StepIntent = "entry" | "welcome" | "choice" | "card_creation" | "transition" | "home";
