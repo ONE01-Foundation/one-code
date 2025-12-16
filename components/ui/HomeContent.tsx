@@ -18,6 +18,7 @@ import { StepPrompt, StepOption } from "./StepPrompt";
 import { AskNobodyInput } from "./AskNobodyInput";
 import { StepSuggestion } from "./StepSuggestion";
 import { OneNextStep } from "@/app/api/nobody/step/route";
+import { StepCard } from "@/lib/step-card";
 
 interface HomeContentProps {
   state: HomeState;
@@ -32,8 +33,8 @@ interface HomeContentProps {
   activeCard?: Card | null;
   onCompleteCard?: (cardId: string) => void;
   onDeferCard?: (cardId: string) => void;
-  activeStepCard?: any; // StepCard from step-card-storage
-  onStepCardDone?: () => void;
+  activeStepCard?: StepCard | null;
+  onStepDone?: () => void;
   showNobody?: boolean;
   onNobodyYes?: () => void;
   onNobodyNotNow?: () => void;
@@ -74,7 +75,7 @@ export function HomeContent({
   onCompleteCard,
   onDeferCard,
   activeStepCard,
-  onStepCardDone,
+  onStepDone,
   showNobody = false,
   onNobodyYes,
   onNobodyNotNow,

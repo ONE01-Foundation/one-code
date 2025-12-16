@@ -87,15 +87,16 @@ import { determineHomeState, HomeState } from "@/lib/home-state";
 import { handleResetParam } from "@/lib/reset";
 import { HomeContent } from "@/components/ui/HomeContent";
 import {
+  StepCard,
   loadStepCards,
-  createStepCard,
+  saveStepCard,
   updateStepCardStatus,
   getActiveStepCard,
-  getActiveCardId,
-  setActiveCardId,
   getLastStepCards,
-  StepCard,
-} from "@/lib/step-card-storage";
+  setActiveCardId,
+  getActiveCardId,
+  createStepCardFromSuggestion,
+} from "@/lib/step-card";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 
@@ -225,19 +226,40 @@ export default function OneScreen() {
   const [isGeneratingStep, setIsGeneratingStep] = useState(false);
   const [lastUserText, setLastUserText] = useState("");
   
+  // Step Card state (persisted)
+  const [activeStepCard, setActiveStepCard] = useState<any>(null);
+  const [showDeck, setShowDeck] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<any>(null);
+  const [showCompletedMessage, setShowCompletedMessage] = useState(false);
+  
+  // Hydrate cards on mount
+  useEffect(() => {
+    const { getActiveCardId, getActiveStepCard, setActiveCardId } = require("@/lib/step-card");
+    const activeId = getActiveCardId();
+    if (activeId) {
+      const card = getActiveStepCard();
+      if (card) {
+        setActiveStepCard(card);
+      } else {
+        setActiveCardId(null);
+      }
+    }
+  }, []);
+  
   // Handle reset param on mount
   useEffect(() => {
     handleResetParam();
   }, []);
   
   // Determine home state (strict state machine)
+  const hasActiveStepCard = !!activeStepCard;
   const hasSuggestion = (actionLoopPlan && actionLoopState === "prompt") || showPrompt || !!stepSuggestion;
   const homeState: HomeState = determineHomeState({
-    hasActiveCard: !!activeCard,
+    hasActiveCard: hasActiveStepCard || !!activeCard,
     hasSuggestion,
     hasPrompt: showPrompt,
-    isLoading: (promptState === "loading" || isGenerating || isGeneratingStep) && !isCompleted,
-    isCompleted,
+    isLoading: (promptState === "loading" || isGenerating || isGeneratingStep) && !isCompleted && !showCompletedMessage,
+    isCompleted: isCompleted || showCompletedMessage,
   });
   
   // Show Nobody when active card first loads
@@ -764,6 +786,112 @@ export default function OneScreen() {
     setShowStatePanel(!showStatePanel);
   };
 
+  // AI Step Suggestion handlers
+  const handleAskNobodySubmit = async (text: string) => {
+    setIsGeneratingStep(true);
+    setLastUserText(text);
+    setStepSuggestion(null);
+
+    try {
+      const response = await fetch("/api/nobody/step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const step = await response.json();
+      setStepSuggestion(step);
+    } catch (error) {
+      console.error("Error fetching step suggestion:", error);
+      setStepSuggestion({
+        title: "Take one small step forward",
+        why: "Start with something simple and clear.",
+        durationMinutes: 10,
+        energy: "low",
+        domain: "life",
+        buttons: [
+          { id: "do", label: "Do it" },
+          { id: "not_now", label: "Not now" },
+          { id: "change", label: "Change" },
+        ],
+      });
+    } finally {
+      setIsGeneratingStep(false);
+    }
+  };
+
+  const handleStepDo = () => {
+    if (!stepSuggestion) return;
+    const card = createStepCardFromSuggestion(stepSuggestion, "active");
+    saveStepCard(card);
+    setActiveCardId(card.id);
+    setActiveStepCard(card);
+    setStepSuggestion(null);
+  };
+
+  const handleStepNotNow = () => {
+    if (!stepSuggestion) return;
+    const card = createStepCardFromSuggestion(stepSuggestion, "skipped");
+    saveStepCard(card);
+    setStepSuggestion(null);
+  };
+
+  const handleStepChange = async () => {
+    if (!lastUserText) return;
+    if (stepSuggestion) {
+      const card = createStepCardFromSuggestion(stepSuggestion, "skipped");
+      saveStepCard(card);
+    }
+    setIsGeneratingStep(true);
+    setStepSuggestion(null);
+
+    try {
+      const response = await fetch("/api/nobody/step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: lastUserText, makeEasier: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const step = await response.json();
+      setStepSuggestion(step);
+    } catch (error) {
+      console.error("Error fetching changed step:", error);
+      setStepSuggestion({
+        title: "Take one small step forward",
+        why: "Start with something simple and clear.",
+        durationMinutes: 10,
+        energy: "low",
+        domain: "life",
+        buttons: [
+          { id: "do", label: "Do it" },
+          { id: "not_now", label: "Not now" },
+          { id: "change", label: "Change" },
+        ],
+      });
+    } finally {
+      setIsGeneratingStep(false);
+    }
+  };
+
+  const handleStepDone = () => {
+    if (!activeStepCard) return;
+    updateStepCardStatus(activeStepCard.id, "done");
+    setActiveCardId(null);
+    setActiveStepCard(null);
+    setShowCompletedMessage(true);
+    setTimeout(() => {
+      setShowCompletedMessage(false);
+    }, 2000);
+  };
+
   // Step Engine handlers
   const handleStepAction = async (actionId: string) => {
     if (!stepPlan) return;
@@ -981,6 +1109,13 @@ export default function OneScreen() {
             actionInProgress={actionInProgress}
             completedMessage="Done"
             isDev={isDev}
+            stepSuggestion={stepSuggestion}
+            onStepDo={handleStepDo}
+            onStepNotNow={handleStepNotNow}
+            onStepChange={handleStepChange}
+            onAskNobodySubmit={handleAskNobodySubmit}
+            activeStepCard={activeStepCard || undefined}
+            onStepDone={handleStepDone}
           />
         </div>
 

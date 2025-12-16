@@ -4,7 +4,7 @@
  * Shows full card details for done/skipped cards
  */
 
-import { StepCard } from "@/lib/step-card-storage";
+import { StepCard } from "@/lib/step-card";
 
 interface CardDetailViewProps {
   card: StepCard;
@@ -14,23 +14,21 @@ interface CardDetailViewProps {
 export function CardDetailView({ card, onClose }: CardDetailViewProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-lg p-6 space-y-6"
+        className="w-full max-w-md mx-4 rounded-lg"
         style={{
           backgroundColor: "var(--background)",
           border: "2px solid var(--border)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
-          <h2
-            className="text-2xl font-normal"
-            style={{ color: "var(--foreground)" }}
-          >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: "var(--border)" }}>
+          <h2 className="text-lg font-medium" style={{ color: "var(--foreground)" }}>
             {card.title}
           </h2>
           <button
@@ -42,43 +40,41 @@ export function CardDetailView({ card, onClose }: CardDetailViewProps) {
           </button>
         </div>
 
-        <div className="space-y-4">
+        {/* Content */}
+        <div className="p-4 space-y-4">
           <div>
-            <p
-              className="text-base opacity-60"
-              style={{ color: "var(--foreground)" }}
-            >
+            <div className="text-sm opacity-60 mb-1" style={{ color: "var(--foreground)" }}>
+              Why
+            </div>
+            <div className="text-base" style={{ color: "var(--foreground)" }}>
               {card.why}
-            </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div
-              className="px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: "var(--neutral-100)",
-                color: "var(--foreground)",
-              }}
-            >
-              {card.durationMinutes} min
+          <div className="flex gap-4">
+            <div>
+              <div className="text-xs opacity-50 mb-1" style={{ color: "var(--foreground)" }}>
+                Duration
+              </div>
+              <div className="text-sm" style={{ color: "var(--foreground)" }}>
+                {card.durationMinutes} min
+              </div>
             </div>
-            <div
-              className="px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: "var(--neutral-100)",
-                color: "var(--foreground)",
-              }}
-            >
-              {card.energy} energy
+            <div>
+              <div className="text-xs opacity-50 mb-1" style={{ color: "var(--foreground)" }}>
+                Energy
+              </div>
+              <div className="text-sm" style={{ color: "var(--foreground)" }}>
+                {card.energy}
+              </div>
             </div>
-            <div
-              className="px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: "var(--neutral-100)",
-                color: "var(--foreground)",
-              }}
-            >
-              {card.status}
+            <div>
+              <div className="text-xs opacity-50 mb-1" style={{ color: "var(--foreground)" }}>
+                Status
+              </div>
+              <div className="text-sm" style={{ color: "var(--foreground)" }}>
+                {card.status}
+              </div>
             </div>
           </div>
         </div>
@@ -86,4 +82,3 @@ export function CardDetailView({ card, onClose }: CardDetailViewProps) {
     </div>
   );
 }
-

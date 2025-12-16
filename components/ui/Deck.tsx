@@ -7,23 +7,23 @@
 
 import { StepCard } from "@/lib/step-card";
 
-interface DeckViewProps {
+interface DeckProps {
   cards: StepCard[];
-  onCardTap?: (card: StepCard) => void;
+  onCardClick?: (card: StepCard) => void;
   onClose: () => void;
 }
 
-export function DeckView({ cards, onCardTap, onClose }: DeckViewProps) {
+export function Deck({ cards, onCardClick, onClose }: DeckProps) {
   const getStatusColor = (status: StepCard["status"]) => {
     switch (status) {
       case "active":
-        return "opacity-100";
+        return "opacity-80";
       case "done":
-        return "opacity-60";
-      case "skipped":
         return "opacity-40";
+      case "skipped":
+        return "opacity-30";
       default:
-        return "opacity-50";
+        return "opacity-60";
     }
   };
 
@@ -34,46 +34,50 @@ export function DeckView({ cards, onCardTap, onClose }: DeckViewProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto rounded-lg"
+        className="w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto rounded-lg p-6"
         style={{
           backgroundColor: "var(--background)",
           border: "2px solid var(--border)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: "var(--border)" }}>
-          <h2 className="text-lg font-medium" style={{ color: "var(--foreground)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <h2
+            className="text-xl font-medium"
+            style={{ color: "var(--foreground)" }}
+          >
             Deck
           </h2>
           <button
             onClick={onClose}
-            className="text-sm opacity-60 hover:opacity-100 transition-opacity"
+            className="text-xs opacity-60 hover:opacity-100 transition-opacity"
             style={{ color: "var(--foreground)" }}
           >
             Close
           </button>
         </div>
 
-        {/* Cards list */}
-        <div className="p-4 space-y-2">
-          {cards.length === 0 ? (
-            <p className="text-sm opacity-50 text-center py-8" style={{ color: "var(--foreground)" }}>
-              No cards yet
-            </p>
-          ) : (
-            cards.map((card) => (
-              <div
+        {cards.length === 0 ? (
+          <p
+            className="text-sm opacity-60 text-center py-8"
+            style={{ color: "var(--foreground)" }}
+          >
+            No cards yet
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {cards.map((card) => (
+              <button
                 key={card.id}
-                onClick={() => onCardTap?.(card)}
-                className="p-3 rounded cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => onCardClick?.(card)}
+                className="w-full text-left p-3 rounded-lg transition-opacity hover:opacity-90"
                 style={{
                   backgroundColor: "var(--neutral-100)",
                   border: "1px solid var(--border)",
                 }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1">
                     <div
                       className={`text-sm font-medium mb-1 ${getStatusColor(card.status)}`}
                       style={{ color: "var(--foreground)" }}
@@ -88,11 +92,12 @@ export function DeckView({ cards, onCardTap, onClose }: DeckViewProps) {
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
