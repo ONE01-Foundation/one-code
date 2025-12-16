@@ -1621,7 +1621,7 @@ export default function OneScreen() {
               id: b.id,
               title: b.title,
               subtitle: "",
-              status: b.state === "done" ? "completed" : b.state === "active" ? "active" : "pending",
+              status: b.state === "done" ? "completed" : "active",
               createdAt: new Date().toISOString(),
               scope: scope,
             }))}
