@@ -235,8 +235,8 @@ export default function OneScreen() {
   const savedScope = styleMemory.lastScope;
   const { scope, toggleScope, mounted: scopeMounted } = useScope(savedScope);
   
-  // Bubbles for SideBubbles (ONE source of truth)
-  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  // Bubbles for SideBubbles (ONE source of truth) - 3-slot navigation
+  const [bubbles, setBubbles] = useState<BubbleSlots>({});
   
   // Nobody Interaction v0.1
   const { showPrompt, promptData, promptState, handleChoice, openPrompt, retryPrompt, useLastPrompt } = useNobody();
