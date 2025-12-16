@@ -7,6 +7,21 @@
  * - Actions over explanations
  */
 
+// Scope layer
+export type Scope = "private" | "global";
+
+// ActionCard for Global ↔ Private Mirror
+export type ActionCardStatus = "active" | "completed" | "archived";
+
+export interface ActionCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  status: ActionCardStatus;
+  createdAt: string;
+  scope: Scope;
+}
+
 // Card System v0.1
 export type CardType = "goal" | "step" | "insight" | "offer" | "need" | "action";
 export type CardState = "draft" | "active" | "progressing" | "done" | "archived";
@@ -108,30 +123,6 @@ export interface Signal {
   reason?: string; // Why signal was dismissed (learning signal)
 }
 
-// Onboarding Without Onboarding (OWO) v0.1
-export type OWOState = "loading" | "presence" | "choice" | "input" | "complete";
-export type OWOChoice = "my_life" | "the_world";
-
-// Identity Without Exposure (IWE) v0.1
-export type IdentityTier = "presence" | "path" | "anchor";
-export type IdentityStatus = "active" | "pending" | "available";
-
-// Action Loop v0.1
-export type ActionLoopState = "prompt" | "choice" | "action" | "closure";
-export type ActionChoice = "yes" | "not_now" | "change";
-export type ActionClosure = "completed" | "skipped" | "changed";
-
-export interface Identity {
-  presenceId: string; // Auto-generated anonymous session ID (always exists)
-  pathId?: string; // Created when user shows consistent activity
-  anchorId?: string; // Optional, only when cross-device or economic action required
-  createdAt: string; // ISO timestamp
-  lastActivityAt: string; // ISO timestamp
-  activityCount: number; // Track activity for Path ID creation
-  pathEligible: boolean; // Whether user is eligible for Path ID
-  anchorEligible: boolean; // Whether user is eligible for Anchor ID
-}
-
 // Step Engine Models
 export type StepActionType = "primary" | "choice";
 export type StepIntent = "entry" | "welcome" | "choice" | "card_creation" | "transition" | "home";
@@ -165,6 +156,30 @@ export interface Step {
   streaming?: boolean; // Support partial reveal
 }
 
+// Onboarding Without Onboarding (OWO) v0.1
+export type OWOState = "loading" | "presence" | "choice" | "input" | "complete";
+export type OWOChoice = "my_life" | "the_world";
+
+// Identity Without Exposure (IWE) v0.1
+export type IdentityTier = "presence" | "path" | "anchor";
+export type IdentityStatus = "active" | "pending" | "available";
+
+export interface Identity {
+  presenceId: string; // Auto-generated anonymous session ID (always exists)
+  pathId?: string; // Created when user shows consistent activity
+  anchorId?: string; // Optional, only when cross-device or economic action required
+  createdAt: string; // ISO timestamp
+  lastActivityAt: string; // ISO timestamp
+  activityCount: number; // Track activity for Path ID creation
+  pathEligible: boolean; // Whether user is eligible for Path ID
+  anchorEligible: boolean; // Whether user is eligible for Anchor ID
+}
+
+// Action Loop v0.1
+export type ActionLoopState = "prompt" | "choice" | "action" | "closure";
+export type ActionChoice = "yes" | "not_now" | "change";
+export type ActionClosure = "completed" | "skipped" | "changed";
+
 // State Memory - Minimal session-based state with mode separation
 export interface State {
   mode: Mode; // "private" | "global"
@@ -172,7 +187,3 @@ export interface State {
   privateContext: PrivateContext; // Isolated, only in private mode
   updatedAt: string; // ISO timestamp
 }
-
-
-
-
