@@ -21,14 +21,20 @@ function saveScope(scope: Scope) {
 }
 
 // Hook for scope state (with hydration guard)
-export function useScope() {
+export function useScope(initialScope?: Scope) {
   const [mounted, setMounted] = useState(false);
-  const [scope, setScope] = useState<Scope>("private"); // Default, will update on mount
+  const [scope, setScope] = useState<Scope>(initialScope || "private"); // Use initialScope if provided
   
   useEffect(() => {
     setMounted(true);
-    setScope(loadScope());
-  }, []);
+    // If initialScope provided, use it; otherwise load from localStorage
+    if (initialScope) {
+      setScope(initialScope);
+      saveScope(initialScope);
+    } else {
+      setScope(loadScope());
+    }
+  }, [initialScope]);
   
   useEffect(() => {
     if (mounted) {
@@ -37,7 +43,15 @@ export function useScope() {
   }, [scope, mounted]);
   
   const toggleScope = () => {
-    setScope((prev) => (prev === "private" ? "global" : "private"));
+    setScope((prev) => {
+      const newScope = prev === "private" ? "global" : "private";
+      // Style Memory v0.1: Save scope preference
+      if (typeof window !== "undefined") {
+        const { saveStyle } = require("@/lib/style-memory");
+        saveStyle({ lastScope: newScope });
+      }
+      return newScope;
+    });
   };
   
   return { scope, setScope, toggleScope, mounted };

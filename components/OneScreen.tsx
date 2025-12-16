@@ -107,6 +107,7 @@ import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
 import { AskPanel } from "@/components/ui/AskPanel";
 import { UILang, detectLangFromText } from "@/lib/lang";
+import { loadStyle, saveStyle, StyleMemory } from "@/lib/style-memory";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -214,8 +215,12 @@ export default function OneScreen() {
   const isGlobal = mode === "global";
   const context: LifeContext = isPrivate ? "private" : "global";
   
-  // Scope layer (Global ↔ Private Mirror)
-  const { scope, toggleScope, mounted: scopeMounted } = useScope();
+  // Style Memory v0.1: Load saved preferences (will be loaded in useEffect)
+  const [styleMemory, setStyleMemory] = useState<StyleMemory>({});
+  
+  // Scope layer (Global ↔ Private Mirror) - Initialize from style memory after load
+  const savedScope = styleMemory.lastScope;
+  const { scope, toggleScope, mounted: scopeMounted } = useScope(savedScope);
   
   // Bubbles for SideBubbles (ONE source of truth)
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
@@ -241,8 +246,8 @@ export default function OneScreen() {
   const [askEcho, setAskEcho] = useState("");
   const [askPhase, setAskPhase] = useState<"idle" | "echo" | "thinking" | "result">("idle");
   
-  // Auto Language v0.1 state
-  const [uiLang, setUiLang] = useState<UILang>(loadUILang());
+  // Auto Language v0.1 state - Initialize from style memory (will be set in useEffect)
+  const [uiLang, setUiLang] = useState<UILang>("en");
   
   // Step Card state (persisted)
   const [activeStepCard, setActiveStepCard] = useState<any>(null);
@@ -327,6 +332,19 @@ export default function OneScreen() {
 
   // Initialize OWO and Step Engine on mount
   useEffect(() => {
+    // Style Memory v0.1: Load saved preferences first
+    const savedStyle = loadStyle();
+    setStyleMemory(savedStyle);
+    
+    // Apply saved UI language
+    if (savedStyle.uiLang) {
+      setUiLang(savedStyle.uiLang);
+      // Also save to legacy UI lang storage for compatibility
+      if (typeof window !== "undefined") {
+        localStorage.setItem("one_ui_lang", savedStyle.uiLang);
+      }
+    }
+    
     // Set initial theme
     const initialTheme = getActiveTheme(themeOverride);
     setActiveTheme(initialTheme);
@@ -879,7 +897,23 @@ export default function OneScreen() {
     // Auto Language v0.1: Detect language from input
     const detectedLang = detectLangFromText(trimmed);
     setUiLang(detectedLang);
-    saveUILang(detectedLang);
+
+    // Style Memory v0.1: Update from user behavior
+    const answerStyle = trimmed.length > 80 ? "standard" : "short";
+    const currentStyle = loadStyle();
+    // Only save valid language codes (exclude "auto")
+    const langToSave = detectedLang === "auto" ? undefined : detectedLang as "en" | "he" | "ar" | "es" | "fr";
+    saveStyle({
+      uiLang: langToSave,
+      lastEntry: "ask",
+      answerStyle,
+      stepDifficulty: currentStyle.stepDifficulty || "standard", // Preserve existing difficulty
+    });
+    
+    // Also save to legacy UI lang storage for compatibility
+    if (typeof window !== "undefined" && langToSave) {
+      localStorage.setItem("one_ui_lang", langToSave);
+    }
 
     // Phase 1: Echo (show user text)
     setAskEcho(trimmed);
@@ -895,11 +929,18 @@ export default function OneScreen() {
     setIsGeneratingStep(true);
     setStepSuggestion(null);
 
+    // Include style memory in API call
+    const style = loadStyle();
     try {
       const response = await fetch("/api/nobody/step", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed, lang: detectedLang }),
+        body: JSON.stringify({
+          text: trimmed,
+          lang: detectedLang,
+          answerStyle: style.answerStyle,
+          stepDifficulty: style.stepDifficulty,
+        }),
       });
 
       if (!response.ok) {
@@ -958,6 +999,10 @@ export default function OneScreen() {
 
   const handleStepChange = async () => {
     if (!lastUserText) return;
+    
+    // Style Memory v0.1: User wants easier step
+    saveStyle({ stepDifficulty: "easier" });
+    
     if (stepSuggestion) {
       const card = createStepCardFromSuggestion(stepSuggestion, "skipped");
       saveStepCard(card);
@@ -965,11 +1010,19 @@ export default function OneScreen() {
     setIsGeneratingStep(true);
     setStepSuggestion(null);
 
+    // Include style memory in API call
+    const style = loadStyle();
     try {
       const response = await fetch("/api/nobody/step", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: lastUserText, makeEasier: true }),
+        body: JSON.stringify({
+          text: lastUserText,
+          makeEasier: true,
+          lang: uiLang,
+          answerStyle: style.answerStyle,
+          stepDifficulty: "easier", // Explicitly easier
+        }),
       });
 
       if (!response.ok) {

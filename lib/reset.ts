@@ -18,6 +18,7 @@ const VERSIONED_KEYS = [
   "nobody:last",
   "one01:v1:cards",
   "one01:v1:activeCardId",
+  "one_style_v1", // Style Memory v0.1
 ];
 
 // Clear all versioned localStorage keys

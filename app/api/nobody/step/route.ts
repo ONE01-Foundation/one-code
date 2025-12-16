@@ -80,10 +80,14 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { text, makeEasier, lang } = body;
+    const { text, makeEasier, lang, answerStyle, stepDifficulty } = body;
     
     // Language: default to "en" if not provided or invalid
     const uiLang = lang && ["en", "he", "ar", "es", "fr"].includes(lang) ? lang : "en";
+    
+    // Style Memory v0.1: Use preferences
+    const preferredAnswerStyle = answerStyle === "short" ? "short" : "standard";
+    const preferredDifficulty = stepDifficulty === "easier" || makeEasier ? "easier" : "standard";
 
     // Validate input
     if (!text || typeof text !== "string") {
@@ -112,6 +116,15 @@ export async function POST(req: NextRequest) {
     
     const langInstruction = langInstructions[uiLang] || langInstructions.en;
 
+    // Style Memory v0.1: Build style instructions
+    let styleInstructions = "";
+    if (preferredAnswerStyle === "short") {
+      styleInstructions += "\n- Keep title to 4 words or fewer.\n- Keep why to 8 words or fewer.";
+    }
+    if (preferredDifficulty === "easier") {
+      styleInstructions += "\n- Prefer shorter duration (5 or 10 minutes).\n- Prefer lower energy (low or medium).";
+    }
+
     const systemPrompt = `You are Nobody, a calm system that helps people take one small step forward.
 
 Your job: Compress the user's intent into ONE actionable next step.
@@ -139,8 +152,8 @@ Strict rules:
 - energy: Choose based on what the step requires (low = minimal effort, high = more effort)
 - domain: Choose the most relevant category
 - buttons: Always return these exact 3 buttons with these IDs (button labels will be translated by the UI, so keep them in English here)
-
-${makeEasier ? "IMPORTANT: The user asked to change this. Make the step EASIER, shorter, or lower energy." : ""}
+${styleInstructions}
+${makeEasier || preferredDifficulty === "easier" ? "\nIMPORTANT: The user prefers easier steps. Make the step EASIER, shorter, or lower energy." : ""}
 
 Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
 
