@@ -110,6 +110,7 @@ import { UILang, detectLangFromText } from "@/lib/lang";
 import { loadStyle, saveStyle, StyleMemory } from "@/lib/style-memory";
 import { getTimeAtmosphere, getNobodyHeadline } from "@/lib/time-atmosphere";
 import { PresenceLayer } from "@/components/ui/PresenceLayer";
+import { SkyLayer } from "@/components/ui/SkyLayer";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -1312,7 +1313,7 @@ export default function OneScreen() {
       {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps, OWO, and action loop */}
       {!hideTopBar && (
         <div 
-          className="fixed top-0 left-0 right-0 z-[9999] pointer-events-auto flex items-center justify-between pt-4 pb-2 px-4" 
+          className="fixed top-0 left-0 right-0 z-50 pointer-events-auto flex items-center justify-between pt-4 pb-2 px-4" 
           style={{ 
             backgroundColor: "var(--background)",
             border: showDebug ? "2px solid green" : "none", // Dev-only outline to verify positioning
@@ -1352,11 +1353,10 @@ export default function OneScreen() {
               {scope === "private" ? "Private" : "Global"}
             </button>
           ) : (
-            showDebug && (
-              <div className="px-4 py-1.5 text-xs opacity-50" style={{ border: "1px dashed red" }}>
-                Scope not mounted
-              </div>
-            )
+            // Placeholder to prevent layout jump (invisible)
+            <div className="px-4 py-1.5 rounded-full text-xs opacity-0 pointer-events-none" style={{ border: "1px solid transparent" }}>
+              Private
+            </div>
           )}
 
           {/* Dev menu (development only) */}
