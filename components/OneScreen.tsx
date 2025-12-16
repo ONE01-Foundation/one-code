@@ -102,6 +102,8 @@ import {
 } from "@/lib/step-card";
 import { buildBubbles, BubbleSlots, BubbleSlot, BubbleItem } from "@/lib/bubbles";
 import { getNextIntent, NextIntent } from "@/lib/flow-lock";
+import { Deck, loadDecks, saveDeck, updateDeck, setActiveDeckId, getActiveDeck, createDeckFromSuggestion } from "@/lib/deck";
+import { DoingStep } from "@/components/ui/DoingStep";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";

@@ -22,7 +22,12 @@ type UITextKey =
   | "done"
   | "generating"
   | "globalViewOnly"
-  | "silence";
+  | "silence"
+  | "start"
+  | "pause"
+  | "resume"
+  | "reset"
+  | "back";
 
 const dict: Record<UILang, Record<UITextKey, string>> = {
   en: {
