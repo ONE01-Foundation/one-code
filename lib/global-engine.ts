@@ -18,6 +18,9 @@ import {
   isBucketSafe,
   isMissionSafe,
 } from "./global-types";
+
+// Re-export GlobalSnapshot for convenience
+export type { GlobalSnapshot };
 import { Domain } from "./ledger-types";
 import { loadStepCards } from "./step-card";
 import { loadDecks } from "./deck";
