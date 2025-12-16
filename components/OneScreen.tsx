@@ -46,6 +46,15 @@ import {
   generateStateBasedSignal,
   activateSignal,
 } from "@/lib/signal-engine";
+import {
+  isOWOComplete,
+  markOWOComplete,
+  saveOWOChoice,
+  saveOWOInput,
+  createFirstCardFromInput,
+  initializeOWO,
+  getOWOChoice,
+} from "@/lib/owo-engine";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -129,50 +138,69 @@ export default function OneScreen() {
   // Signal & Timing Engine state
   const [activeSignal, setActiveSignal] = useState<Signal | null>(null);
   const [signalVisible, setSignalVisible] = useState(false);
+  
+  // Onboarding Without Onboarding (OWO) state
+  const [owoState, setOwoState] = useState<"loading" | "presence" | "choice" | "input" | "complete">("loading");
+  const [owoInput, setOwoInput] = useState("");
+  const [showOwo, setShowOwo] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
   const context: LifeContext = isPrivate ? "private" : "global";
 
-  // Initialize OneID and Step Engine on mount
+  // Initialize OWO and Step Engine on mount
   useEffect(() => {
-    const userId = getOrCreateOneID();
-    
     // Set initial theme
     const initialTheme = getActiveTheme(themeOverride);
     setActiveTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
     
-    // Initialize Step Engine
-    if (!isOnboardingComplete(userId)) {
-      // Check if welcome choice exists (from old flow)
-      const welcomeChoice = getWelcomeChoice();
-      const plan = createOnboardingPlan(userId, welcomeChoice || undefined);
-      setStepPlan(plan);
-      setShowSteps(true);
+    // Initialize OWO (Onboarding Without Onboarding)
+    const { userId, needsOWO } = initializeOWO();
+    
+    if (needsOWO) {
+      // Show OWO flow
+      setShowOwo(true);
       
-      // Load first step with pause
-      const step = getCurrentStep(plan);
-      if (step) {
-        setCurrentStep(step);
-        if (step.pause) {
-          setIsPausing(true);
-          setTimeout(() => {
-            setIsPausing(false);
-          }, step.pause);
-        }
-      }
+      // Short loading screen (minimal, calm)
+      setIsLoading(true);
+      setTimeout(() => {
+        setIsLoading(false);
+        setOwoState("presence");
+      }, 800); // Short loading
     } else {
-      // Onboarding complete, use Life Loop Engine
-      setShowSteps(false);
-      
-      // Check for signals on app open (Signal & Timing Engine)
-      // Only if no active user action
-      if (!showSteps && !currentLifeAction) {
-        const signal = checkSignalsOnAppOpen(context, false);
-        if (signal) {
-          setActiveSignal(signal);
-          setSignalVisible(true);
+      // OWO complete, check for Step Engine onboarding
+      if (!isOnboardingComplete(userId)) {
+        // Check if welcome choice exists (from old flow)
+        const welcomeChoice = getWelcomeChoice();
+        const plan = createOnboardingPlan(userId, welcomeChoice || undefined);
+        setStepPlan(plan);
+        setShowSteps(true);
+        
+        // Load first step with pause
+        const step = getCurrentStep(plan);
+        if (step) {
+          setCurrentStep(step);
+          if (step.pause) {
+            setIsPausing(true);
+            setTimeout(() => {
+              setIsPausing(false);
+            }, step.pause);
+          }
+        }
+      } else {
+        // All onboarding complete, use Life Loop Engine
+        setShowSteps(false);
+        
+        // Check for signals on app open (Signal & Timing Engine)
+        // Only if no active user action
+        if (!showSteps && !currentLifeAction) {
+          const signal = checkSignalsOnAppOpen(context, false);
+          if (signal) {
+            setActiveSignal(signal);
+            setSignalVisible(true);
+          }
         }
       }
     }
@@ -320,6 +348,78 @@ export default function OneScreen() {
       // TODO: Trigger step from signal
       // This would integrate with Step Engine
     }
+  };
+
+  // OWO handlers
+  const handleOWOPresenceContinue = () => {
+    setOwoState("choice");
+  };
+
+  const handleOWOChoice = (choice: "my_life" | "the_world") => {
+    saveOWOChoice(choice);
+    setOwoState("input");
+  };
+
+  const handleOWOInputSubmit = () => {
+    if (owoInput.trim()) {
+      saveOWOInput(owoInput);
+      const choice = getOWOChoice() || "my_life";
+      createFirstCardFromInput(owoInput, choice);
+    }
+    
+    // Seamless transition to main One Screen
+    markOWOComplete();
+    setOwoState("complete");
+    setShowOwo(false);
+    
+    // Initialize main state
+    setTimeout(() => {
+      if (!isGlobal) {
+        const activeState = getActiveLifeState(context);
+        if (activeState) {
+          setCurrentLifeState(activeState);
+          const activeAction = getActiveLifeAction(activeState.id);
+          if (activeAction) {
+            setCurrentLifeAction(activeAction);
+            setNobodyMessage(NOBODY_MESSAGES.actionReady);
+          } else {
+            generateActionForState(activeState);
+          }
+        } else {
+          setCurrentLifeState(null);
+          setCurrentLifeAction(null);
+          setNobodyMessage(NOBODY_MESSAGES.noAction);
+        }
+      }
+    }, 300);
+  };
+
+  const handleOWOInputSkip = () => {
+    // Skip input, seamless transition
+    markOWOComplete();
+    setOwoState("complete");
+    setShowOwo(false);
+    
+    // Initialize main state
+    setTimeout(() => {
+      if (!isGlobal) {
+        const activeState = getActiveLifeState(context);
+        if (activeState) {
+          setCurrentLifeState(activeState);
+          const activeAction = getActiveLifeAction(activeState.id);
+          if (activeAction) {
+            setCurrentLifeAction(activeAction);
+            setNobodyMessage(NOBODY_MESSAGES.actionReady);
+          } else {
+            generateActionForState(activeState);
+          }
+        } else {
+          setCurrentLifeState(null);
+          setCurrentLifeAction(null);
+          setNobodyMessage(NOBODY_MESSAGES.noAction);
+        }
+      }
+    }, 300);
   };
 
   // Update theme when override changes
@@ -504,8 +604,8 @@ export default function OneScreen() {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
-      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps */}
-      {!showSteps && (
+      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps and OWO */}
+      {!showSteps && !showOwo && (
         <div className="flex items-center justify-between pt-4 pb-2 px-4">
           {/* Theme Toggle (minimal, top-left) */}
           <button
@@ -769,8 +869,8 @@ export default function OneScreen() {
         </div>
       </div>
 
-      {/* Bottom: Minimal anchor - Hidden during steps */}
-      {!showSteps && (
+      {/* Bottom: Minimal anchor - Hidden during steps and OWO */}
+      {!showSteps && !showOwo && (
         <div className="flex items-center justify-center pb-6 pt-4">
           <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
         </div>

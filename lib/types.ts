@@ -108,6 +108,10 @@ export interface Signal {
   reason?: string; // Why signal was dismissed (learning signal)
 }
 
+// Onboarding Without Onboarding (OWO) v0.1
+export type OWOState = "loading" | "presence" | "choice" | "input" | "complete";
+export type OWOChoice = "my_life" | "the_world";
+
 // Step Engine Models
 export type StepActionType = "primary" | "choice";
 export type StepIntent = "entry" | "welcome" | "choice" | "card_creation" | "transition" | "home";
