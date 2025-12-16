@@ -100,7 +100,7 @@ import {
   getActiveCardId,
   createStepCardFromSuggestion,
 } from "@/lib/step-card";
-import { buildBubbles, BubbleSlots, BubbleSlot } from "@/lib/bubbles";
+import { buildBubbles, BubbleSlots, BubbleSlot, BubbleItem } from "@/lib/bubbles";
 import { getNextIntent, NextIntent } from "@/lib/flow-lock";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
