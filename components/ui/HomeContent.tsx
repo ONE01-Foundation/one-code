@@ -28,6 +28,7 @@ interface HomeContentProps {
   onFindNextStep?: () => void;
   isGenerating?: boolean;
   scope?: "private" | "global";
+  nextIntent?: "show_active" | "show_step" | "ask_nobody" | "silence";
   // Active
   activeStepCard?: StepCard | null;
   onStepDone?: () => void;
@@ -49,6 +50,7 @@ export function HomeContent({
   onFindNextStep,
   isGenerating = false,
   scope = "private",
+  nextIntent = "ask_nobody",
   activeStepCard,
   onStepDone,
   stepSuggestion,

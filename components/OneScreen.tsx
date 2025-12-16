@@ -101,6 +101,7 @@ import {
   createStepCardFromSuggestion,
 } from "@/lib/step-card";
 import { buildBubbles, Bubble } from "@/lib/bubbles";
+import { getNextIntent, NextIntent } from "@/lib/flow-lock";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
@@ -283,6 +284,15 @@ export default function OneScreen() {
     hasPrompt: false, // Legacy - not used in MVP
     isLoading: isGeneratingStep && !showCompletedMessage,
     isCompleted: showCompletedMessage,
+  });
+  
+  // Flow Lock: Compute next intent (ONE continuation rule)
+  const nextIntent: NextIntent = getNextIntent({
+    homeState,
+    activeCard: null, // Legacy - not used in MVP
+    activeStepCard,
+    stepSuggestion,
+    actionLoopState: undefined, // Legacy - not used in MVP
   });
   
   // Note: Nobody presence flow removed - using StepCard flow only
@@ -1139,16 +1149,13 @@ export default function OneScreen() {
             state={homeState}
             isLoading={isGeneratingStep}
             onFindNextStep={() => {
-              // Private scope: focus input (input will handle submission)
-              // Global scope: do nothing (view-only)
-              if (scope === "private") {
-                // Input is always visible in empty state, just focus it
+              // Flow Lock: Only focus input if nextIntent is "ask_nobody"
+              if (nextIntent === "ask_nobody" && scope === "private") {
                 const input = document.querySelector('input[placeholder="Tell me what you need…"]') as HTMLInputElement;
                 if (input) {
                   input.focus();
                 }
               }
-              // Global scope: no action
             }}
             isGenerating={isGeneratingStep}
             scope={scope}
