@@ -19,6 +19,39 @@ import { Card, CardStatus, State, Mode } from "@/lib/types";
 // Loop states
 type LoopState = "observe" | "reduce" | "offer" | "act" | "reflect";
 
+// Theme types
+type ThemeOverride = "auto" | "light" | "dark";
+type ActiveTheme = "light" | "dark";
+
+// Theme detection based on local time
+function getTimeBasedTheme(): ActiveTheme {
+  const now = new Date();
+  const hour = now.getHours();
+  // 07:00 to 18:59 -> Light, 19:00 to 06:59 -> Dark
+  return hour >= 7 && hour < 19 ? "light" : "dark";
+}
+
+// Load theme override from localStorage
+function loadThemeOverride(): ThemeOverride {
+  if (typeof window === "undefined") return "auto";
+  const stored = localStorage.getItem("one_theme_override");
+  return (stored as ThemeOverride) || "auto";
+}
+
+// Save theme override to localStorage
+function saveThemeOverride(override: ThemeOverride) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("one_theme_override", override);
+}
+
+// Get active theme (override or time-based)
+function getActiveTheme(override: ThemeOverride): ActiveTheme {
+  if (override === "auto") {
+    return getTimeBasedTheme();
+  }
+  return override;
+}
+
 // Reflection messages (calm, neutral, one thought)
 const REFLECTION_MESSAGES = [
   "Small actions create stability.",
@@ -99,6 +132,8 @@ export default function OneScreen() {
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [memoryState, setMemoryState] = useState<State>(loadState());
   const [reflectionMessage, setReflectionMessage] = useState<string>("");
+  const [themeOverride, setThemeOverride] = useState<ThemeOverride>(loadThemeOverride());
+  const [activeTheme, setActiveTheme] = useState<ActiveTheme>(getActiveTheme(themeOverride));
 
   const isPrivate = memoryState.mode === "private";
   const isGlobal = memoryState.mode === "global";
@@ -110,7 +145,48 @@ export default function OneScreen() {
       localStorage.setItem("one_session_id", `session_${Date.now()}`);
     }
     setMemoryState(loadState());
+    
+    // Set initial theme
+    const initialTheme = getActiveTheme(themeOverride);
+    setActiveTheme(initialTheme);
+    document.documentElement.setAttribute("data-theme", initialTheme);
   }, []);
+
+  // Update theme when override changes
+  useEffect(() => {
+    const newTheme = getActiveTheme(themeOverride);
+    setActiveTheme(newTheme);
+    document.documentElement.setAttribute("data-theme", newTheme);
+    saveThemeOverride(themeOverride);
+  }, [themeOverride]);
+
+  // Check for time-based theme changes (if override is "auto")
+  useEffect(() => {
+    if (themeOverride !== "auto") return;
+
+    const checkTheme = () => {
+      const newTheme = getTimeBasedTheme();
+      if (newTheme !== activeTheme) {
+        setActiveTheme(newTheme);
+        document.documentElement.setAttribute("data-theme", newTheme);
+      }
+    };
+
+    // Check immediately
+    checkTheme();
+
+    // Check every minute
+    const interval = setInterval(checkTheme, 60000);
+
+    return () => clearInterval(interval);
+  }, [themeOverride, activeTheme]);
+
+  // Handle theme override toggle
+  const handleThemeToggle = () => {
+    const nextOverride: ThemeOverride =
+      themeOverride === "auto" ? "light" : themeOverride === "light" ? "dark" : "auto";
+    setThemeOverride(nextOverride);
+  };
 
   // Handle mode switch (user-initiated only)
   const handleModeSwitch = (newMode: Mode) => {
@@ -262,17 +338,32 @@ export default function OneScreen() {
   const globalData = isGlobal ? getGlobalData() : null;
 
   return (
-    <div className="fixed inset-0 bg-white flex flex-col">
-      {/* Top: Mode Toggle */}
-      <div className="flex items-center justify-center pt-4 pb-2">
-        <div className="flex gap-1 border border-black rounded-full px-1 py-1">
+    <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
+      {/* Top: Theme Toggle (subtle corner) + Mode Toggle */}
+      <div className="flex items-center justify-between pt-4 pb-2 px-4">
+        {/* Theme Toggle (minimal, top-left) */}
+        <button
+          onClick={handleThemeToggle}
+          className="w-8 h-8 flex items-center justify-center text-xs opacity-40 hover:opacity-100 transition-opacity rounded-full"
+          style={{ color: "var(--foreground)" }}
+          title={themeOverride === "auto" ? "Auto (tap to override)" : themeOverride === "light" ? "Light (tap for dark)" : "Dark (tap for auto)"}
+        >
+          {themeOverride === "auto" ? "○" : activeTheme === "light" ? "●" : "○"}
+        </button>
+
+        {/* Mode Toggle (center) */}
+        <div className="flex gap-1 rounded-full px-1 py-1" style={{ border: "1px solid var(--border)" }}>
           <button
             onClick={() => handleModeSwitch("private")}
             className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
               isPrivate
-                ? "bg-black text-white"
-                : "text-black hover:opacity-70"
+                ? "text-white"
+                : "hover:opacity-70"
             }`}
+            style={{
+              backgroundColor: isPrivate ? "var(--foreground)" : "transparent",
+              color: isPrivate ? "var(--background)" : "var(--foreground)",
+            }}
           >
             Private
           </button>
@@ -280,13 +371,20 @@ export default function OneScreen() {
             onClick={() => handleModeSwitch("global")}
             className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
               isGlobal
-                ? "bg-black text-white"
-                : "text-black hover:opacity-70"
+                ? "text-white"
+                : "hover:opacity-70"
             }`}
+            style={{
+              backgroundColor: isGlobal ? "var(--foreground)" : "transparent",
+              color: isGlobal ? "var(--background)" : "var(--foreground)",
+            }}
           >
             Global
           </button>
         </div>
+
+        {/* Spacer for balance */}
+        <div className="w-8" />
       </div>
 
       {/* Center: Focus Zone */}
@@ -294,8 +392,9 @@ export default function OneScreen() {
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-neutral-50 blur-3xl"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl"
             style={{
+              backgroundColor: "var(--neutral-50)",
               animation: "subtle-pulse 4s ease-in-out infinite",
             }}
           />
@@ -306,18 +405,18 @@ export default function OneScreen() {
           {isGlobal ? (
             /* Global Mode: View Only */
             <div className="space-y-4">
-              <p className="text-lg text-neutral-600 mb-4">
+              <p className="text-lg mb-4" style={{ color: "var(--neutral-600)" }}>
                 {globalData
                   ? `${globalData.totalCards} people completed a small action today`
                   : "Anonymous aggregates"}
               </p>
               {globalData && (
                 <div className="space-y-2">
-                  <div className="p-4 border border-black rounded-lg">
-                    <div className="text-2xl font-bold text-black">
+                  <div className="p-4 rounded-lg" style={{ border: "1px solid var(--border)" }}>
+                    <div className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
                       {globalData.cardsByStatus.done}
                     </div>
-                    <div className="text-xs text-neutral-500 mt-1">
+                    <div className="text-xs mt-1" style={{ color: "var(--neutral-500)" }}>
                       Actions completed
                     </div>
                   </div>
@@ -330,12 +429,16 @@ export default function OneScreen() {
               {loopState === "observe" && (
                 /* OBSERVE: One sentence, one Continue button */
                 <div className="space-y-6">
-                  <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed">
+                  <p className="text-2xl sm:text-3xl leading-relaxed font-normal" style={{ color: "var(--foreground)" }}>
                     What matters for you right now?
                   </p>
                   <button
                     onClick={handleContinue}
-                    className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    style={{
+                      backgroundColor: "var(--foreground)",
+                      color: "var(--background)",
+                    }}
                   >
                     Continue
                   </button>
@@ -345,7 +448,7 @@ export default function OneScreen() {
               {loopState === "reduce" && (
                 /* REDUCE: Exactly two options */
                 <div className="space-y-6">
-                  <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed">
+                  <p className="text-xl sm:text-2xl leading-relaxed" style={{ color: "var(--foreground)" }}>
                     Choose what you want to work on now.
                   </p>
                   <div className="space-y-3">
@@ -353,7 +456,20 @@ export default function OneScreen() {
                       <button
                         key={option.id}
                         onClick={() => handleOptionSelect(option.id)}
-                        className="w-full px-6 py-4 bg-white border-2 border-black rounded-lg text-left hover:bg-black hover:text-white transition-colors duration-200"
+                        className="w-full px-6 py-4 rounded-lg text-left transition-colors duration-200"
+                        style={{
+                          backgroundColor: "var(--background)",
+                          border: "2px solid var(--border)",
+                          color: "var(--foreground)",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "var(--foreground)";
+                          e.currentTarget.style.color = "var(--background)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "var(--background)";
+                          e.currentTarget.style.color = "var(--foreground)";
+                        }}
                       >
                         <div className="font-medium text-lg">{option.label}</div>
                       </button>
@@ -365,23 +481,27 @@ export default function OneScreen() {
               {loopState === "offer" && currentCard && (
                 /* OFFER: One Card */
                 <div className="space-y-6">
-                  <div className="p-6 border-2 border-black rounded-lg text-left">
-                    <div className="text-sm text-neutral-500 mb-2">Status: {currentCard.status}</div>
-                    <div className="text-xl font-bold text-black mb-3">
+                  <div className="p-6 rounded-lg text-left" style={{ border: "2px solid var(--border)" }}>
+                    <div className="text-sm mb-2" style={{ color: "var(--neutral-500)" }}>Status: {currentCard.status}</div>
+                    <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
                       {currentCard.title}
                     </div>
-                    <div className="text-lg text-neutral-700 mb-2">
+                    <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
                       {currentCard.action}
                     </div>
                     {currentCard.time && (
-                      <div className="text-sm text-neutral-500">
+                      <div className="text-sm" style={{ color: "var(--neutral-500)" }}>
                         {currentCard.time} min
                       </div>
                     )}
                   </div>
                   <button
                     onClick={() => setLoopState("act")}
-                    className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    style={{
+                      backgroundColor: "var(--foreground)",
+                      color: "var(--background)",
+                    }}
                   >
                     Continue
                   </button>
@@ -391,24 +511,33 @@ export default function OneScreen() {
               {loopState === "act" && currentCard && (
                 /* ACT: Do it / Not now */
                 <div className="space-y-6">
-                  <div className="p-6 border-2 border-black rounded-lg text-left">
-                    <div className="text-xl font-bold text-black mb-3">
+                  <div className="p-6 rounded-lg text-left" style={{ border: "2px solid var(--border)" }}>
+                    <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
                       {currentCard.title}
                     </div>
-                    <div className="text-lg text-neutral-700">
+                    <div className="text-lg sm:text-xl" style={{ color: "var(--neutral-700)" }}>
                       {currentCard.action}
                     </div>
                   </div>
                   <div className="space-y-3">
                     <button
                       onClick={handleDoIt}
-                      className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                      style={{
+                        backgroundColor: "var(--foreground)",
+                        color: "var(--background)",
+                      }}
                     >
                       Do it
                     </button>
                     <button
                       onClick={handleNotNow}
-                      className="w-full px-6 py-4 bg-white border-2 border-black text-black rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                      style={{
+                        backgroundColor: "var(--background)",
+                        border: "2px solid var(--border)",
+                        color: "var(--foreground)",
+                      }}
                     >
                       Not now
                     </button>
@@ -419,12 +548,16 @@ export default function OneScreen() {
               {loopState === "reflect" && (
                 /* REFLECT: Reflection sentence + Next step */
                 <div className="space-y-6">
-                  <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed">
+                  <p className="text-xl sm:text-2xl leading-relaxed" style={{ color: "var(--foreground)" }}>
                     {reflectionMessage}
                   </p>
                   <button
                     onClick={handleNextStep}
-                    className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    style={{
+                      backgroundColor: "var(--foreground)",
+                      color: "var(--background)",
+                    }}
                   >
                     Next step
                   </button>
@@ -437,7 +570,7 @@ export default function OneScreen() {
 
       {/* Bottom: Minimal anchor */}
       <div className="flex items-center justify-center pb-6 pt-4">
-        <div className="text-xs text-neutral-400">ONE01</div>
+        <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
       </div>
     </div>
   );
