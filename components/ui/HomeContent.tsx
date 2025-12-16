@@ -21,6 +21,8 @@ import { OneNextStep } from "@/app/api/nobody/step/route";
 import { StepCard } from "@/lib/step-card";
 import { UILang } from "@/lib/lang";
 import { t } from "@/lib/ui-text";
+import { getHeaderText } from "@/lib/header-text";
+import { Scope } from "@/lib/types";
 
 interface HomeContentProps {
   state: HomeState;

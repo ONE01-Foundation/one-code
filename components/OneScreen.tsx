@@ -109,6 +109,7 @@ import { AskPanel } from "@/components/ui/AskPanel";
 import { UILang, detectLangFromText } from "@/lib/lang";
 import { loadStyle, saveStyle, StyleMemory } from "@/lib/style-memory";
 import { getTimeAtmosphere, getNobodyHeadline } from "@/lib/time-atmosphere";
+import { PresenceLayer } from "@/components/ui/PresenceLayer";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
