@@ -86,6 +86,18 @@ import { NobodyPrompt } from "@/components/ui/NobodyPrompt";
 import { determineHomeState, HomeState } from "@/lib/home-state";
 import { handleResetParam } from "@/lib/reset";
 import { HomeContent } from "@/components/ui/HomeContent";
+import {
+  loadStepCards,
+  createStepCard,
+  updateStepCardStatus,
+  getActiveStepCard,
+  getActiveCardId,
+  setActiveCardId,
+  getLastStepCards,
+  StepCard,
+} from "@/lib/step-card-storage";
+import { DeckView } from "@/components/ui/DeckView";
+import { CardDetailView } from "@/components/ui/CardDetailView";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -208,18 +220,23 @@ export default function OneScreen() {
   const [showNobody, setShowNobody] = useState(false);
   const [showStepPrompt, setShowStepPrompt] = useState(false);
   
+  // AI Step Suggestion state
+  const [stepSuggestion, setStepSuggestion] = useState<any>(null);
+  const [isGeneratingStep, setIsGeneratingStep] = useState(false);
+  const [lastUserText, setLastUserText] = useState("");
+  
   // Handle reset param on mount
   useEffect(() => {
     handleResetParam();
   }, []);
   
   // Determine home state (strict state machine)
-  const hasSuggestion = (actionLoopPlan && actionLoopState === "prompt") || showPrompt;
+  const hasSuggestion = (actionLoopPlan && actionLoopState === "prompt") || showPrompt || !!stepSuggestion;
   const homeState: HomeState = determineHomeState({
     hasActiveCard: !!activeCard,
     hasSuggestion,
     hasPrompt: showPrompt,
-    isLoading: (promptState === "loading" || isGenerating) && !isCompleted,
+    isLoading: (promptState === "loading" || isGenerating || isGeneratingStep) && !isCompleted,
     isCompleted,
   });
   

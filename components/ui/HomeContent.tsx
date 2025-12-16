@@ -15,6 +15,9 @@ import { ActionLoopPlan } from "@/lib/action-loop-engine";
 import { DomainChoice } from "./DomainChoice";
 import { NobodyPresence } from "./NobodyPresence";
 import { StepPrompt, StepOption } from "./StepPrompt";
+import { AskNobodyInput } from "./AskNobodyInput";
+import { StepSuggestion } from "./StepSuggestion";
+import { OneNextStep } from "@/app/api/nobody/step/route";
 
 interface HomeContentProps {
   state: HomeState;
@@ -29,6 +32,8 @@ interface HomeContentProps {
   activeCard?: Card | null;
   onCompleteCard?: (cardId: string) => void;
   onDeferCard?: (cardId: string) => void;
+  activeStepCard?: any; // StepCard from step-card-storage
+  onStepCardDone?: () => void;
   showNobody?: boolean;
   onNobodyYes?: () => void;
   onNobodyNotNow?: () => void;
@@ -48,6 +53,12 @@ interface HomeContentProps {
   actionInProgress?: boolean;
   // Completed
   completedMessage?: string;
+  // AI Step Suggestion
+  stepSuggestion?: OneNextStep | null;
+  onStepDo?: () => void;
+  onStepNotNow?: () => void;
+  onStepChange?: () => void;
+  onAskNobodySubmit?: (text: string) => void;
   // Debug
   isDev?: boolean;
 }
@@ -62,6 +73,8 @@ export function HomeContent({
   activeCard,
   onCompleteCard,
   onDeferCard,
+  activeStepCard,
+  onStepCardDone,
   showNobody = false,
   onNobodyYes,
   onNobodyNotNow,
@@ -80,6 +93,11 @@ export function HomeContent({
   actionInProgress = false,
   completedMessage = "Done",
   isDev = false,
+  stepSuggestion,
+  onStepDo,
+  onStepNotNow,
+  onStepChange,
+  onAskNobodySubmit,
 }: HomeContentProps) {
   // Unified layout structure
   return (
@@ -302,20 +320,26 @@ export function HomeContent({
             ) : null}
           </>
         ) : state === "empty" ? (
-          /* EMPTY: No active card + CTA */
-          <div className="text-center py-12">
-            <button
-              onClick={onFindNextStep}
-              disabled={isGenerating}
-              className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-              style={{
-                backgroundColor: "var(--foreground)",
-                color: "var(--background)",
-              }}
-            >
-              {isGenerating ? "Generating..." : "Find next step"}
-            </button>
-          </div>
+          /* EMPTY: No active card + CTA + Ask Nobody input */
+          <>
+            <div className="text-center py-12 pb-24">
+              <button
+                onClick={onFindNextStep}
+                disabled={isGenerating}
+                className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                style={{
+                  backgroundColor: "var(--foreground)",
+                  color: "var(--background)",
+                }}
+              >
+                {isGenerating ? "Generating..." : "Find next step"}
+              </button>
+            </div>
+            <AskNobodyInput
+              onSubmit={(text) => onAskNobodySubmit?.(text)}
+              isGenerating={isGenerating}
+            />
+          </>
         ) : null}
       </div>
     </div>
