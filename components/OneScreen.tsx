@@ -929,15 +929,19 @@ export default function OneScreen() {
     const trimmed = text.trim();
     if (trimmed.length === 0 || trimmed.length > 280) return;
 
-    // Auto Language v0.1: Detect language from input
-    const detectedLang = detectLangFromText(trimmed);
-    setUiLang(detectedLang);
+    // Auto Language v0.1: Detect language from input (for UI text)
+    const detectedUILang = detectUILang(trimmed);
+    setUiLang(detectedUILang);
+    
+    // Detect header language (simplified to he/en)
+    const headerLangDetected = detectLangFromText(trimmed);
+    setHeaderLang(headerLangDetected);
 
     // Style Memory v0.1: Update from user behavior
     const answerStyle = trimmed.length > 80 ? "standard" : "short";
     const currentStyle = loadStyle();
     // Only save valid language codes (exclude "auto")
-    const langToSave = detectedLang === "auto" ? undefined : detectedLang as "en" | "he" | "ar" | "es" | "fr";
+    const langToSave = detectedUILang === "auto" ? undefined : detectedUILang as "en" | "he" | "ar" | "es" | "fr";
     saveStyle({
       uiLang: langToSave,
       lastEntry: "ask",
