@@ -1324,17 +1324,6 @@ export default function OneScreen() {
           />
         )}
         
-        {/* Nobody Presence - Subtle Light Movement */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl"
-            style={{
-              backgroundColor: "var(--neutral-50)",
-              animation: "subtle-pulse 4s ease-in-out infinite",
-            }}
-          />
-        </div>
-
         {/* Unified UI Structure - Single state only */}
         <div className="relative z-20 w-full">
           <HomeContent
