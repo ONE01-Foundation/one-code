@@ -80,6 +80,8 @@ import { SideBubbles } from "@/components/ui/SideBubbles";
 import { DebugPanel } from "@/components/ui/DebugPanel";
 import { useCards } from "@/hooks/useCards";
 import { CenterCard } from "@/components/ui/CenterCard";
+import { useNobody } from "@/hooks/useNobody";
+import { NobodyPrompt } from "@/components/ui/NobodyPrompt";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -187,7 +189,10 @@ export default function OneScreen() {
   const { scope, toggleScope } = useScope();
   
   // Cards Lifecycle v0.1
-  const { activeCard, visibleCards, completeCard, deferCard } = useCards(scope);
+  const { activeCard, visibleCards, completeCard, deferCard, refresh: refreshCards } = useCards(scope);
+  
+  // Nobody Interaction v0.1
+  const { showPrompt, promptData, isLoading: nobodyLoading, handleChoice, openPrompt, refreshPrompt } = useNobody();
 
   // Initialize OWO and Step Engine on mount
   useEffect(() => {
@@ -790,18 +795,42 @@ export default function OneScreen() {
         {/* Side Bubbles (next/context/last done - max 3) */}
         <SideBubbles cards={visibleCards} />
         
-        {/* Center Card (active card) */}
-        {activeCard ? (
+        {/* Nobody Prompt (first run or manual) */}
+        {showPrompt && promptData ? (
+          <NobodyPrompt
+            say={promptData.say}
+            choices={promptData.choices}
+            onChoice={(choiceId) => {
+              handleChoice(choiceId);
+              // Refresh cards to show newly created card
+              setTimeout(() => refreshCards(), 100);
+            }}
+            onRefresh={refreshPrompt}
+            isLoading={nobodyLoading}
+          />
+        ) : activeCard ? (
+          /* Center Card (active card) */
           <CenterCard
             card={activeCard}
             onComplete={() => completeCard(activeCard.id)}
             onDefer={() => deferCard(activeCard.id)}
           />
         ) : (
-          /* No active card - show placeholder or create prompt */
-          <div className="text-center opacity-50">
-            <p className="text-lg">No active card</p>
-            <p className="text-sm mt-2">Create one to begin</p>
+          /* No active card - show "Ask Nobody" button */
+          <div className="text-center space-y-4">
+            <div className="opacity-50 mb-4">
+              <p className="text-lg">What matters for you right now?</p>
+            </div>
+            <button
+              onClick={openPrompt}
+              className="px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+              style={{
+                backgroundColor: "var(--foreground)",
+                color: "var(--background)",
+              }}
+            >
+              Ask Nobody
+            </button>
           </div>
         )}
         
