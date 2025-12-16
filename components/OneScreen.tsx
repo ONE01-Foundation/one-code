@@ -204,6 +204,10 @@ export default function OneScreen() {
   // Domain Choice state (First Meaningful Step)
   const [showDomainChoice, setShowDomainChoice] = useState(false);
   
+  // Nobody Presence state
+  const [showNobody, setShowNobody] = useState(false);
+  const [showStepPrompt, setShowStepPrompt] = useState(false);
+  
   // Handle reset param on mount
   useEffect(() => {
     handleResetParam();
@@ -218,6 +222,18 @@ export default function OneScreen() {
     isLoading: (promptState === "loading" || isGenerating) && !isCompleted,
     isCompleted,
   });
+  
+  // Show Nobody when active card first loads
+  useEffect(() => {
+    if (activeCard && homeState === "active" && !showStepPrompt) {
+      // Show Nobody on first load of active card
+      setShowNobody(true);
+    } else if (!activeCard) {
+      // Reset Nobody when no active card
+      setShowNobody(false);
+      setShowStepPrompt(false);
+    }
+  }, [activeCard, homeState, showStepPrompt]);
   
   // Auto-reset completed state after short delay
   useEffect(() => {
@@ -916,6 +932,22 @@ export default function OneScreen() {
             activeCard={activeCard || undefined}
             onCompleteCard={(cardId) => completeCard(cardId)}
             onDeferCard={(cardId) => deferCard(cardId)}
+            showNobody={showNobody}
+            onNobodyYes={() => {
+              setShowNobody(false);
+              setShowStepPrompt(true);
+            }}
+            onNobodyNotNow={() => {
+              setShowNobody(false);
+            }}
+            showStepPrompt={showStepPrompt}
+            onStepSelect={(option) => {
+              // Handle step selection (static for now, no AI)
+              console.log("Step selected:", option);
+              // For now, just hide the prompt and return to calm view
+              setShowStepPrompt(false);
+              // TODO: Create a step card or action based on selection
+            }}
             showPrompt={showPrompt}
             promptData={promptData || undefined}
             promptState={promptState}

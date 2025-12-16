@@ -13,6 +13,8 @@ import { NobodyResponse } from "@/lib/nobody";
 import { ActionLoopState } from "@/lib/types";
 import { ActionLoopPlan } from "@/lib/action-loop-engine";
 import { DomainChoice } from "./DomainChoice";
+import { NobodyPresence } from "./NobodyPresence";
+import { StepPrompt, StepOption } from "./StepPrompt";
 
 interface HomeContentProps {
   state: HomeState;
@@ -27,6 +29,11 @@ interface HomeContentProps {
   activeCard?: Card | null;
   onCompleteCard?: (cardId: string) => void;
   onDeferCard?: (cardId: string) => void;
+  showNobody?: boolean;
+  onNobodyYes?: () => void;
+  onNobodyNotNow?: () => void;
+  showStepPrompt?: boolean;
+  onStepSelect?: (option: string) => void;
   // Suggestion
   showPrompt?: boolean;
   promptData?: NobodyResponse | null;
@@ -50,9 +57,16 @@ export function HomeContent({
   isLoading = false,
   onFindNextStep,
   isGenerating = false,
+  showDomainChoice = false,
+  onDomainSelect,
   activeCard,
   onCompleteCard,
   onDeferCard,
+  showNobody = false,
+  onNobodyYes,
+  onNobodyNotNow,
+  showStepPrompt = false,
+  onStepSelect,
   showPrompt = false,
   promptData,
   promptState = "idle",
@@ -97,50 +111,63 @@ export function HomeContent({
             </div>
           </div>
         ) : state === "active" && activeCard ? (
-          /* ACTIVE: Minimal active card view */
-          <div className="space-y-8 py-12">
-            <div className="text-center space-y-4">
-              <h2
-                className="text-3xl sm:text-4xl font-normal"
-                style={{ color: "var(--foreground)" }}
-              >
-                {activeCard.title}
-              </h2>
-              <p
-                className="text-base sm:text-lg opacity-60"
-                style={{ color: "var(--foreground)" }}
-              >
-                We'll take this one step at a time.
-              </p>
+          /* ACTIVE: Minimal active card view + Nobody presence */
+          showStepPrompt ? (
+            /* Step Prompt: What feels easiest to do next? */
+            <StepPrompt onSelect={(option) => onStepSelect?.(option)} />
+          ) : showNobody ? (
+            /* Nobody Presence: First message */
+            <NobodyPresence
+              message="Let's take one small step."
+              onYes={() => onNobodyYes?.()}
+              onNotNow={() => onNobodyNotNow?.()}
+            />
+          ) : (
+            /* Calm active card view (Nobody hidden) */
+            <div className="space-y-8 py-12">
+              <div className="text-center space-y-4">
+                <h2
+                  className="text-3xl sm:text-4xl font-normal"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  {activeCard.title}
+                </h2>
+                <p
+                  className="text-base sm:text-lg opacity-60"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  We'll take this one step at a time.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={() => onFindNextStep?.()}
+                  disabled={isGenerating}
+                  className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                  style={{
+                    backgroundColor: "var(--foreground)",
+                    color: "var(--background)",
+                  }}
+                >
+                  What's the next small step?
+                </button>
+                <button
+                  onClick={() => {
+                    // Defer current card (set to draft) to allow choosing a new focus
+                    onDeferCard?.(activeCard.id);
+                  }}
+                  className="w-full px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200"
+                  style={{
+                    backgroundColor: "var(--background)",
+                    border: "2px solid var(--border)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  Change focus
+                </button>
+              </div>
             </div>
-            <div className="space-y-3">
-              <button
-                onClick={() => onFindNextStep?.()}
-                disabled={isGenerating}
-                className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                style={{
-                  backgroundColor: "var(--foreground)",
-                  color: "var(--background)",
-                }}
-              >
-                What's the next small step?
-              </button>
-              <button
-                onClick={() => {
-                  // Defer current card (set to draft) to allow choosing a new focus
-                  onDeferCard?.(activeCard.id);
-                }}
-                className="w-full px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200"
-                style={{
-                  backgroundColor: "var(--background)",
-                  border: "2px solid var(--border)",
-                  color: "var(--foreground)",
-                }}
-              >
-                Change focus
-              </button>
-            </div>
-          </div>
+          )
         ) : state === "suggestion" ? (
           /* SUGGESTION: System suggests next step */
           <>
