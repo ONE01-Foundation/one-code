@@ -1343,6 +1343,9 @@ export default function OneScreen() {
         </div>
       )}
 
+      {/* Presence Layer - Time-based calm background */}
+      <PresenceLayer activeTheme={activeTheme} phase={timePhase} />
+
       {/* Center: Focus Zone - Strict State Machine (ONE state only) */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden pt-14">
         {/* Side Bubbles (NEXT, LATER, DONE - max 3) - Only show in active state */}
@@ -1368,6 +1371,7 @@ export default function OneScreen() {
             scope={scope}
             nextIntent={nextIntent}
             uiLang={uiLang}
+            timePhase={timePhase}
             stepSuggestion={stepSuggestion}
             onStepDo={handleStepDo}
             onStepNotNow={handleStepNotNow}
