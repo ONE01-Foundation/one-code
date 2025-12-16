@@ -111,6 +111,9 @@ import { loadStyle, saveStyle, StyleMemory } from "@/lib/style-memory";
 import { getTimeAtmosphere, getNobodyHeadline } from "@/lib/time-atmosphere";
 import { PresenceLayer } from "@/components/ui/PresenceLayer";
 import { SkyLayer } from "@/components/ui/SkyLayer";
+import { NobodyHeader } from "@/components/ui/NobodyHeader";
+import { getSkyMoodByHour } from "@/lib/sky-mood";
+import { detectLangFromText, getNobodyHeader, Lang } from "@/lib/nobody-copy";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
