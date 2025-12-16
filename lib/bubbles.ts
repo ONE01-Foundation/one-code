@@ -1,20 +1,29 @@
 /**
- * Bubble System - SideBubbles v0.1
+ * Bubble System - 3-Slot Navigation v0.1
  * 
- * ONE source of truth for 3 bubbles: NEXT, LATER, DONE
- * Mirrors card system, no parallel storage
+ * LAST | NOW | NEXT
+ * Fixed slots, deterministic
  */
 
 import { StepCard, loadStepCards } from "./step-card";
 import { OneNextStep } from "@/app/api/nobody/step/route";
 
-export type BubbleKind = "next" | "later" | "done";
+export type BubbleSlot = "last" | "now" | "next";
 
-export interface Bubble {
+export type BubbleState = "done" | "active" | "queued";
+
+export interface BubbleItem {
   id: string;
-  kind: BubbleKind;
   title: string;
-  meta?: string; // Optional metadata (e.g., "5 min", "suggested")
+  state: BubbleState;
+  slot: BubbleSlot;
+  card?: StepCard; // Reference to the actual card (for detail view)
+}
+
+export interface BubbleSlots {
+  last?: BubbleItem;
+  now?: BubbleItem;
+  next?: BubbleItem;
 }
 
 interface BuildBubblesInput {
@@ -24,75 +33,86 @@ interface BuildBubblesInput {
 }
 
 /**
- * Build bubbles from ONE source of truth
- * Priority: DONE (last completed) -> LATER (deferred) -> NEXT (suggested)
+ * Build 3-slot bubbles: LAST | NOW | NEXT
  */
 export function buildBubbles({
   activeStepCard,
   stepSuggestion,
   stepCards,
-}: BuildBubblesInput): Bubble[] {
-  const bubbles: Bubble[] = [];
+}: BuildBubblesInput): BubbleSlots {
+  const slots: BubbleSlots = {};
 
-  // DONE: Last card with status="done" (most recent)
-  const doneCards = stepCards.filter((c) => c.status === "done");
+  // NOW: Active card (center)
+  if (activeStepCard) {
+    slots.now = {
+      id: activeStepCard.id,
+      title: activeStepCard.title,
+      state: "active",
+      slot: "now",
+      card: activeStepCard,
+    };
+  }
+
+  // Filter out active card from pool
+  const nonActiveCards = stepCards.filter(
+    (c) => !activeStepCard || c.id !== activeStepCard.id
+  );
+
+  // LAST: Most recent done card
+  const doneCards = nonActiveCards.filter((c) => c.status === "done");
   if (doneCards.length > 0) {
     const lastDone = doneCards.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     )[0];
-    bubbles.push({
-      id: `done_${lastDone.id}`,
-      kind: "done",
+    slots.last = {
+      id: lastDone.id,
       title: lastDone.title,
-      meta: `${lastDone.durationMinutes} min`,
-    });
+      state: "done",
+      slot: "last",
+      card: lastDone,
+    };
   }
 
-  // LATER: Most recent deferred/not_now card (skipped only, not suggested)
-  const laterCards = stepCards.filter(
-    (c) => c.status === "skipped" && c.id !== activeStepCard?.id
-  );
-  if (laterCards.length > 0) {
-    const lastLater = laterCards.sort(
-      (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
-    )[0];
-    bubbles.push({
-      id: `later_${lastLater.id}`,
-      kind: "later",
-      title: lastLater.title,
-      meta: "deferred",
-    });
-  }
-
-  // NEXT: 
-  // a) If stepSuggestion exists -> use it as NEXT preview
-  // b) Else use most relevant suggested card (not active)
+  // NEXT: First queued/deferred/pending
+  // Priority: stepSuggestion > suggested > skipped
   if (stepSuggestion) {
-    bubbles.push({
-      id: `next_suggestion`,
-      kind: "next",
+    slots.next = {
+      id: "next_suggestion",
       title: stepSuggestion.title,
-      meta: `${stepSuggestion.durationMinutes} min`,
-    });
+      state: "queued",
+      slot: "next",
+    };
   } else {
-    // Find most relevant suggested card (not active)
-    const suggestedCards = stepCards.filter(
-      (c) => c.status === "suggested" && c.id !== activeStepCard?.id
-    );
+    // Find first suggested card
+    const suggestedCards = nonActiveCards.filter((c) => c.status === "suggested");
     if (suggestedCards.length > 0) {
-      const mostRecent = suggestedCards.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      const firstSuggested = suggestedCards.sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       )[0];
-      bubbles.push({
-        id: `next_${mostRecent.id}`,
-        kind: "next",
-        title: mostRecent.title,
-        meta: `${mostRecent.durationMinutes} min`,
-      });
+      slots.next = {
+        id: firstSuggested.id,
+        title: firstSuggested.title,
+        state: "queued",
+        slot: "next",
+        card: firstSuggested,
+      };
+    } else {
+      // Fallback: first skipped card (deferred)
+      const skippedCards = nonActiveCards.filter((c) => c.status === "skipped");
+      if (skippedCards.length > 0) {
+        const firstSkipped = skippedCards.sort(
+          (a, b) => new Date(a.updatedAt || a.createdAt).getTime() - new Date(b.updatedAt || b.createdAt).getTime()
+        )[0];
+        slots.next = {
+          id: firstSkipped.id,
+          title: firstSkipped.title,
+          state: "queued",
+          slot: "next",
+          card: firstSkipped,
+        };
+      }
     }
   }
 
-  // Return max 3 bubbles, in priority order: DONE, LATER, NEXT
-  return bubbles.slice(0, 3);
+  return slots;
 }
-
