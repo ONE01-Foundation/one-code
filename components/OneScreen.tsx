@@ -108,6 +108,7 @@ import { NamePathModal } from "@/components/ui/NamePathModal";
 import { AskPanel } from "@/components/ui/AskPanel";
 import { UILang, detectLangFromText } from "@/lib/lang";
 import { loadStyle, saveStyle, StyleMemory } from "@/lib/style-memory";
+import { getTimeAtmosphere, getNobodyHeadline } from "@/lib/time-atmosphere";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
