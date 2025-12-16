@@ -7,7 +7,9 @@
  * - Actions over explanations
  */
 
-export type CardState = "pending" | "done" | "skipped";
+// Card status for the action loop
+export type CardStatus = "ready" | "in_progress" | "done";
+export type CardScope = "private" | "global";
 export type IntentCategory = "health" | "money" | "work" | "relationship" | "self" | "other";
 
 // Minimal data model
@@ -17,15 +19,21 @@ export interface Session {
   lastActivityAt: string;
 }
 
+// Card schema for the core action loop
 export interface Card {
   id: string;
-  intent: string; // Single, reduced intent
-  action_text: string; // Short imperative sentence
-  state: CardState; // pending | done | skipped
+  type?: string; // Optional card type
+  title: string; // Short title (e.g., "Lower friction")
+  action: string; // One suggested action (e.g., "Prepare clothes for tomorrow")
+  status: CardStatus; // ready | in_progress | done
+  scope: CardScope; // private | global
+  time?: number; // Estimated time in minutes (optional)
   category?: IntentCategory;
-  timestamp: string; // ISO string
-  createdAt: string;
+  createdAt: string; // ISO string
 }
+
+// Legacy types (kept for compatibility)
+export type CardState = "pending" | "done" | "skipped"; // @deprecated - use CardStatus
 
 // Closure Types - Every interaction must end in ONE of these
 export type ClosureType = "DONE" | "PAUSED" | "REDIRECTED";
@@ -56,8 +64,6 @@ export interface State {
   updatedAt: string; // ISO timestamp
 }
 
-// Legacy types (kept for compatibility, will be removed later)
-export type CardStatus = "pending" | "done" | "delayed"; // @deprecated - use CardState
 
 
 

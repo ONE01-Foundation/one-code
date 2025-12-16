@@ -28,12 +28,16 @@ type IntentCategory = "health" | "money" | "work" | "relationship" | "self" | "o
 
 interface DistillationResult {
   intent: string; // Single, reduced intent
+  title: string; // Short card title
+  action: string; // ONE short imperative sentence
+  time?: number; // Estimated time in minutes
   category: IntentCategory;
-  action_text: string; // ONE short imperative sentence
   needs_clarification?: boolean;
   clarification_question?: string;
   isDesireOrRequest?: boolean; // For setting openThread
   shouldSetPendingQuestion?: boolean; // For setting pendingQuestion
+  // Legacy field for backward compatibility
+  action_text?: string; // @deprecated - use action
 }
 
 export async function POST(req: Request) {
@@ -58,8 +62,10 @@ export async function POST(req: Request) {
       // Fallback for development without API key
       return NextResponse.json({
         intent: trimmedInput,
+        title: "Next step",
+        action: `Complete: ${trimmedInput}`,
+        time: 5,
         category: "other",
-        action_text: `Complete: ${trimmedInput}`,
         needs_clarification: false,
       });
     }
@@ -82,22 +88,25 @@ User input: "${trimmedInput}"${contextNote}
 
 Rules:
 1. Reduce the input to a single, clear intent (one sentence max)
-2. Classify into ONE category: health, money, work, relationship, self, or other
-3. Generate ONE action only (short imperative sentence, max 10 words)
-4. Prefer physical, real-world actions when possible
-5. If the input is unclear or ambiguous, set needs_clarification to true and provide a short clarifying question (one sentence max)
-6. If continuing a thread, maintain continuity naturally but don't reference past explicitly
+2. Generate a short card title (2-4 words, e.g., "Lower friction", "Clear space", "Move forward")
+3. Generate ONE action only (short imperative sentence, max 10 words, e.g., "Prepare clothes for tomorrow")
+4. Estimate time in minutes (1-60, optional)
+5. Classify into ONE category: health, money, work, relationship, self, or other
+6. Prefer physical, real-world actions when possible
+7. If the input is unclear or ambiguous, set needs_clarification to true and provide a short clarifying question (one sentence max)
+8. If continuing a thread, maintain continuity naturally but don't reference past explicitly
 
 Return ONLY valid JSON in this exact format:
 {
   "intent": "single clear intent sentence",
+  "title": "short card title (2-4 words, e.g., 'Lower friction', 'Clear space')",
+  "action": "ONE short imperative sentence (e.g., 'Prepare clothes for tomorrow')",
+  "time": 5, // Estimated time in minutes (optional, 1-60)
   "category": "health|money|work|relationship|self|other",
-  "action_text": "ONE short imperative sentence",
   "needs_clarification": false,
   "clarification_question": null,
   "isDesireOrRequest": false,
-  // true if input expresses a desire or request (e.g., "I want...", "I need...", "Can you...")
-  "shouldSetPendingQuestion": false  // true if you asked a clarification question
+  "shouldSetPendingQuestion": false
 }
 
 If clarification is needed:
@@ -141,24 +150,47 @@ If clarification is needed:
       console.error("Failed to parse AI response:", content);
       result = {
         intent: trimmedInput,
+        title: "Next step",
+        action: `Complete: ${trimmedInput}`,
+        time: 5,
         category: "other",
-        action_text: `Complete: ${trimmedInput}`,
         needs_clarification: false,
       };
     }
 
     // Validate result structure
-    if (!result.intent || !result.category || !result.action_text) {
+    if (!result.intent || !result.category || !result.action) {
       result = {
         intent: trimmedInput,
+        title: "Next step",
+        action: `Complete: ${trimmedInput}`,
+        time: 5,
         category: "other",
-        action_text: `Complete: ${trimmedInput}`,
         needs_clarification: false,
         isDesireOrRequest: false,
         shouldSetPendingQuestion: false,
       };
     }
+    
+    // Ensure title exists
+    if (!result.title) {
+      result.title = result.intent.split(' ').slice(0, 3).join(' ') || "Next step";
+    }
 
+    // Ensure required fields exist
+    if (!result.action && result.action_text) {
+      result.action = result.action_text; // Backward compatibility
+    }
+    if (!result.action) {
+      result.action = `Complete: ${trimmedInput}`;
+    }
+    if (!result.title) {
+      result.title = result.intent.split(' ').slice(0, 3).join(' ') || "Next step";
+    }
+    if (!result.time) {
+      result.time = 5; // Default 5 minutes
+    }
+    
     // Ensure flags are set
     if (result.needs_clarification === undefined) result.needs_clarification = false;
     if (result.isDesireOrRequest === undefined) {
@@ -180,8 +212,10 @@ If clarification is needed:
     
     return NextResponse.json({
       intent: userInput || "Unknown intent",
+      title: "Next step",
+      action: userInput ? `Complete: ${userInput}` : "Start a new task",
+      time: 5,
       category: "other",
-      action_text: userInput ? `Complete: ${userInput}` : "Start a new task",
       needs_clarification: false,
     });
   }

@@ -1,52 +1,41 @@
 /**
- * ONE01 Screen - Core Loop Implementation
+ * ONE01 Screen - Core Action Loop
  * 
- * FLOW:
- * 1. Entry State: Nobody presence + "What do you need right now?"
- * 2. Input: 2 options OR type (max 120 chars)
- * 3. AI Distillation: intent → category → ONE action
- * 4. Card Creation: create card with action_text
- * 5. Action Presentation: "Do you want to do this now?" (Do / Not now)
- * 6. Resolution: mark done/skipped, return to entry
+ * LOOP: Observe → Reduce → Offer → Act → Reflect
  * 
  * PRINCIPLES:
- * - One screen only (state-based)
- * - Max 2 choices at any moment
- * - Short text only (1-2 lines)
- * - No explanations, only actions
- * - User always has control
+ * - One screen only
+ * - One sentence at a time
+ * - One choice at a time
+ * - One action at a time
+ * - Nobody is a system mediator, not a character
  */
 
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardState, State, ClosureType, Mode, SharedContext, PrivateContext } from "@/lib/types";
+import { Card, CardStatus, State, Mode } from "@/lib/types";
 
-type AppState = "entry" | "processing" | "action" | "closure";
+// Loop states
+type LoopState = "observe" | "reduce" | "offer" | "act" | "reflect";
 
-interface DistillationResult {
-  intent: string;
-  category: string;
-  action_text: string;
-  needs_clarification?: boolean;
-  clarification_question?: string;
-  isDesireOrRequest?: boolean;
-  shouldSetPendingQuestion?: boolean;
-}
+// Reflection messages (calm, neutral, one thought)
+const REFLECTION_MESSAGES = [
+  "Small actions create stability.",
+  "Progress happens in steps.",
+  "One thing at a time.",
+  "Clarity comes from action.",
+];
 
-// Generate 2 suggested options based on context
-function getSuggestedOptions(): { id: string; label: string }[] {
-  // Simple suggestions - will be dynamic later
-  return [
-    { id: "suggest-1", label: "I need to focus" },
-    { id: "suggest-2", label: "I need to decide" },
-  ];
-}
+// Reduction options (exactly two)
+const REDUCTION_OPTIONS = [
+  { id: "health", label: "Health" },
+  { id: "work", label: "Work" },
+];
 
 // State management functions
 function loadState(): State {
   if (typeof window === "undefined") {
-    // SSR: return default state
     return {
       mode: "private",
       sharedContext: {
@@ -64,7 +53,6 @@ function loadState(): State {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      // Migrate old state format if needed
       if (!parsed.mode) {
         return {
           mode: "private",
@@ -99,168 +87,66 @@ function loadState(): State {
 }
 
 function saveState(state: State) {
-  if (typeof window === "undefined") return; // SSR: skip
+  if (typeof window === "undefined") return;
   state.updatedAt = new Date().toISOString();
   state.sharedContext.systemTime = new Date().toISOString();
   localStorage.setItem("one_state", JSON.stringify(state));
 }
 
-function clearState() {
-  if (typeof window === "undefined") return; // SSR: skip
-  localStorage.removeItem("one_state");
-}
-
 export default function OneScreen() {
-  const [state, setState] = useState<AppState>("entry");
-  const [userInput, setUserInput] = useState("");
-  const [showTextInput, setShowTextInput] = useState(false);
+  const [loopState, setLoopState] = useState<LoopState>("observe");
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
-  const [distillationResult, setDistillationResult] = useState<DistillationResult | null>(null);
-  const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
   const [memoryState, setMemoryState] = useState<State>(loadState());
-  const [closureType, setClosureType] = useState<ClosureType | null>(null);
-  const [closureMessage, setClosureMessage] = useState<string | null>(null);
+  const [reflectionMessage, setReflectionMessage] = useState<string>("");
 
-  // Mode management
-  const currentMode = memoryState.mode;
-  const isPrivate = currentMode === "private";
-  const isGlobal = currentMode === "global";
+  const isPrivate = memoryState.mode === "private";
+  const isGlobal = memoryState.mode === "global";
 
-  // Load session and state from localStorage
+  // Load state on mount
   useEffect(() => {
     const sessionId = localStorage.getItem("one_session_id");
     if (!sessionId) {
       localStorage.setItem("one_session_id", `session_${Date.now()}`);
     }
-    // Load state on mount
     setMemoryState(loadState());
   }, []);
 
   // Handle mode switch (user-initiated only)
   const handleModeSwitch = (newMode: Mode) => {
-    if (newMode === currentMode) return; // No change
-    
+    if (newMode === memoryState.mode) return;
     const updatedState = { ...memoryState };
     updatedState.mode = newMode;
-    // Update sharedContext systemTime
     updatedState.sharedContext.systemTime = new Date().toISOString();
-    // Do NOT reset privateContext - mode switch preserves state
     saveState(updatedState);
     setMemoryState(updatedState);
+    // Reset to observe when switching modes
+    setLoopState("observe");
+    setSelectedOption(null);
+    setCurrentCard(null);
   };
 
-  // Closure: DONE
-  const applyDoneClosure = () => {
-    const newState: State = {
-      ...memoryState,
-      privateContext: {
-        openThread: null,
-        lastSuggestedAction: null,
-        pendingQuestion: null,
-      },
-      sharedContext: {
-        ...memoryState.sharedContext,
-        systemTime: new Date().toISOString(),
-      },
-    };
-    saveState(newState);
-    setMemoryState(newState);
-    setClosureType("DONE");
-    setClosureMessage("Action completed.");
+  // OBSERVE → REDUCE: Continue button
+  const handleContinue = () => {
+    if (isGlobal) return; // Global mode is view-only
+    setLoopState("reduce");
   };
 
-  // Closure: PAUSED
-  const applyPausedClosure = () => {
-    const newState: State = {
-      ...memoryState,
-      privateContext: {
-        ...memoryState.privateContext,
-        pendingQuestion: null,
-        // Keep lastSuggestedAction (don't clear it)
-      },
-      sharedContext: {
-        ...memoryState.sharedContext,
-        systemTime: new Date().toISOString(),
-      },
-    };
-    saveState(newState);
-    setMemoryState(newState);
-    setClosureType("PAUSED");
-    setClosureMessage("Action paused.");
-  };
+  // REDUCE → OFFER: Select option
+  const handleOptionSelect = async (optionId: string) => {
+    if (isGlobal) return;
+    setSelectedOption(optionId);
+    setLoopState("offer");
 
-  // Closure: REDIRECTED
-  const applyRedirectedClosure = (newThread: string) => {
-    const newState: State = {
-      ...memoryState,
-      privateContext: {
-        openThread: newThread,
-        lastSuggestedAction: null,
-        pendingQuestion: null,
-      },
-      sharedContext: {
-        ...memoryState.sharedContext,
-        systemTime: new Date().toISOString(),
-      },
-    };
-    saveState(newState);
-    setMemoryState(newState);
-    setClosureType("REDIRECTED");
-    setClosureMessage("Topic changed.");
-  };
-
-  // Handle option selection
-  const handleOptionSelect = async (optionLabel: string) => {
-    await processInput(optionLabel);
-  };
-
-  // Handle text input submission
-  const handleTextSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (userInput.trim().length > 0 && userInput.trim().length <= 120) {
-      await processInput(userInput.trim());
-    }
-  };
-
-  // Process input through AI distillation (Private mode only)
-  const processInput = async (input: string) => {
-    // Global mode: no actions allowed
-    if (isGlobal) {
-      return;
-    }
-    
-    setState("processing");
-    setShowTextInput(false);
-    setUserInput("");
-
-    // Check if user is switching topic (ignore pending question)
-    const isSwitchingTopic = memoryState.privateContext.pendingQuestion && 
-      !input.toLowerCase().includes(memoryState.privateContext.pendingQuestion.toLowerCase().split(' ')[0]);
-
-    // Update state: clear pendingQuestion if answered or switching topic
-    const currentState = { ...memoryState };
-    if (memoryState.privateContext.pendingQuestion) {
-      if (isSwitchingTopic) {
-        // User switched topic, clear thread
-        currentState.privateContext.pendingQuestion = null;
-        currentState.privateContext.openThread = null;
-      } else {
-        // User answered, clear pending question
-        currentState.privateContext.pendingQuestion = null;
-      }
-    }
-
+    // Generate card using AI distillation
     try {
       const response = await fetch("/api/distill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          input,
-          state: currentState.privateContext.openThread || currentState.privateContext.pendingQuestion 
-            ? { 
-                openThread: currentState.privateContext.openThread,
-                pendingQuestion: currentState.privateContext.pendingQuestion,
-              } 
+        body: JSON.stringify({
+          input: REDUCTION_OPTIONS.find((o) => o.id === optionId)?.label || optionId,
+          state: isPrivate && memoryState.privateContext.openThread
+            ? memoryState
             : null,
         }),
       });
@@ -269,224 +155,110 @@ export default function OneScreen() {
         throw new Error("Distillation failed");
       }
 
-      const result: DistillationResult = await response.json();
+      const result = await response.json();
 
-      // Update state based on result
-      const newState = { ...currentState };
-
-      // If clarification needed, set pendingQuestion (only in private mode)
-      if (result.needs_clarification && result.clarification_question) {
-        if (isPrivate) {
-          newState.privateContext.pendingQuestion = result.clarification_question;
-          saveState(newState);
-          setMemoryState(newState);
-          setClarificationQuestion(result.clarification_question);
-          setState("entry");
-          return;
-        }
-        // Global mode: don't set pendingQuestion (no personal questions)
-      }
-
-      // Check for REDIRECTED closure before updating state
-      const hadOpenThread = newState.privateContext.openThread !== null;
-      let shouldShowRedirected = false;
-
-      // If desire/request, set openThread (unless switching topic) - only in private mode
-      if (isPrivate && result.isDesireOrRequest && !isSwitchingTopic) {
-        // Check if thread changed
-        if (hadOpenThread && newState.privateContext.openThread !== result.intent) {
-          shouldShowRedirected = true;
-        }
-        newState.privateContext.openThread = result.intent;
-      } else if (isSwitchingTopic && isPrivate) {
-        // Topic changed
-        if (result.isDesireOrRequest && hadOpenThread) {
-          // New topic with desire/request - REDIRECTED
-          shouldShowRedirected = true;
-          newState.privateContext.openThread = result.intent;
-        } else {
-          newState.privateContext.openThread = null;
-        }
-      }
-
-      // Clear lastSuggestedAction (user responded)
-      newState.privateContext.lastSuggestedAction = null;
-
-
-      saveState(newState);
-      setMemoryState(newState);
-
-      // Create card (only in private mode)
-      if (!isPrivate) {
-        // Global mode: no card creation, just show info
-        setState("entry");
-        return;
-      }
-
+      // Create card
       const card: Card = {
         id: `card_${Date.now()}`,
-        intent: result.intent,
-        action_text: result.action_text,
-        state: "pending",
+        title: result.title || result.intent || "Next step",
+        action: result.action || result.action_text || `Complete: ${optionId}`,
+        status: "ready",
+        scope: "private",
+        time: result.time,
         category: result.category as any,
-        timestamp: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       };
 
-      // Save card to localStorage (private mode only)
+      // Save card
       const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
       cards.push(card);
       localStorage.setItem("one_cards", JSON.stringify(cards));
 
       setCurrentCard(card);
-      setDistillationResult(result);
-      
-      // If REDIRECTED closure should be shown, display it briefly before action
-      if (shouldShowRedirected) {
-        setClosureType("REDIRECTED");
-        setClosureMessage("Topic changed.");
-        setState("closure");
-        setTimeout(() => {
-          setClosureType(null);
-          setClosureMessage(null);
-          setState("action");
-        }, 1500);
-      } else {
-        setState("action");
-      }
     } catch (error) {
-      console.error("Error processing input:", error);
-      // Fallback: create simple card
+      console.error("Error generating card:", error);
+      // Fallback card
       const card: Card = {
         id: `card_${Date.now()}`,
-        intent: input,
-        action_text: `Complete: ${input}`,
-        state: "pending",
-        timestamp: new Date().toISOString(),
+        title: "Next step",
+        action: `Work on ${optionId}`,
+        status: "ready",
+        scope: "private",
+        time: 5,
         createdAt: new Date().toISOString(),
       };
       const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
       cards.push(card);
       localStorage.setItem("one_cards", JSON.stringify(cards));
       setCurrentCard(card);
-      setState("action");
     }
   };
 
-  // Handle action resolution
-  const handleDo = () => {
+  // ACT: Do it
+  const handleDoIt = () => {
     if (!currentCard) return;
 
-      // Update card state to "done" (only in private mode)
-      if (isPrivate) {
-        const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
-        const updated = cards.map((c: Card) =>
-          c.id === currentCard.id ? { ...c, state: "done" as CardState } : c
-        );
-        localStorage.setItem("one_cards", JSON.stringify(updated));
-        // Apply DONE closure
-        applyDoneClosure();
-      } else {
-        // Global mode: no card updates, just return to entry
-        setCurrentCard(null);
-        setDistillationResult(null);
-        setState("entry");
-        return;
-      }
+    // Update card status to "in_progress"
+    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+    const updated = cards.map((c: Card) =>
+      c.id === currentCard.id ? { ...c, status: "in_progress" as CardStatus } : c
+    );
+    localStorage.setItem("one_cards", JSON.stringify(updated));
 
-    // Show closure, then return to entry
-    setCurrentCard(null);
-    setDistillationResult(null);
-    setState("closure");
-    
-    // Auto-return to entry after showing closure
-    setTimeout(() => {
-      setClosureType(null);
-      setClosureMessage(null);
-      setState("entry");
-    }, 1500);
+    // Move to reflect state
+    setCurrentCard({ ...currentCard, status: "in_progress" });
+    setLoopState("reflect");
+    setReflectionMessage(
+      REFLECTION_MESSAGES[Math.floor(Math.random() * REFLECTION_MESSAGES.length)]
+    );
   };
 
+  // ACT: Not now
   const handleNotNow = () => {
     if (!currentCard) return;
 
-      // Update card state to "skipped" (only in private mode)
-      if (isPrivate) {
-        const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
-        const updated = cards.map((c: Card) =>
-          c.id === currentCard.id ? { ...c, state: "skipped" as CardState } : c
-        );
-        localStorage.setItem("one_cards", JSON.stringify(updated));
-        // Apply PAUSED closure
-        applyPausedClosure();
-      } else {
-        // Global mode: no card updates, just return to entry
-        setCurrentCard(null);
-        setDistillationResult(null);
-        setState("entry");
-        return;
-      }
+    // Mark card as done (skipped)
+    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+    const updated = cards.map((c: Card) =>
+      c.id === currentCard.id ? { ...c, status: "done" as CardStatus } : c
+    );
+    localStorage.setItem("one_cards", JSON.stringify(updated));
 
-    // Show closure, then return to entry
+    // Return to observe
     setCurrentCard(null);
-    setDistillationResult(null);
-    setState("closure");
-    
-    // Auto-return to entry after showing closure
-    setTimeout(() => {
-      setClosureType(null);
-      setClosureMessage(null);
-      setState("entry");
-    }, 1500);
+    setSelectedOption(null);
+    setLoopState("observe");
   };
 
-  // Handle clearing pending question (user ignores it)
-  const handleClearPendingQuestion = () => {
-    const newState = { ...memoryState };
-    newState.privateContext.pendingQuestion = null;
-    saveState(newState);
-    setMemoryState(newState);
-    setClarificationQuestion(null);
+  // REFLECT: Next step
+  const handleNextStep = () => {
+    if (!currentCard) return;
+
+    // Mark card as done
+    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+    const updated = cards.map((c: Card) =>
+      c.id === currentCard.id ? { ...c, status: "done" as CardStatus } : c
+    );
+    localStorage.setItem("one_cards", JSON.stringify(updated));
+
+    // Return to observe
+    setCurrentCard(null);
+    setSelectedOption(null);
+    setLoopState("observe");
   };
 
-  // Get aggregated global data (anonymous, no personal data)
+  // Get global data (aggregated, anonymous)
   const getGlobalData = () => {
-    // In a real implementation, this would come from an API endpoint
-    // For now, calculate from local cards (simulating aggregated data)
     const allCards = JSON.parse(localStorage.getItem("one_cards") || "[]");
-    
-    // Aggregate counts (anonymous)
     const totalCards = allCards.length;
     const cardsByStatus = {
-      pending: allCards.filter((c: Card) => c.state === "pending").length,
-      done: allCards.filter((c: Card) => c.state === "done").length,
-      skipped: allCards.filter((c: Card) => c.state === "skipped").length,
+      ready: allCards.filter((c: Card) => c.status === "ready").length,
+      in_progress: allCards.filter((c: Card) => c.status === "in_progress").length,
+      done: allCards.filter((c: Card) => c.status === "done").length,
     };
-    
-    // Aggregate by category (anonymous)
-    const cardsByCategory: Record<string, number> = {};
-    allCards.forEach((c: Card) => {
-      if (c.category) {
-        cardsByCategory[c.category] = (cardsByCategory[c.category] || 0) + 1;
-      }
-    });
-    
-    // Active domains (top categories)
-    const activeDomains = Object.entries(cardsByCategory)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([category]) => category);
-    
-    return {
-      totalCards,
-      cardsByStatus,
-      activeDomains,
-    };
+    return { totalCards, cardsByStatus };
   };
 
-  const suggestedOptions = getSuggestedOptions();
-
-  // Get data for current mode
   const globalData = isGlobal ? getGlobalData() : null;
 
   return (
@@ -517,25 +289,6 @@ export default function OneScreen() {
         </div>
       </div>
 
-      {/* Top: Context Line */}
-      <div className="flex items-center justify-center pt-4 pb-6 px-6">
-        <h1 className="text-4xl sm:text-5xl font-normal text-black text-center">
-          {state === "entry"
-            ? isPrivate
-              ? "What do you need right now?"
-              : "Global view"
-            : state === "processing"
-            ? "Processing..."
-            : state === "action"
-            ? isPrivate
-              ? "Do you want to do this now?"
-              : "View only"
-            : state === "closure"
-            ? ""
-            : "Next step available."}
-        </h1>
-      </div>
-
       {/* Center: Focus Zone */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
         {/* Nobody Presence - Subtle Light Movement */}
@@ -550,215 +303,141 @@ export default function OneScreen() {
 
         {/* Center Content */}
         <div className="relative z-10 w-full max-w-md text-center">
-          {state === "entry" && (
-            <div className="space-y-6">
-              {isPrivate ? (
-                <>
-                  {/* Private Mode: Interactive */}
-                  {/* Clarification question if needed */}
-                  {clarificationQuestion && (
-                    <div className="space-y-4">
-                      <p className="text-lg text-neutral-700 leading-relaxed">
-                        {clarificationQuestion}
-                      </p>
-                      <button
-                        onClick={handleClearPendingQuestion}
-                        className="text-sm text-neutral-500 hover:text-black"
-                      >
-                        Clear
-                      </button>
+          {isGlobal ? (
+            /* Global Mode: View Only */
+            <div className="space-y-4">
+              <p className="text-lg text-neutral-600 mb-4">
+                {globalData
+                  ? `${globalData.totalCards} people completed a small action today`
+                  : "Anonymous aggregates"}
+              </p>
+              {globalData && (
+                <div className="space-y-2">
+                  <div className="p-4 border border-black rounded-lg">
+                    <div className="text-2xl font-bold text-black">
+                      {globalData.cardsByStatus.done}
                     </div>
-                  )}
-
-                  {/* 2 Suggested Options */}
-                  {!showTextInput && !clarificationQuestion && (
-                    <div className="space-y-3">
-                      {suggestedOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          onClick={() => handleOptionSelect(option.label)}
-                          className="w-full px-6 py-4 bg-white border-2 border-black rounded-lg text-left hover:bg-black hover:text-white transition-colors duration-200"
-                        >
-                          <div className="font-medium text-lg">{option.label}</div>
-                        </button>
-                      ))}
+                    <div className="text-xs text-neutral-500 mt-1">
+                      Actions completed
                     </div>
-                  )}
-
-                  {/* Text Input (explicitly invoked) */}
-                  {showTextInput ? (
-                    <form onSubmit={handleTextSubmit} className="space-y-4">
-                      <input
-                        type="text"
-                        value={userInput}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val.length <= 120) {
-                            setUserInput(val);
-                          }
-                        }}
-                        placeholder="Type your intent (max 120 chars)..."
-                        className="w-full px-4 py-3 border-2 border-black rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-black"
-                        autoFocus
-                        maxLength={120}
-                      />
-                      <div className="flex gap-3">
-                        <button
-                          type="submit"
-                          disabled={userInput.trim().length === 0}
-                          className="flex-1 px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Continue
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowTextInput(false);
-                            setUserInput("");
-                          }}
-                          className="flex-1 px-6 py-3 bg-white border-2 border-black text-black rounded-lg font-medium hover:opacity-90"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <div className="text-xs text-neutral-400">
-                        {userInput.length}/120
-                      </div>
-                    </form>
-                  ) : (
-                    !clarificationQuestion && (
-                      <button
-                        onClick={() => setShowTextInput(true)}
-                        className="text-sm text-neutral-500 hover:text-black transition-colors"
-                      >
-                        Or type your intent
-                      </button>
-                    )
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Global Mode: View Only - Aggregated Anonymous Data */}
-                  {globalData && (
-                    <div className="space-y-4">
-                      <p className="text-base text-neutral-600">
-                        Anonymous aggregates
-                      </p>
-                      <div className="space-y-3">
-                        <div className="p-4 border border-black rounded-lg">
-                          <div className="text-2xl font-bold text-black">
-                            {globalData.totalCards}
-                          </div>
-                          <div className="text-xs text-neutral-500 mt-1">
-                            Total cards
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="p-3 border border-black rounded-lg text-center">
-                            <div className="text-lg font-bold text-black">
-                              {globalData.cardsByStatus.pending}
-                            </div>
-                            <div className="text-xs text-neutral-500 mt-1">
-                              Pending
-                            </div>
-                          </div>
-                          <div className="p-3 border border-black rounded-lg text-center">
-                            <div className="text-lg font-bold text-black">
-                              {globalData.cardsByStatus.done}
-                            </div>
-                            <div className="text-xs text-neutral-500 mt-1">
-                              Done
-                            </div>
-                          </div>
-                          <div className="p-3 border border-black rounded-lg text-center">
-                            <div className="text-lg font-bold text-black">
-                              {globalData.cardsByStatus.skipped}
-                            </div>
-                            <div className="text-xs text-neutral-500 mt-1">
-                              Skipped
-                            </div>
-                          </div>
-                        </div>
-                        {globalData.activeDomains && globalData.activeDomains.length > 0 && (
-                          <div className="p-4 border border-black rounded-lg">
-                            <div className="text-sm text-neutral-500 mb-2">
-                              Active domains
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {globalData.activeDomains.map((domain, i) => (
-                                <span
-                                  key={i}
-                                  className="px-2 py-1 text-xs border border-neutral-300 rounded"
-                                >
-                                  {domain}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
+                  </div>
+                </div>
               )}
             </div>
-          )}
-
-          {state === "processing" && (
-            <div className="space-y-4">
-              <div className="w-12 h-12 border-4 border-neutral-200 border-t-black rounded-full mx-auto animate-spin" />
-              <p className="text-base text-neutral-600">
-                Distilling your intent...
-              </p>
-            </div>
-          )}
-
-          {state === "action" && currentCard && (
-            <div className="space-y-6">
-              {/* Action text (1-2 lines) */}
-              <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed font-medium">
-                {currentCard.action_text}
-              </p>
-
-              {/* 2 Choices: Do / Not now (only in private mode) */}
-              {isPrivate ? (
-                <div className="space-y-3">
+          ) : (
+            /* Private Mode: Action Loop */
+            <>
+              {loopState === "observe" && (
+                /* OBSERVE: One sentence, one Continue button */
+                <div className="space-y-6">
+                  <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed">
+                    What matters for you right now?
+                  </p>
                   <button
-                    onClick={handleDo}
+                    onClick={handleContinue}
                     className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
                   >
-                    Do
-                  </button>
-                  <button
-                    onClick={handleNotNow}
-                    className="w-full px-6 py-4 bg-white border-2 border-black text-black rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-                  >
-                    Not now
+                    Continue
                   </button>
                 </div>
-              ) : (
-                <p className="text-sm text-neutral-500">
-                  View only mode
-                </p>
               )}
-            </div>
-          )}
 
-          {state === "closure" && closureMessage && (
-            <div className="space-y-4">
-              <p className="text-lg text-neutral-700 leading-relaxed">
-                {closureMessage}
-              </p>
-            </div>
+              {loopState === "reduce" && (
+                /* REDUCE: Exactly two options */
+                <div className="space-y-6">
+                  <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed">
+                    Choose what you want to work on now.
+                  </p>
+                  <div className="space-y-3">
+                    {REDUCTION_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => handleOptionSelect(option.id)}
+                        className="w-full px-6 py-4 bg-white border-2 border-black rounded-lg text-left hover:bg-black hover:text-white transition-colors duration-200"
+                      >
+                        <div className="font-medium text-lg">{option.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {loopState === "offer" && currentCard && (
+                /* OFFER: One Card */
+                <div className="space-y-6">
+                  <div className="p-6 border-2 border-black rounded-lg text-left">
+                    <div className="text-sm text-neutral-500 mb-2">Status: {currentCard.status}</div>
+                    <div className="text-xl font-bold text-black mb-3">
+                      {currentCard.title}
+                    </div>
+                    <div className="text-lg text-neutral-700 mb-2">
+                      {currentCard.action}
+                    </div>
+                    {currentCard.time && (
+                      <div className="text-sm text-neutral-500">
+                        {currentCard.time} min
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setLoopState("act")}
+                    className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                  >
+                    Continue
+                  </button>
+                </div>
+              )}
+
+              {loopState === "act" && currentCard && (
+                /* ACT: Do it / Not now */
+                <div className="space-y-6">
+                  <div className="p-6 border-2 border-black rounded-lg text-left">
+                    <div className="text-xl font-bold text-black mb-3">
+                      {currentCard.title}
+                    </div>
+                    <div className="text-lg text-neutral-700">
+                      {currentCard.action}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleDoIt}
+                      className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    >
+                      Do it
+                    </button>
+                    <button
+                      onClick={handleNotNow}
+                      className="w-full px-6 py-4 bg-white border-2 border-black text-black rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {loopState === "reflect" && (
+                /* REFLECT: Reflection sentence + Next step */
+                <div className="space-y-6">
+                  <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed">
+                    {reflectionMessage}
+                  </p>
+                  <button
+                    onClick={handleNextStep}
+                    className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                  >
+                    Next step
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Bottom: Minimal anchor (optional, can be removed) */}
+      {/* Bottom: Minimal anchor */}
       <div className="flex items-center justify-center pb-6 pt-4">
-        <div className="text-xs text-neutral-400">
-          ONE01
-        </div>
+        <div className="text-xs text-neutral-400">ONE01</div>
       </div>
     </div>
   );
