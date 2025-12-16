@@ -266,6 +266,9 @@ export default function OneScreen() {
   // Auto Language v0.1 state - Initialize from style memory (will be set in useEffect)
   const [uiLang, setUiLang] = useState<UILang>("en");
   
+  // Nobody Header language (simplified to he/en)
+  const [headerLang, setHeaderLang] = useState<Lang>("en");
+  
   // Time Phase state (updates every 60s)
   const [timePhase, setTimePhase] = useState<"dawn" | "day" | "sunset" | "night">(getTimePhase());
   
