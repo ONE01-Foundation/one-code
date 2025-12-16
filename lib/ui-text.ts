@@ -46,6 +46,11 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     generating: "Generating...",
     globalViewOnly: "Global is view-only",
     silence: "Silence.",
+    start: "Start",
+    pause: "Pause",
+    resume: "Resume",
+    reset: "Reset",
+    back: "Back",
   },
   he: {
     findStep: "מצא צעד הבא",
@@ -63,6 +68,11 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     generating: "מייצר...",
     globalViewOnly: "גלובלי הוא צפייה בלבד",
     silence: "שקט.",
+    start: "התחל",
+    pause: "השהה",
+    resume: "המשך",
+    reset: "איפוס",
+    back: "חזור",
   },
   ar: {
     findStep: "الخطوة التالية",
@@ -80,6 +90,11 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     generating: "جارٍ التوليد...",
     globalViewOnly: "العالمي للعرض فقط",
     silence: "صمت.",
+    start: "ابدأ",
+    pause: "إيقاف مؤقت",
+    resume: "استئناف",
+    reset: "إعادة تعيين",
+    back: "رجوع",
   },
   es: {
     findStep: "Encuentra el siguiente paso",
@@ -97,6 +112,11 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     generating: "Generando...",
     globalViewOnly: "Global es solo visualización",
     silence: "Silencio.",
+    start: "Iniciar",
+    pause: "Pausar",
+    resume: "Reanudar",
+    reset: "Restablecer",
+    back: "Atrás",
   },
   fr: {
     findStep: "Trouve la prochaine étape",
@@ -114,6 +134,11 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     generating: "Génération...",
     globalViewOnly: "Global est en lecture seule",
     silence: "Silence.",
+    start: "Démarrer",
+    pause: "Pause",
+    resume: "Reprendre",
+    reset: "Réinitialiser",
+    back: "Retour",
   },
   auto: {
     // Auto falls back to English
@@ -132,6 +157,11 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     generating: "Generating...",
     globalViewOnly: "Global is view-only",
     silence: "Silence.",
+    start: "Start",
+    pause: "Pause",
+    resume: "Resume",
+    reset: "Reset",
+    back: "Back",
   },
 };
 

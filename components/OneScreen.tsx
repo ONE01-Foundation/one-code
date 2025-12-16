@@ -1160,16 +1160,54 @@ export default function OneScreen() {
     }, 1500);
   };
 
+  // Helper: Map Domain to StepCardDomain
+  const mapDomainToStepCardDomain = (domain: Domain): StepCardDomain => {
+    const mapping: Record<Domain, StepCardDomain> = {
+      health: "health",
+      money: "money",
+      work: "career",
+      relationships: "relationships",
+      learning: "learning",
+      life: "life",
+      other: "life",
+    };
+    return mapping[domain] || "life";
+  };
+
   // Global: Bring to Private handler
   const handleBringToPrivate = (item: GlobalNeedBucket | GlobalOfferBucket | GlobalMission) => {
+    // Determine title and why based on item type
+    let title: string;
+    let why: string;
+    let durationMinutes: number;
+    let energy: "low" | "medium" | "high";
+    let domain: StepCardDomain;
+
+    // Type guard: Check if it's a GlobalMission
+    if ("title" in item && "why" in item && "estimatedMinutes" in item) {
+      // It's a GlobalMission
+      title = item.title;
+      why = item.why;
+      durationMinutes = item.estimatedMinutes;
+      energy = item.difficulty === "hard" ? "high" : item.difficulty === "medium" ? "medium" : "low";
+      domain = mapDomainToStepCardDomain(item.domain);
+    } else {
+      // It's a GlobalNeedBucket or GlobalOfferBucket
+      title = item.label;
+      why = `Join ${item.label}`;
+      durationMinutes = 15;
+      energy = "medium";
+      domain = mapDomainToStepCardDomain(item.domain);
+    }
+
     // Create a private card from the global item
     const card = createStepCardFromSuggestion(
       {
-        title: "mission" in item ? item.title : item.label,
-        why: "why" in item ? item.why : `Join ${item.label}`,
-        durationMinutes: "estimatedMinutes" in item ? item.estimatedMinutes : 15,
-        energy: "difficulty" in item && item.difficulty === "hard" ? "high" : "medium",
-        domain: item.domain,
+        title,
+        why,
+        durationMinutes,
+        energy,
+        domain,
       },
       "active"
     );
@@ -1178,7 +1216,9 @@ export default function OneScreen() {
     setActiveStepCard(card);
     
     // Switch to private scope
-    setScope("private");
+    if (scope === "global") {
+      toggleScope();
+    }
     
     // Refresh global snapshot
     const snapshot = getGlobalSnapshot();
