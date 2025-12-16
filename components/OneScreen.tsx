@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card, Signal, ActionLoopState, ActionChoice, ActionClosure, Scope } from "@/lib/types";
 import {
   getOrCreateOneID,
@@ -105,6 +105,7 @@ import { getNextIntent, NextIntent } from "@/lib/flow-lock";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
+import { AskPanel } from "@/components/ui/AskPanel";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -233,6 +234,12 @@ export default function OneScreen() {
   const [isGeneratingStep, setIsGeneratingStep] = useState(false);
   const [lastUserText, setLastUserText] = useState("");
   
+  // Live Ask v0.1 micro-states
+  const [askOpen, setAskOpen] = useState(false);
+  const [askBusy, setAskBusy] = useState(false);
+  const [askEcho, setAskEcho] = useState("");
+  const [askPhase, setAskPhase] = useState<"idle" | "echo" | "thinking" | "result">("idle");
+  
   // Step Card state (persisted)
   const [activeStepCard, setActiveStepCard] = useState<any>(null);
   const [showDeck, setShowDeck] = useState(false);
@@ -256,7 +263,7 @@ export default function OneScreen() {
   }, []);
   
   // Update bubbles when activeStepCard, stepSuggestion, or stepCards change
-  const updateBubbles = () => {
+  const updateBubbles = useCallback(() => {
     const allStepCards = loadStepCards();
     const newBubbles = buildBubbles({
       activeStepCard,
@@ -264,11 +271,11 @@ export default function OneScreen() {
       stepCards: allStepCards,
     });
     setBubbles(newBubbles);
-  };
+  }, [activeStepCard, stepSuggestion]);
   
   useEffect(() => {
     updateBubbles();
-  }, [activeStepCard, stepSuggestion]);
+  }, [updateBubbles]);
   
   // Handle reset param on mount
   useEffect(() => {
@@ -843,17 +850,47 @@ export default function OneScreen() {
     setShowStatePanel(!showStatePanel);
   };
 
-  // AI Step Suggestion handlers
+  // Live Ask v0.1 handlers
+  const handleOpenAsk = () => {
+    if (askBusy || isGeneratingStep) return; // Guard against double-open
+    setAskOpen(true);
+    setAskPhase("idle");
+    setAskEcho("");
+  };
+
+  const handleCloseAsk = () => {
+    if (askBusy || isGeneratingStep) return; // Guard against closing during busy
+    setAskOpen(false);
+    setAskPhase("idle");
+    setAskEcho("");
+    setLastUserText("");
+  };
+
   const handleAskNobodySubmit = async (text: string) => {
+    if (askBusy || isGeneratingStep) return; // Guard against double-submit
+    
+    const trimmed = text.trim();
+    if (trimmed.length === 0 || trimmed.length > 280) return;
+
+    // Phase 1: Echo (show user text)
+    setAskEcho(trimmed);
+    setLastUserText(trimmed);
+    setAskPhase("echo");
+    setAskBusy(true);
+
+    // Brief pause before thinking (300-500ms)
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // Phase 2: Thinking
+    setAskPhase("thinking");
     setIsGeneratingStep(true);
-    setLastUserText(text);
     setStepSuggestion(null);
 
     try {
       const response = await fetch("/api/nobody/step", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: trimmed }),
       });
 
       if (!response.ok) {
@@ -861,7 +898,12 @@ export default function OneScreen() {
       }
 
       const step = await response.json();
+      
+      // Phase 3: Result (close panel, show suggestion)
+      setAskPhase("result");
       setStepSuggestion(step);
+      setAskOpen(false);
+      setAskPhase("idle");
     } catch (error) {
       console.error("Error fetching step suggestion:", error);
       setStepSuggestion({
@@ -876,8 +918,12 @@ export default function OneScreen() {
           { id: "change", label: "Change" },
         ],
       });
+      setAskOpen(false);
+      setAskPhase("idle");
     } finally {
       setIsGeneratingStep(false);
+      setAskBusy(false);
+      setAskEcho("");
     }
   };
 
@@ -1149,21 +1195,19 @@ export default function OneScreen() {
             state={homeState}
             isLoading={isGeneratingStep}
             onFindNextStep={() => {
-              // Flow Lock: Only focus input if nextIntent is "ask_nobody"
+              // Live Ask v0.1: Open AskPanel instead of focusing input
               if (nextIntent === "ask_nobody" && scope === "private") {
-                const input = document.querySelector('input[placeholder="Tell me what you need…"]') as HTMLInputElement;
-                if (input) {
-                  input.focus();
-                }
+                handleOpenAsk();
               }
             }}
             isGenerating={isGeneratingStep}
             scope={scope}
+            nextIntent={nextIntent}
             stepSuggestion={stepSuggestion}
             onStepDo={handleStepDo}
             onStepNotNow={handleStepNotNow}
             onStepChange={handleStepChange}
-            onAskNobodySubmit={scope === "private" ? handleAskNobodySubmit : undefined}
+            onAskNobodySubmit={undefined} // Removed - using AskPanel instead
             activeStepCard={activeStepCard || undefined}
             onStepDone={handleStepDone}
             completedMessage="Done"
@@ -1372,6 +1416,16 @@ export default function OneScreen() {
           onClose={() => setSelectedCard(null)}
         />
       )}
+
+      {/* AskPanel - Live Ask v0.1 */}
+      <AskPanel
+        isOpen={askOpen}
+        phase={askPhase}
+        userText={askEcho}
+        onSubmit={handleAskNobodySubmit}
+        onClose={handleCloseAsk}
+        isGenerating={isGeneratingStep}
+      />
 
       {/* Name Path Modal */}
       {showNamePathModal && (

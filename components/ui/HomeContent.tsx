@@ -138,9 +138,16 @@ export function HomeContent({
             onChange={onStepChange || (() => {})}
           />
         ) : state === "empty" ? (
-          /* EMPTY: Show button + input (private) or view-only message (global) */
+          /* EMPTY: Show button + input (private) or view-only message (global) or silence */
           <>
-            {scope === "private" ? (
+            {nextIntent === "silence" ? (
+              /* SILENCE: Calm empty center, no CTA */
+              <div className="text-center py-12">
+                <p className="text-base opacity-60" style={{ color: "var(--foreground)" }}>
+                  Silence.
+                </p>
+              </div>
+            ) : scope === "private" ? (
               <>
                 <div className="text-center py-12 pb-24">
                   <button
