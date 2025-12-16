@@ -75,6 +75,10 @@ import {
   saveActionLoopPlan,
   loadActionLoopPlan,
 } from "@/lib/action-loop-engine";
+import { useScope } from "@/hooks/useScope";
+import { getCardsByScope } from "@/data/cards";
+import { SideBubbles } from "@/components/ui/SideBubbles";
+import { DebugPanel } from "@/components/ui/DebugPanel";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -177,6 +181,10 @@ export default function OneScreen() {
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
   const context: LifeContext = isPrivate ? "private" : "global";
+  
+  // Scope layer (Global ↔ Private Mirror)
+  const { scope, toggleScope } = useScope();
+  const scopeCards = getCardsByScope(scope);
 
   // Initialize OWO and Step Engine on mount
   useEffect(() => {
@@ -756,37 +764,18 @@ export default function OneScreen() {
             {themeOverride === "auto" ? "○" : activeTheme === "light" ? "●" : "○"}
           </button>
 
-          {/* Mode Toggle (center) */}
-          <div className="flex gap-1 rounded-full px-1 py-1" style={{ border: "1px solid var(--border)" }}>
-            <button
-              onClick={() => handleModeSwitch("private")}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
-                isPrivate
-                  ? "text-white"
-                  : "hover:opacity-70"
-              }`}
-              style={{
-                backgroundColor: isPrivate ? "var(--foreground)" : "transparent",
-                color: isPrivate ? "var(--background)" : "var(--foreground)",
-              }}
-            >
-              Private
-            </button>
-            <button
-              onClick={() => handleModeSwitch("global")}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
-                isGlobal
-                  ? "text-white"
-                  : "hover:opacity-70"
-              }`}
-              style={{
-                backgroundColor: isGlobal ? "var(--foreground)" : "transparent",
-                color: isGlobal ? "var(--background)" : "var(--foreground)",
-              }}
-            >
-              Global
-            </button>
-          </div>
+          {/* Scope Toggle (single control, no layout change) */}
+          <button
+            onClick={toggleScope}
+            className="px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 hover:opacity-70"
+            style={{
+              backgroundColor: scope === "private" ? "var(--foreground)" : "transparent",
+              color: scope === "private" ? "var(--background)" : "var(--foreground)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            {scope === "private" ? "Private" : "Global"}
+          </button>
 
           {/* Spacer for balance */}
           <div className="w-8" />
@@ -795,6 +784,9 @@ export default function OneScreen() {
 
       {/* Center: Focus Zone */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
+        {/* Side Bubbles (4 cards from active scope) */}
+        <SideBubbles cards={scopeCards} />
+        
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
@@ -1217,15 +1209,29 @@ export default function OneScreen() {
                         >
                           Keep this path
                         </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+          )}
+        </div>
+      )}
+
+      {/* Debug Panel (dev only) */}
+      <DebugPanel
+        scope={scope}
+        cards={scopeCards}
+        dataSource={scope === "private" ? "getPrivateCards()" : "getGlobalCards()"}
+      />
+    </div>
+  );
+})()}
           </div>
         </div>
       )}
+
+      {/* Debug Panel (dev only) */}
+      <DebugPanel
+        scope={scope}
+        cards={scopeCards}
+        dataSource={scope === "private" ? "getPrivateCards()" : "getGlobalCards()"}
+      />
     </div>
   );
 }
