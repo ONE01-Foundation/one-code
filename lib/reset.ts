@@ -16,6 +16,8 @@ const VERSIONED_KEYS = [
   "one_signals",
   "one_nobody_prompt_data",
   "nobody:last",
+  "one01:v1:cards",
+  "one01:v1:activeCardId",
 ];
 
 // Clear all versioned localStorage keys

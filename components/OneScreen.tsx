@@ -251,15 +251,15 @@ export default function OneScreen() {
     handleResetParam();
   }, []);
   
-  // Determine home state (strict state machine)
+  // Determine home state (strict state machine) - StepCard only
   const hasActiveStepCard = !!activeStepCard;
-  const hasSuggestion = (actionLoopPlan && actionLoopState === "prompt") || showPrompt || !!stepSuggestion;
+  const hasSuggestion = !!stepSuggestion || isGeneratingStep;
   const homeState: HomeState = determineHomeState({
-    hasActiveCard: hasActiveStepCard || !!activeCard,
+    hasActiveCard: hasActiveStepCard,
     hasSuggestion,
-    hasPrompt: showPrompt,
-    isLoading: (promptState === "loading" || isGenerating || isGeneratingStep) && !isCompleted && !showCompletedMessage,
-    isCompleted: isCompleted || showCompletedMessage,
+    hasPrompt: false, // Legacy - not used in MVP
+    isLoading: isGeneratingStep && !showCompletedMessage,
+    isCompleted: showCompletedMessage,
   });
   
   // Show Nobody when active card first loads
@@ -887,9 +887,10 @@ export default function OneScreen() {
     setActiveCardId(null);
     setActiveStepCard(null);
     setShowCompletedMessage(true);
+    // Auto-return to empty after 1500ms (between 1200-2000ms)
     setTimeout(() => {
       setShowCompletedMessage(false);
-    }, 2000);
+    }, 1500);
   };
 
   // Step Engine handlers
@@ -1047,80 +1048,30 @@ export default function OneScreen() {
         <div className="relative z-20 w-full">
           <HomeContent
             state={homeState}
-            isLoading={promptState === "loading" || isGenerating}
+            isLoading={isGeneratingStep}
             onFindNextStep={() => {
-              if (homeState === "empty") {
-                setShowDomainChoice(true);
-              } else {
-                openPrompt();
+              // Private scope: focus input (input will handle submission)
+              // Global scope: do nothing (view-only)
+              if (scope === "private") {
+                // Input is always visible in empty state, just focus it
+                const input = document.querySelector('input[placeholder="Tell me what you need…"]') as HTMLInputElement;
+                if (input) {
+                  input.focus();
+                }
               }
+              // Global scope: no action
             }}
-            isGenerating={isGenerating}
-            showDomainChoice={showDomainChoice}
-            onDomainSelect={(domain) => {
-              // Map domain to card title and intent
-              const domainMap: Record<string, { title: string; intent: string }> = {
-                work: { title: "Work", intent: "work" },
-                health: { title: "Health", intent: "health" },
-                mind: { title: "Mind", intent: "self" },
-                relationships: { title: "Relationships", intent: "relationship" },
-                other: { title: "Something else", intent: "other" },
-              };
-              
-              const { title, intent } = domainMap[domain] || { title: domain, intent: "other" };
-              
-              // Create active card
-              const newCard = createCard(title, intent, "private", "user_choice");
-              
-              // Promote to active
-              updateCardState(newCard.id, "active");
-              
-              // Close choice modal and refresh
-              setShowDomainChoice(false);
-              refreshCards();
-            }}
-            activeCard={activeCard || undefined}
-            onCompleteCard={(cardId) => completeCard(cardId)}
-            onDeferCard={(cardId) => deferCard(cardId)}
-            showNobody={showNobody}
-            onNobodyYes={() => {
-              setShowNobody(false);
-              setShowStepPrompt(true);
-            }}
-            onNobodyNotNow={() => {
-              setShowNobody(false);
-            }}
-            showStepPrompt={showStepPrompt}
-            onStepSelect={(option) => {
-              // Handle step selection (static for now, no AI)
-              console.log("Step selected:", option);
-              // For now, just hide the prompt and return to calm view
-              setShowStepPrompt(false);
-              // TODO: Create a step card or action based on selection
-            }}
-            showPrompt={showPrompt}
-            promptData={promptData || undefined}
-            promptState={promptState}
-            onPromptChoice={(choiceId) => {
-              handleChoice(choiceId);
-              setTimeout(() => refreshCards(), 100);
-            }}
-            onPromptRetry={retryPrompt}
-            onPromptUseLast={useLastPrompt}
-            actionLoopPlan={actionLoopPlan || undefined}
-            actionLoopState={actionLoopState}
-            onActionChoice={handleActionLoopChoice}
-            onActionComplete={handleActionComplete}
-            actionInProgress={actionInProgress}
-            completedMessage="Done"
-            isDev={isDev}
+            isGenerating={isGeneratingStep}
+            scope={scope}
             stepSuggestion={stepSuggestion}
             onStepDo={handleStepDo}
             onStepNotNow={handleStepNotNow}
             onStepChange={handleStepChange}
-            onAskNobodySubmit={handleAskNobodySubmit}
+            onAskNobodySubmit={scope === "private" ? handleAskNobodySubmit : undefined}
             activeStepCard={activeStepCard || undefined}
             onStepDone={handleStepDone}
+            completedMessage="Done"
+            isDev={isDev}
           />
         </div>
 

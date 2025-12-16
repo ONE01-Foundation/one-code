@@ -27,39 +27,18 @@ interface HomeContentProps {
   // Empty
   onFindNextStep?: () => void;
   isGenerating?: boolean;
-  showDomainChoice?: boolean;
-  onDomainSelect?: (domain: string) => void;
+  scope?: "private" | "global";
   // Active
-  activeCard?: Card | null;
-  onCompleteCard?: (cardId: string) => void;
-  onDeferCard?: (cardId: string) => void;
   activeStepCard?: StepCard | null;
   onStepDone?: () => void;
-  showNobody?: boolean;
-  onNobodyYes?: () => void;
-  onNobodyNotNow?: () => void;
-  showStepPrompt?: boolean;
-  onStepSelect?: (option: string) => void;
   // Suggestion
-  showPrompt?: boolean;
-  promptData?: NobodyResponse | null;
-  promptState?: "idle" | "loading" | "ready" | "timeout";
-  onPromptChoice?: (choiceId: string) => void;
-  onPromptRetry?: () => void;
-  onPromptUseLast?: () => void;
-  actionLoopPlan?: ActionLoopPlan | null;
-  actionLoopState?: ActionLoopState;
-  onActionChoice?: (choice: "yes" | "not_now" | "change") => void;
-  onActionComplete?: () => void;
-  actionInProgress?: boolean;
-  // Completed
-  completedMessage?: string;
-  // AI Step Suggestion
   stepSuggestion?: OneNextStep | null;
   onStepDo?: () => void;
   onStepNotNow?: () => void;
   onStepChange?: () => void;
   onAskNobodySubmit?: (text: string) => void;
+  // Completed
+  completedMessage?: string;
   // Debug
   isDev?: boolean;
 }
@@ -69,36 +48,16 @@ export function HomeContent({
   isLoading = false,
   onFindNextStep,
   isGenerating = false,
-  showDomainChoice = false,
-  onDomainSelect,
-  activeCard,
-  onCompleteCard,
-  onDeferCard,
+  scope = "private",
   activeStepCard,
   onStepDone,
-  showNobody = false,
-  onNobodyYes,
-  onNobodyNotNow,
-  showStepPrompt = false,
-  onStepSelect,
-  showPrompt = false,
-  promptData,
-  promptState = "idle",
-  onPromptChoice,
-  onPromptRetry,
-  onPromptUseLast,
-  actionLoopPlan,
-  actionLoopState = "prompt",
-  onActionChoice,
-  onActionComplete,
-  actionInProgress = false,
-  completedMessage = "Done",
-  isDev = false,
   stepSuggestion,
   onStepDo,
   onStepNotNow,
   onStepChange,
   onAskNobodySubmit,
+  completedMessage = "Done",
+  isDev = false,
 }: HomeContentProps) {
   // Unified layout structure
   return (
@@ -110,7 +69,7 @@ export function HomeContent({
         </div>
       )}
 
-      {/* Center Content - switches based on state */}
+      {/* Center Content - StepCard flow only */}
       <div className="space-y-6">
         {state === "loading" ? (
           /* LOADING: Minimal, calm */
@@ -129,217 +88,86 @@ export function HomeContent({
               {completedMessage}
             </div>
           </div>
-        ) : state === "active" && activeCard ? (
-          /* ACTIVE: Minimal active card view + Nobody presence */
-          showStepPrompt ? (
-            /* Step Prompt: What feels easiest to do next? */
-            <StepPrompt onSelect={(option) => onStepSelect?.(option)} />
-          ) : showNobody ? (
-            /* Nobody Presence: First message */
-            <NobodyPresence
-              message="Let's take one small step."
-              onYes={() => onNobodyYes?.()}
-              onNotNow={() => onNobodyNotNow?.()}
-            />
-          ) : (
-            /* Calm active card view (Nobody hidden) */
-            <div className="space-y-8 py-12">
-              <div className="text-center space-y-4">
-                <h2
-                  className="text-3xl sm:text-4xl font-normal"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  {activeCard.title}
-                </h2>
-                <p
-                  className="text-base sm:text-lg opacity-60"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  We'll take this one step at a time.
+        ) : state === "active" && activeStepCard ? (
+          /* ACTIVE: Show active StepCard + Done button */
+          <div className="space-y-8 py-12">
+            <div className="text-center space-y-4">
+              <h2
+                className="text-3xl sm:text-4xl font-bold"
+                style={{ color: "var(--foreground)" }}
+              >
+                {activeStepCard.title}
+              </h2>
+              <p
+                className="text-base sm:text-lg opacity-70"
+                style={{ color: "var(--foreground)" }}
+              >
+                {activeStepCard.why}
+              </p>
+            </div>
+            <div className="flex justify-center gap-4 text-sm opacity-80" style={{ color: "var(--foreground)" }}>
+              <span className="px-3 py-1 rounded-full" style={{ backgroundColor: "var(--neutral-100)" }}>
+                {activeStepCard.durationMinutes} min
+              </span>
+              <span className="px-3 py-1 rounded-full" style={{ backgroundColor: "var(--neutral-100)" }}>
+                {activeStepCard.energy} energy
+              </span>
+              <span className="px-3 py-1 rounded-full" style={{ backgroundColor: "var(--neutral-100)" }}>
+                {activeStepCard.domain}
+              </span>
+            </div>
+            <button
+              onClick={onStepDone}
+              className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+              style={{
+                backgroundColor: "var(--foreground)",
+                color: "var(--background)",
+              }}
+            >
+              Done
+            </button>
+          </div>
+        ) : state === "suggestion" && stepSuggestion ? (
+          /* SUGGESTION: Show stepSuggestion + buttons */
+          <StepSuggestion
+            step={stepSuggestion}
+            onDo={onStepDo || (() => {})}
+            onNotNow={onStepNotNow || (() => {})}
+            onChange={onStepChange || (() => {})}
+          />
+        ) : state === "empty" ? (
+          /* EMPTY: Show button + input (private) or view-only message (global) */
+          <>
+            {scope === "private" ? (
+              <>
+                <div className="text-center py-12 pb-24">
+                  <button
+                    onClick={onFindNextStep}
+                    disabled={isGenerating}
+                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                    style={{
+                      backgroundColor: "var(--foreground)",
+                      color: "var(--background)",
+                    }}
+                  >
+                    {isGenerating ? "Generating..." : "Find next step"}
+                  </button>
+                </div>
+                {onAskNobodySubmit && (
+                  <AskNobodyInput
+                    onSubmit={onAskNobodySubmit}
+                    isGenerating={isGenerating}
+                  />
+                )}
+              </>
+            ) : (
+              /* Global scope: view-only */
+              <div className="text-center py-12">
+                <p className="text-base opacity-60" style={{ color: "var(--foreground)" }}>
+                  Global is view-only
                 </p>
               </div>
-              <div className="space-y-3">
-                <button
-                  onClick={() => onFindNextStep?.()}
-                  disabled={isGenerating}
-                  className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                  style={{
-                    backgroundColor: "var(--foreground)",
-                    color: "var(--background)",
-                  }}
-                >
-                  What's the next small step?
-                </button>
-                <button
-                  onClick={() => {
-                    // Defer current card (set to draft) to allow choosing a new focus
-                    onDeferCard?.(activeCard.id);
-                  }}
-                  className="w-full px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200"
-                  style={{
-                    backgroundColor: "var(--background)",
-                    border: "2px solid var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  Change focus
-                </button>
-              </div>
-            </div>
-          )
-        ) : state === "suggestion" ? (
-          /* SUGGESTION: System suggests next step */
-          <>
-            {showPrompt && promptData ? (
-              <NobodyPrompt
-                response={promptData}
-                state={promptState}
-                onChoice={onPromptChoice || (() => {})}
-                onRetry={onPromptRetry}
-                onUseLast={onPromptUseLast}
-              />
-            ) : actionLoopPlan && actionLoopState === "prompt" ? (
-              (() => {
-                // Import getCurrentActionStep dynamically to avoid circular deps
-                const { getCurrentActionStep } = require("@/lib/action-loop-engine");
-                const currentStep = getCurrentActionStep(actionLoopPlan);
-                if (!currentStep) return null;
-
-                return (
-                  <div className="space-y-6">
-                    {/* Prompt: single clear suggestion */}
-                    <div
-                      className="p-6 rounded-lg text-left transition-all duration-500"
-                      style={{ border: "2px solid var(--border)" }}
-                    >
-                      <div
-                        className="text-2xl sm:text-3xl font-bold mb-3"
-                        style={{ color: "var(--foreground)" }}
-                      >
-                        {currentStep.prompt}
-                      </div>
-                      <div
-                        className="text-lg sm:text-xl mb-2"
-                        style={{ color: "var(--neutral-700)" }}
-                      >
-                        {currentStep.action}
-                      </div>
-                      {currentStep.estimatedTime && (
-                        <div
-                          className="text-xs mt-4 opacity-50"
-                          style={{ color: "var(--neutral-500)" }}
-                        >
-                          {currentStep.estimatedTime} min
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bottom Actions: Primary (Yes) + Secondary (Not now / Change) */}
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => onActionChoice?.("yes")}
-                        disabled={isGenerating}
-                        className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                        style={{
-                          backgroundColor: "var(--foreground)",
-                          color: "var(--background)",
-                        }}
-                      >
-                        Yes
-                      </button>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => onActionChoice?.("not_now")}
-                          disabled={isGenerating}
-                          className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                          style={{
-                            backgroundColor: "var(--background)",
-                            border: "2px solid var(--border)",
-                            color: "var(--foreground)",
-                          }}
-                        >
-                          Not now
-                        </button>
-                        <button
-                          onClick={() => onActionChoice?.("change")}
-                          disabled={isGenerating}
-                          className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                          style={{
-                            backgroundColor: "var(--background)",
-                            border: "2px solid var(--border)",
-                            color: "var(--foreground)",
-                          }}
-                        >
-                          Change
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()
-            ) : actionLoopPlan && actionLoopState === "action" && actionInProgress ? (
-              /* Action in progress */
-              (() => {
-                const { getCurrentActionStep } = require("@/lib/action-loop-engine");
-                const currentStep = getCurrentActionStep(actionLoopPlan);
-                if (!currentStep) return null;
-
-                return (
-                  <div className="space-y-6">
-                    <div
-                      className="p-6 rounded-lg text-left transition-all duration-500"
-                      style={{ border: "2px solid var(--border)" }}
-                    >
-                      <div
-                        className="text-2xl sm:text-3xl font-bold mb-3"
-                        style={{ color: "var(--foreground)" }}
-                      >
-                        {currentStep.prompt}
-                      </div>
-                      <div
-                        className="text-lg sm:text-xl mb-2"
-                        style={{ color: "var(--neutral-700)" }}
-                      >
-                        {currentStep.action}
-                      </div>
-                    </div>
-
-                    {/* Bottom Action: Done button */}
-                    <button
-                      onClick={onActionComplete}
-                      className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-                      style={{
-                        backgroundColor: "var(--foreground)",
-                        color: "var(--background)",
-                      }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                );
-              })()
-            ) : null}
-          </>
-        ) : state === "empty" ? (
-          /* EMPTY: No active card + CTA + Ask Nobody input */
-          <>
-            <div className="text-center py-12 pb-24">
-              <button
-                onClick={onFindNextStep}
-                disabled={isGenerating}
-                className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                style={{
-                  backgroundColor: "var(--foreground)",
-                  color: "var(--background)",
-                }}
-              >
-                {isGenerating ? "Generating..." : "Find next step"}
-              </button>
-            </div>
-            <AskNobodyInput
-              onSubmit={(text) => onAskNobodySubmit?.(text)}
-              isGenerating={isGenerating}
-            />
+            )}
           </>
         ) : null}
       </div>
