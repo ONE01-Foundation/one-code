@@ -7,52 +7,28 @@
  * - Actions over explanations
  */
 
-export type CardStatus = "pending" | "done" | "delayed";
+export type CardState = "pending" | "done" | "skipped";
+export type IntentCategory = "health" | "money" | "work" | "relationship" | "self" | "other";
 
-export interface Intent {
+// Minimal data model
+export interface Session {
   id: string;
-  text: string;
-  createdAt: Date;
-  userId: string;
-}
-
-export interface DecompositionOption {
-  id: string;
-  label: string;
-  description?: string;
+  createdAt: string;
+  lastActivityAt: string;
 }
 
 export interface Card {
   id: string;
-  intentId: string;
-  action: string; // Single, clear action
-  status: CardStatus;
-  createdAt: Date;
-  completedAt?: Date;
-  delayedUntil?: Date;
-  userId: string;
+  intent: string; // Single, reduced intent
+  action_text: string; // Short imperative sentence
+  state: CardState; // pending | done | skipped
+  category?: IntentCategory;
+  timestamp: string; // ISO string
+  createdAt: string;
 }
 
-export interface Loop {
-  id: string;
-  cardId: string;
-  frequency: "daily" | "weekly" | "monthly";
-  lastRunAt?: Date;
-  nextRunAt: Date;
-  userId: string;
-}
-
-export interface GlobalMirror {
-  // Anonymous aggregate data
-  totalIntents: number;
-  totalCards: number;
-  cardsByStatus: {
-    pending: number;
-    done: number;
-    delayed: number;
-  };
-  // No user-specific data
-}
+// Legacy types (kept for compatibility, will be removed later)
+export type CardStatus = "pending" | "done" | "delayed"; // @deprecated - use CardState
 
 
 

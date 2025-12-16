@@ -1,252 +1,194 @@
 /**
- * ONE01 Screen - Core Interaction Loop
+ * ONE01 Screen - Core Loop Implementation
  * 
- * STRUCTURE:
- * - Top: Context line (one large, calm text)
- * - Center: Focus zone (one thing at a time)
- * - Side: 4 context circles (icons only, text on focus)
- * - Bottom: Anchor circle (current state, back/confirm)
+ * FLOW:
+ * 1. Entry State: Nobody presence + "What do you need right now?"
+ * 2. Input: 2 options OR type (max 120 chars)
+ * 3. AI Distillation: intent → category → ONE action
+ * 4. Card Creation: create card with action_text
+ * 5. Action Presentation: "Do you want to do this now?" (Do / Not now)
+ * 6. Resolution: mark done/skipped, return to entry
  * 
- * STATES:
- * - Orientation: User just arrived, narrow intent
- * - Action: User choosing/doing something
- * - Reflection: Show result, offer next step
- * 
- * INTERACTIONS:
- * - Single tap: Confirm/Select
- * - Double tap: Back
- * - Focus/Hover: Show label
- * - No free typing by default
+ * PRINCIPLES:
+ * - One screen only (state-based)
+ * - Max 2 choices at any moment
+ * - Short text only (1-2 lines)
+ * - No explanations, only actions
+ * - User always has control
  */
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { Card, CardState } from "@/lib/types";
 
-type AppState = "orientation" | "action" | "reflection";
+type AppState = "entry" | "processing" | "action" | "resolved";
 
-interface Direction {
-  id: string;
-  icon: string; // Simple emoji or symbol for now
-  label: string;
-  description?: string;
+interface DistillationResult {
+  intent: string;
+  category: string;
+  action_text: string;
+  needs_clarification?: boolean;
+  clarification_question?: string;
 }
 
-// Generate directions based on context (will be dynamic later)
-function getDirections(state: AppState): Direction[] {
-  if (state === "orientation") {
-    return [
-      { id: "improve", icon: "↑", label: "Improve" },
-      { id: "resolve", icon: "→", label: "Resolve" },
-      { id: "decide", icon: "↓", label: "Decide" },
-      { id: "explore", icon: "←", label: "Explore" },
-    ];
-  }
-  // For action/reflection, show fewer or different directions
+// Generate 2 suggested options based on context
+function getSuggestedOptions(): { id: string; label: string }[] {
+  // Simple suggestions - will be dynamic later
   return [
-    { id: "continue", icon: "→", label: "Continue" },
-    { id: "pause", icon: "⏸", label: "Pause" },
-    { id: "complete", icon: "✓", label: "Complete" },
+    { id: "suggest-1", label: "I need to focus" },
+    { id: "suggest-2", label: "I need to decide" },
   ];
 }
 
-// Context line text based on state
-function getContextLine(state: AppState, step?: string): string {
-  switch (state) {
-    case "orientation":
-      return "What do you need right now?";
-    case "action":
-      return step || "Choose one direction.";
-    case "reflection":
-      return "This is your next step.";
-    default:
-      return "What do you need right now?";
-  }
-}
-
-// Center content based on state (1-2 lines max, neutral language)
-function getCenterContent(state: AppState, hasSelection?: boolean): string {
-  switch (state) {
-    case "orientation":
-      return "Next step available.";
-    case "action":
-      if (hasSelection) {
-        return ""; // Confirmation will be shown separately
-      }
-      return "Select a direction to proceed.";
-    case "reflection":
-      return "Action completed. Next step available.";
-    default:
-      return "Next step available.";
-  }
-}
-
 export default function OneScreen() {
-  const [state, setState] = useState<AppState>("orientation");
-  const [selectedDirection, setSelectedDirection] = useState<Direction | null>(null);
-  const [focusedCircle, setFocusedCircle] = useState<string | null>(null);
-  const [confirmationText, setConfirmationText] = useState<string | null>(null);
+  const [state, setState] = useState<AppState>("entry");
+  const [userInput, setUserInput] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
-  const [inputValue, setInputValue] = useState("");
-  const doubleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastTapRef = useRef<number>(0);
+  const [currentCard, setCurrentCard] = useState<Card | null>(null);
+  const [distillationResult, setDistillationResult] = useState<DistillationResult | null>(null);
+  const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
 
-  const directions = getDirections(state);
-  const contextLine = getContextLine(state, confirmationText || undefined);
-  const centerContent = getCenterContent(state, !!selectedDirection);
-
-  // Handle circle interaction
-  const handleCircleTap = (direction: Direction) => {
-    const now = Date.now();
-    const timeSinceLastTap = now - lastTapRef.current;
-
-    if (timeSinceLastTap < 300) {
-      // Double tap - go back
-      if (doubleTapTimerRef.current) {
-        clearTimeout(doubleTapTimerRef.current);
-      }
-      handleBack();
-      lastTapRef.current = 0;
-      return;
+  // Load session from localStorage
+  useEffect(() => {
+    const sessionId = localStorage.getItem("one_session_id");
+    if (!sessionId) {
+      localStorage.setItem("one_session_id", `session_${Date.now()}`);
     }
+  }, []);
 
-    // Single tap - select direction
-    lastTapRef.current = now;
-    doubleTapTimerRef.current = setTimeout(() => {
-      handleDirectionSelect(direction);
-      doubleTapTimerRef.current = null;
-    }, 300);
+  // Handle option selection
+  const handleOptionSelect = async (optionLabel: string) => {
+    await processInput(optionLabel);
   };
 
-  const handleDirectionSelect = (direction: Direction) => {
-    setSelectedDirection(direction);
-    setConfirmationText(`Proceed with "${direction.label}"?`);
-    setState("action");
-  };
-
-  const handleConfirm = () => {
-    if (selectedDirection) {
-      // Move to reflection state
-      setState("reflection");
-      setConfirmationText(null);
-      // In a real implementation, this would trigger the actual action
-    }
-  };
-
-  const handleBack = () => {
-    if (state === "action" && selectedDirection) {
-      // Go back to orientation
-      setState("orientation");
-      setSelectedDirection(null);
-      setConfirmationText(null);
-    } else if (state === "reflection") {
-      // Go back to action or orientation
-      setState("orientation");
-      setSelectedDirection(null);
-      setConfirmationText(null);
-    }
-  };
-
-  // Anchor circle interactions
-  const handleAnchorTap = () => {
-    const now = Date.now();
-    const timeSinceLastTap = now - lastTapRef.current;
-
-    if (timeSinceLastTap < 300) {
-      // Double tap - back
-      handleBack();
-      lastTapRef.current = 0;
-      return;
-    }
-
-    // Single tap - confirm
-    lastTapRef.current = now;
-    setTimeout(() => {
-      if (state === "action" && selectedDirection) {
-        handleConfirm();
-      }
-    }, 300);
-  };
-
-  // Explicitly invoke text input
-  const handleInvokeTextInput = () => {
-    setShowTextInput(true);
-  };
-
-  const handleTextSubmit = (e: React.FormEvent) => {
+  // Handle text input submission
+  const handleTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      // Process text input
-      setConfirmationText(`Proceed with "${inputValue.trim()}"?`);
-      setShowTextInput(false);
-      setInputValue("");
+    if (userInput.trim().length > 0 && userInput.trim().length <= 120) {
+      await processInput(userInput.trim());
+    }
+  };
+
+  // Process input through AI distillation
+  const processInput = async (input: string) => {
+    setState("processing");
+    setShowTextInput(false);
+    setUserInput("");
+
+    try {
+      const response = await fetch("/api/distill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Distillation failed");
+      }
+
+      const result: DistillationResult = await response.json();
+
+      // If clarification needed, show question
+      if (result.needs_clarification && result.clarification_question) {
+        setClarificationQuestion(result.clarification_question);
+        setState("entry");
+        return;
+      }
+
+      // Create card
+      const card: Card = {
+        id: `card_${Date.now()}`,
+        intent: result.intent,
+        action_text: result.action_text,
+        state: "pending",
+        category: result.category as any,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+
+      // Save card to localStorage
+      const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+      cards.push(card);
+      localStorage.setItem("one_cards", JSON.stringify(cards));
+
+      setCurrentCard(card);
+      setDistillationResult(result);
+      setState("action");
+    } catch (error) {
+      console.error("Error processing input:", error);
+      // Fallback: create simple card
+      const card: Card = {
+        id: `card_${Date.now()}`,
+        intent: input,
+        action_text: `Complete: ${input}`,
+        state: "pending",
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+      cards.push(card);
+      localStorage.setItem("one_cards", JSON.stringify(cards));
+      setCurrentCard(card);
       setState("action");
     }
   };
 
+  // Handle action resolution
+  const handleDo = () => {
+    if (!currentCard) return;
+
+    // Update card state to "done"
+    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+    const updated = cards.map((c: Card) =>
+      c.id === currentCard.id ? { ...c, state: "done" as CardState } : c
+    );
+    localStorage.setItem("one_cards", JSON.stringify(updated));
+
+    // Return to entry
+    setCurrentCard(null);
+    setDistillationResult(null);
+    setState("entry");
+  };
+
+  const handleNotNow = () => {
+    if (!currentCard) return;
+
+    // Update card state to "skipped"
+    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+    const updated = cards.map((c: Card) =>
+      c.id === currentCard.id ? { ...c, state: "skipped" as CardState } : c
+    );
+    localStorage.setItem("one_cards", JSON.stringify(updated));
+
+    // Return to entry
+    setCurrentCard(null);
+    setDistillationResult(null);
+    setState("entry");
+  };
+
+  const suggestedOptions = getSuggestedOptions();
+
   return (
     <div className="fixed inset-0 bg-white flex flex-col">
-      {/* Top: Context Line - Permanent Zone */}
+      {/* Top: Context Line */}
       <div className="flex items-center justify-center pt-8 pb-6 px-6">
         <h1 className="text-4xl sm:text-5xl font-normal text-black text-center">
-          {contextLine}
+          {state === "entry"
+            ? "What do you need right now?"
+            : state === "processing"
+            ? "Processing..."
+            : state === "action"
+            ? "Do you want to do this now?"
+            : "Next step available."}
         </h1>
       </div>
 
-      {/* Center: Focus Zone - Permanent Zone */}
+      {/* Center: Focus Zone */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-        {/* Side Circles - Context Options (4 max) */}
-        <div className="absolute inset-0 pointer-events-none">
-          {directions.slice(0, 4).map((direction, index) => {
-            const positions = [
-              { top: "12%", left: "12%" }, // Top left
-              { top: "12%", right: "12%" }, // Top right
-              { bottom: "24%", left: "12%" }, // Bottom left
-              { bottom: "24%", right: "12%" }, // Bottom right
-            ];
-            const pos = positions[index] || positions[0];
-            const isFocused = focusedCircle === direction.id;
-
-            return (
-              <div
-                key={direction.id}
-                className="absolute pointer-events-auto z-20"
-                style={pos}
-                onMouseEnter={() => setFocusedCircle(direction.id)}
-                onMouseLeave={() => setFocusedCircle(null)}
-                onTouchStart={() => setFocusedCircle(direction.id)}
-                onTouchEnd={() => setTimeout(() => setFocusedCircle(null), 1500)}
-              >
-                <button
-                  onClick={() => handleCircleTap(direction)}
-                  className={`
-                    w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 
-                    flex items-center justify-center
-                    transition-all duration-200
-                    ${isFocused 
-                      ? "border-black bg-black text-white scale-110 shadow-lg" 
-                      : "border-neutral-300 bg-white text-black hover:border-black"
-                    }
-                  `}
-                >
-                  <span className="text-2xl sm:text-3xl">{direction.icon}</span>
-                </button>
-                {/* Label appears on focus */}
-                {isFocused && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap z-30">
-                    <div className="px-3 py-1.5 bg-black text-white text-xs font-medium rounded shadow-lg">
-                      {direction.label}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div 
+          <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-neutral-50 blur-3xl"
             style={{
               animation: "subtle-pulse 4s ease-in-out infinite",
@@ -254,111 +196,148 @@ export default function OneScreen() {
           />
         </div>
 
-        {/* Center Content - One thing at a time */}
+        {/* Center Content */}
         <div className="relative z-10 w-full max-w-md text-center">
-          {showTextInput ? (
-            <form onSubmit={handleTextSubmit} className="space-y-4">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Type your intent..."
-                className="w-full px-4 py-3 border-2 border-black rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-black"
-                autoFocus
-              />
-              <div className="flex gap-3">
+          {state === "entry" && (
+            <div className="space-y-6">
+              {/* Clarification question if needed */}
+              {clarificationQuestion && (
+                <div className="space-y-4">
+                  <p className="text-lg text-neutral-700 leading-relaxed">
+                    {clarificationQuestion}
+                  </p>
+                  <button
+                    onClick={() => setClarificationQuestion(null)}
+                    className="text-sm text-neutral-500 hover:text-black"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              {/* 2 Suggested Options */}
+              {!showTextInput && !clarificationQuestion && (
+                <div className="space-y-3">
+                  {suggestedOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => handleOptionSelect(option.label)}
+                      className="w-full px-6 py-4 bg-white border-2 border-black rounded-lg text-left hover:bg-black hover:text-white transition-colors duration-200"
+                    >
+                      <div className="font-medium text-lg">{option.label}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Text Input (explicitly invoked) */}
+              {showTextInput ? (
+                <form onSubmit={handleTextSubmit} className="space-y-4">
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.length <= 120) {
+                        setUserInput(val);
+                      }
+                    }}
+                    placeholder="Type your intent (max 120 chars)..."
+                    className="w-full px-4 py-3 border-2 border-black rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-black"
+                    autoFocus
+                    maxLength={120}
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      disabled={userInput.trim().length === 0}
+                      className="flex-1 px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Continue
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTextInput(false);
+                        setUserInput("");
+                      }}
+                      className="flex-1 px-6 py-3 bg-white border-2 border-black text-black rounded-lg font-medium hover:opacity-90"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <div className="text-xs text-neutral-400">
+                    {userInput.length}/120
+                  </div>
+                </form>
+              ) : (
+                !clarificationQuestion && (
+                  <button
+                    onClick={() => setShowTextInput(true)}
+                    className="text-sm text-neutral-500 hover:text-black transition-colors"
+                  >
+                    Or type your intent
+                  </button>
+                )
+              )}
+            </div>
+          )}
+
+          {state === "processing" && (
+            <div className="space-y-4">
+              <div className="w-12 h-12 border-4 border-neutral-200 border-t-black rounded-full mx-auto animate-spin" />
+              <p className="text-base text-neutral-600">
+                Distilling your intent...
+              </p>
+            </div>
+          )}
+
+          {state === "action" && currentCard && (
+            <div className="space-y-6">
+              {/* Action text (1-2 lines) */}
+              <p className="text-xl sm:text-2xl text-neutral-800 leading-relaxed font-medium">
+                {currentCard.action_text}
+              </p>
+
+              {/* 2 Choices: Do / Not now */}
+              <div className="space-y-3">
                 <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90"
+                  onClick={handleDo}
+                  className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
                 >
-                  Continue
+                  Do
                 </button>
                 <button
-                  type="button"
-                  onClick={() => {
-                    setShowTextInput(false);
-                    setInputValue("");
-                  }}
-                  className="flex-1 px-6 py-3 bg-white border-2 border-black text-black rounded-lg font-medium hover:opacity-90"
+                  onClick={handleNotNow}
+                  className="w-full px-6 py-4 bg-white border-2 border-black text-black rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
                 >
-                  Cancel
+                  Not now
                 </button>
               </div>
-            </form>
-          ) : (
-            <div className="space-y-6">
-              {/* System message (1-2 lines max) - only show if no confirmation */}
-              {!(state === "action" && selectedDirection) && centerContent && (
-                <p className="text-lg sm:text-xl text-neutral-700 leading-relaxed">
-                  {centerContent}
-                </p>
-              )}
+            </div>
+          )}
 
-              {/* Confirmation if in action state - single question */}
-              {state === "action" && selectedDirection && (
-                <div className="space-y-4">
-                  <p className="text-base sm:text-lg text-neutral-800 leading-relaxed">
-                    {confirmationText}
-                  </p>
-                </div>
-              )}
-
-              {/* Reflection state - show result, offer next step */}
-              {state === "reflection" && (
-                <div className="space-y-4">
-                  <p className="text-base sm:text-lg text-neutral-700 leading-relaxed">
-                    {centerContent}
-                  </p>
-                </div>
-              )}
-
-              {/* Option to invoke text input - only in orientation */}
-              {state === "orientation" && !showTextInput && (
-                <button
-                  onClick={handleInvokeTextInput}
-                  className="text-sm text-neutral-500 hover:text-black transition-colors"
-                >
-                  Or type your intent
-                </button>
-              )}
+          {state === "resolved" && (
+            <div className="space-y-4">
+              <p className="text-lg text-neutral-700 leading-relaxed">
+                Next step available.
+              </p>
+              <button
+                onClick={() => setState("entry")}
+                className="px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90"
+              >
+                Continue
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Bottom: Anchor Circle - Permanent Zone */}
-      <div className="flex flex-col items-center justify-center pb-8 pt-4 relative">
-        <button
-          onClick={handleAnchorTap}
-          className={`
-            w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2
-            flex items-center justify-center
-            transition-all duration-200
-            ${
-              state === "action" && selectedDirection
-                ? "border-black bg-black text-white shadow-lg"
-                : state === "reflection"
-                ? "border-black bg-white text-black"
-                : "border-neutral-300 bg-white text-black hover:border-black"
-            }
-          `}
-        >
-          <span className="text-xl sm:text-2xl font-medium">
-            {state === "orientation" ? "○" : state === "action" ? "✓" : "○"}
-          </span>
-        </button>
-        {/* Subtle hint text */}
-        {state === "action" && selectedDirection && (
-          <div className="absolute -top-8 text-xs text-neutral-400 text-center whitespace-nowrap">
-            <div>Tap to confirm</div>
-            <div className="text-[10px] mt-0.5 opacity-70">Double tap to go back</div>
-          </div>
-        )}
-        {state === "reflection" && (
-          <div className="absolute -top-8 text-xs text-neutral-400 text-center whitespace-nowrap">
-            <div>Double tap to return</div>
-          </div>
-        )}
+      {/* Bottom: Minimal anchor (optional, can be removed) */}
+      <div className="flex items-center justify-center pb-6 pt-4">
+        <div className="text-xs text-neutral-400">
+          ONE01
+        </div>
       </div>
     </div>
   );
