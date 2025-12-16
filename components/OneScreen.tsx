@@ -795,44 +795,46 @@ export default function OneScreen() {
         {/* Side Bubbles (next/context/last done - max 3) */}
         <SideBubbles cards={visibleCards} />
         
-        {/* Nobody Prompt (first run or manual) */}
-        {showPrompt && promptData ? (
-          <NobodyPrompt
-            say={promptData.say}
-            choices={promptData.choices}
-            onChoice={(choiceId) => {
-              handleChoice(choiceId);
-              // Refresh cards to show newly created card
-              setTimeout(() => refreshCards(), 100);
-            }}
-            onRefresh={refreshPrompt}
-            isLoading={nobodyLoading}
-          />
-        ) : activeCard ? (
-          /* Center Card (active card) */
-          <CenterCard
-            card={activeCard}
-            onComplete={() => completeCard(activeCard.id)}
-            onDefer={() => deferCard(activeCard.id)}
-          />
-        ) : (
-          /* No active card - show "Ask Nobody" button */
-          <div className="text-center space-y-4">
-            <div className="opacity-50 mb-4">
-              <p className="text-lg">What matters for you right now?</p>
-            </div>
-            <button
-              onClick={openPrompt}
-              className="px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-              style={{
-                backgroundColor: "var(--foreground)",
-                color: "var(--background)",
+        {/* Nobody Prompt / Cards Lifecycle - Primary UI (z-20 to be above old UI) */}
+        <div className="relative z-20 w-full max-w-md text-center">
+          {showPrompt && promptData ? (
+            <NobodyPrompt
+              say={promptData.say}
+              choices={promptData.choices}
+              onChoice={(choiceId) => {
+                handleChoice(choiceId);
+                // Refresh cards to show newly created card
+                setTimeout(() => refreshCards(), 100);
               }}
-            >
-              Ask Nobody
-            </button>
-          </div>
-        )}
+              onRefresh={refreshPrompt}
+              isLoading={nobodyLoading}
+            />
+          ) : activeCard ? (
+            /* Center Card (active card) */
+            <CenterCard
+              card={activeCard}
+              onComplete={() => completeCard(activeCard.id)}
+              onDefer={() => deferCard(activeCard.id)}
+            />
+          ) : (
+            /* No active card - show "Ask Nobody" button */
+            <div className="text-center space-y-4">
+              <div className="opacity-50 mb-4">
+                <p className="text-lg">What matters for you right now?</p>
+              </div>
+              <button
+                onClick={openPrompt}
+                className="px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                style={{
+                  backgroundColor: "var(--foreground)",
+                  color: "var(--background)",
+                }}
+              >
+                Ask Nobody
+              </button>
+            </div>
+          )}
+        </div>
         
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -845,7 +847,8 @@ export default function OneScreen() {
           />
         </div>
 
-        {/* Center Content */}
+        {/* Center Content - Hide when Nobody prompt or Cards Lifecycle is active */}
+        {!showPrompt && !activeCard && (
         <div className="relative z-10 w-full max-w-md text-center">
           {/* Signal UI (subtle, no popups/banners) - only when no active user action */}
           {activeSignal && signalVisible && !showSteps && !currentLifeAction && (
@@ -940,6 +943,8 @@ export default function OneScreen() {
             </div>
           ) : (
             /* Private Mode: Life Loop Engine */
+            /* Hide Action Loop when Nobody prompt or Cards Lifecycle is active */
+            !showPrompt && !activeCard ? (
             <div className="space-y-6">
               {/* Nobody message (calm, short) */}
               {nobodyMessage && (
@@ -1149,8 +1154,10 @@ export default function OneScreen() {
                 </div>
               )}
             </div>
+            ) : null
           )}
         </div>
+        )}
       </div>
 
       {/* Bottom: State Panel toggle and "Keep this path" - Hidden during steps, OWO, and action loop */}
