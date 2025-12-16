@@ -1531,7 +1531,7 @@ export default function OneScreen() {
                   color: "var(--background)",
                 }}
               >
-                {t(uiLang, "start") || "Start"}
+                Start
               </button>
               <button
                 onClick={() => {
@@ -1547,7 +1547,7 @@ export default function OneScreen() {
                   color: "var(--foreground)",
                 }}
               >
-                {t(uiLang, "notNow")}
+                Not now
               </button>
             </div>
           ) : (
