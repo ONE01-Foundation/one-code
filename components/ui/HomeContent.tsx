@@ -34,6 +34,7 @@ interface HomeContentProps {
   scope?: "private" | "global";
   nextIntent?: "show_active" | "show_step" | "ask_nobody" | "silence";
   uiLang?: UILang;
+  timePhase?: "dawn" | "day" | "sunset" | "night";
   // Active
   activeStepCard?: StepCard | null;
   onStepDone?: () => void;
