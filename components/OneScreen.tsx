@@ -99,15 +99,17 @@ import {
   setActiveCardId,
   getActiveCardId,
   createStepCardFromSuggestion,
+  StepCardDomain,
 } from "@/lib/step-card";
 import { buildBubbles, BubbleSlots, BubbleSlot, BubbleItem } from "@/lib/bubbles";
 import { getNextIntent, NextIntent } from "@/lib/flow-lock";
 import { Deck, loadDecks, saveDeck, updateDeck, setActiveDeckId, getActiveDeck, createDeckFromSuggestion } from "@/lib/deck";
 import { DoingStep } from "@/components/ui/DoingStep";
-import { getGlobalSnapshot, GlobalSnapshot } from "@/lib/global-engine";
+import { getGlobalSnapshot } from "@/lib/global-engine";
+import type { GlobalSnapshot } from "@/lib/global-types";
 import { GlobalView } from "@/components/ui/GlobalView";
 import { GlobalNeedBucket, GlobalOfferBucket, GlobalMission } from "@/lib/global-types";
-import { createStepCardFromSuggestion } from "@/lib/step-card";
+import type { Domain } from "@/lib/ledger-types";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
 import { NamePathModal } from "@/components/ui/NamePathModal";
