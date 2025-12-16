@@ -262,6 +262,9 @@ export default function OneScreen() {
   // Auto Language v0.1 state - Initialize from style memory (will be set in useEffect)
   const [uiLang, setUiLang] = useState<UILang>("en");
   
+  // Time Phase state (updates every 60s)
+  const [timePhase, setTimePhase] = useState<"dawn" | "day" | "sunset" | "night">(getTimePhase());
+  
   // Step Card state (persisted)
   const [activeStepCard, setActiveStepCard] = useState<any>(null);
   const [showDeck, setShowDeck] = useState(false);
