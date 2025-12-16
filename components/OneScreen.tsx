@@ -1171,34 +1171,90 @@ export default function OneScreen() {
   const shouldShowNamePath = shouldOfferPathName();
   const showDebug = process.env.NODE_ENV === "development";
 
+  // TopBar Gate Inspector (dev only)
+  const hideTopBar = showSteps || showOwo || actionLoopState === "action";
+  const gate = {
+    showSteps,
+    showOwo,
+    actionLoopState,
+    hideTopBar,
+    scopeMounted,
+    scope,
+  };
+
+  // Force Home handler (dev only)
+  const handleForceHome = () => {
+    setShowOwo(false);
+    setShowSteps(false);
+    setActionLoopState("prompt");
+    setActionInProgress(false);
+    setAskOpen(false);
+    setShowStatePanel(false);
+    setShowNamePathModal(false);
+    setShowDeck(false);
+    setSelectedCard(null);
+  };
+
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
+      {/* TopBar Gate Inspector (dev only) - Always visible for debugging */}
+      {showDebug && (
+        <div className="fixed top-0 left-0 z-[10000] pointer-events-auto p-2 text-xs font-mono" style={{ backgroundColor: "rgba(0,0,0,0.8)", color: "#fff", border: "1px solid #fff" }}>
+          <div className="mb-1">
+            TopBar: {hideTopBar ? "OFF" : "ON"}
+          </div>
+          <div className="text-[10px] opacity-80">
+            steps:{showSteps ? "1" : "0"} owo:{showOwo ? "1" : "0"} action:{actionLoopState}
+          </div>
+          <div className="text-[10px] opacity-80">
+            scopeMounted:{scopeMounted ? "1" : "0"} scope:{scope}
+          </div>
+          {(showOwo || showSteps) && (
+            <button
+              onClick={handleForceHome}
+              className="mt-2 px-2 py-1 text-[10px] bg-red-600 hover:bg-red-700 text-white rounded"
+            >
+              Force Home
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps, OWO, and action loop */}
-      {!showSteps && !showOwo && actionLoopState !== "action" && (
-        <div className="flex items-center justify-between pt-4 pb-2 px-4">
+      {!hideTopBar && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-auto flex items-center justify-between pt-4 pb-2 px-4" style={{ backgroundColor: "var(--background)" }}>
           {/* Theme Toggle (minimal, top-left) */}
           <button
             onClick={handleThemeToggle}
             className="w-8 h-8 flex items-center justify-center text-xs opacity-40 hover:opacity-100 transition-opacity rounded-full"
-            style={{ color: "var(--foreground)" }}
+            style={{ 
+              color: "var(--foreground)",
+              border: showDebug ? "1px solid red" : "none", // Dev-only border for visibility
+            }}
             title={themeOverride === "auto" ? "Auto (tap to override)" : themeOverride === "light" ? "Light (tap for dark)" : "Dark (tap for auto)"}
           >
             {themeOverride === "auto" ? "○" : activeTheme === "light" ? "●" : "○"}
           </button>
 
           {/* Scope Toggle (only render when mounted to prevent flicker) */}
-          {scopeMounted && (
+          {scopeMounted ? (
             <button
               onClick={toggleScope}
               className="px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 hover:opacity-70"
               style={{
                 backgroundColor: scope === "private" ? "var(--foreground)" : "transparent",
                 color: scope === "private" ? "var(--background)" : "var(--foreground)",
-                border: "1px solid var(--border)",
+                border: showDebug ? "2px solid blue" : "1px solid var(--border)", // Dev-only border for visibility
               }}
             >
               {scope === "private" ? "Private" : "Global"}
             </button>
+          ) : (
+            showDebug && (
+              <div className="px-4 py-1.5 text-xs opacity-50" style={{ border: "1px dashed red" }}>
+                Scope not mounted
+              </div>
+            )
           )}
 
           {/* Dev menu (development only) */}
@@ -1231,7 +1287,7 @@ export default function OneScreen() {
       )}
 
       {/* Center: Focus Zone - Strict State Machine (ONE state only) */}
-      <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
+      <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden pt-14">
         {/* Side Bubbles (NEXT, LATER, DONE - max 3) - Only show in active state */}
         {homeState === "active" && (
           <SideBubbles
