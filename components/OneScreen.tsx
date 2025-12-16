@@ -12,7 +12,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step } from "@/lib/types";
+import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card } from "@/lib/types";
 import {
   getOrCreateOneID,
   getActiveLifeState,
@@ -33,6 +33,11 @@ import {
   createOnboardingPlan,
   isOnboardingComplete,
 } from "@/lib/step-engine";
+import {
+  getMostRelevantCard,
+  getCardsNeedingAttention,
+  updateCardState,
+} from "@/lib/card-engine";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -108,6 +113,10 @@ export default function OneScreen() {
   const [currentStep, setCurrentStep] = useState<Step | null>(null);
   const [isPausing, setIsPausing] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
+  
+  // Card System state
+  const [contextualCard, setContextualCard] = useState<Card | null>(null);
+  const [cardHighlight, setCardHighlight] = useState(false);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
@@ -207,6 +216,30 @@ export default function OneScreen() {
       setNobodyMessage(NOBODY_MESSAGES.noAction);
     }
   }, [mode, isPrivate, isGlobal, context, showSteps]);
+
+  // Load contextual card (Card System v0.1)
+  useEffect(() => {
+    if (showSteps) return; // Don't show cards during steps
+    
+    // Get most relevant card for current context
+    const relevantCard = getMostRelevantCard(context);
+    
+    if (relevantCard) {
+      setContextualCard(relevantCard);
+      
+      // Check if card needs attention
+      const cardsNeedingAttention = getCardsNeedingAttention(context);
+      const needsAttention = cardsNeedingAttention.some((c) => c.id === relevantCard.id);
+      
+      if (needsAttention) {
+        // Gently highlight card
+        setCardHighlight(true);
+        setTimeout(() => setCardHighlight(false), 2000);
+      }
+    } else {
+      setContextualCard(null);
+    }
+  }, [mode, context, showSteps]);
 
   // Update theme when override changes
   useEffect(() => {
@@ -520,6 +553,26 @@ export default function OneScreen() {
                 <p className="text-lg sm:text-xl leading-relaxed opacity-70" style={{ color: "var(--foreground)" }}>
                   {nobodyMessage}
                 </p>
+              )}
+
+              {/* Contextual Card (Card System v0.1) - appears when relevant */}
+              {contextualCard && !currentLifeAction && (
+                <div
+                  className={`p-4 rounded-lg text-left transition-all duration-500 ${
+                    cardHighlight ? "opacity-100" : "opacity-60"
+                  }`}
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: cardHighlight ? "var(--neutral-50)" : "transparent",
+                  }}
+                >
+                  <div className="text-xs mb-1 opacity-50" style={{ color: "var(--neutral-500)" }}>
+                    {contextualCard.type}
+                  </div>
+                  <div className="text-base leading-relaxed" style={{ color: "var(--foreground)" }}>
+                    {contextualCard.content}
+                  </div>
+                </div>
               )}
 
               {/* ONE active LifeAction in center */}

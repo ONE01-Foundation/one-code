@@ -7,9 +7,10 @@
  * - Actions over explanations
  */
 
-// Card status for the action loop
-export type CardStatus = "ready" | "in_progress" | "done";
-export type CardScope = "private" | "global";
+// Card System v0.1
+export type CardType = "goal" | "step" | "insight" | "offer" | "need" | "action";
+export type CardState = "draft" | "active" | "progressing" | "done" | "archived";
+export type CardScope = "private" | "global" | "bridge";
 export type IntentCategory = "health" | "money" | "work" | "relationship" | "self" | "other";
 
 // Minimal data model
@@ -19,21 +20,28 @@ export interface Session {
   lastActivityAt: string;
 }
 
-// Card schema for the core action loop
+// Card schema v0.1 - represents persistent truth or intent
 export interface Card {
   id: string;
-  type?: string; // Optional card type
-  title: string; // Short title (e.g., "Lower friction")
-  action: string; // One suggested action (e.g., "Prepare clothes for tomorrow")
-  status: CardStatus; // ready | in_progress | done
-  scope: CardScope; // private | global
+  type: CardType; // goal, step, insight, offer, need, action
+  state: CardState; // draft, active, progressing, done, archived
+  scope: CardScope; // private, global, bridge
+  content: string; // Single concise sentence
+  originStepId?: string; // Step that created this card
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+  
+  // Legacy fields (for backward compatibility)
+  title?: string; // @deprecated - use content
+  action?: string; // @deprecated - use content
+  status?: "ready" | "in_progress" | "done"; // @deprecated - use state
   time?: number; // Estimated time in minutes (optional)
   category?: IntentCategory;
-  createdAt: string; // ISO string
 }
 
 // Legacy types (kept for compatibility)
-export type CardState = "pending" | "done" | "skipped"; // @deprecated - use CardStatus
+// Note: CardState is now defined above for Card System v0.1
+// Old CardState type was: "pending" | "done" | "skipped" (deprecated)
 
 // Closure Types - Every interaction must end in ONE of these
 export type ClosureType = "DONE" | "PAUSED" | "REDIRECTED";

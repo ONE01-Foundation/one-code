@@ -12,6 +12,7 @@
 
 import { Step, StepContext, StepIntent, StepAction, Card, LifeState, LifeAction } from "@/lib/types";
 import { createLifeState, createLifeAction, generateLifeAction } from "./life-engine";
+import { createCard, updateCardState } from "./card-engine";
 
 // Step plan (5-7 steps ahead)
 export interface StepPlan {
@@ -189,29 +190,22 @@ export function createOnboardingPlan(userId: string, welcomeChoice?: "want" | "o
       try {
         const lifeAction = await generateLifeAction(lifeState, null);
         
-        // Map LifeFocus to IntentCategory (relationship vs relationships)
-        const category: "health" | "money" | "work" | "relationship" | "self" | "other" = 
-          focus === "relationships" ? "relationship" : focus;
+        // Determine card type based on welcome choice
+        const cardType: "goal" | "step" | "insight" | "offer" | "need" | "action" = 
+          choice === "want" ? "need" : "offer";
         
-        // Create card from action
-        const card: Card = {
-          id: `card_${Date.now()}`,
-          title: lifeAction.title,
-          action: lifeAction.description,
-          status: "ready",
-          scope: "private",
-          category: category,
-          createdAt: new Date().toISOString(),
-        };
+        // Create card using card-engine (v0.1)
+        const card = createCard(
+          cardType,
+          `${lifeAction.title}: ${lifeAction.description}`,
+          "private",
+          "first_card" // originStepId
+        );
+        
+        // Activate the card
+        updateCardState(card.id, "active");
         
         ctx.cards.push(card);
-        
-        // Save card to localStorage
-        if (typeof window !== "undefined") {
-          const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
-          cards.push(card);
-          localStorage.setItem("one_cards", JSON.stringify(cards));
-        }
       } catch (error) {
         console.error("Error creating first card:", error);
         // Continue even if card creation fails
