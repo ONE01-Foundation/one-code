@@ -12,6 +12,7 @@ import { NobodyPrompt } from "./NobodyPrompt";
 import { NobodyResponse } from "@/lib/nobody";
 import { ActionLoopState } from "@/lib/types";
 import { ActionLoopPlan } from "@/lib/action-loop-engine";
+import { DomainChoice } from "./DomainChoice";
 
 interface HomeContentProps {
   state: HomeState;
@@ -20,6 +21,8 @@ interface HomeContentProps {
   // Empty
   onFindNextStep?: () => void;
   isGenerating?: boolean;
+  showDomainChoice?: boolean;
+  onDomainSelect?: (domain: string) => void;
   // Active
   activeCard?: Card | null;
   onCompleteCard?: (cardId: string) => void;
@@ -94,12 +97,50 @@ export function HomeContent({
             </div>
           </div>
         ) : state === "active" && activeCard ? (
-          /* ACTIVE: Active card view */
-          <CenterCard
-            card={activeCard}
-            onComplete={() => onCompleteCard?.(activeCard.id)}
-            onDefer={() => onDeferCard?.(activeCard.id)}
-          />
+          /* ACTIVE: Minimal active card view */
+          <div className="space-y-8 py-12">
+            <div className="text-center space-y-4">
+              <h2
+                className="text-3xl sm:text-4xl font-normal"
+                style={{ color: "var(--foreground)" }}
+              >
+                {activeCard.title}
+              </h2>
+              <p
+                className="text-base sm:text-lg opacity-60"
+                style={{ color: "var(--foreground)" }}
+              >
+                We'll take this one step at a time.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => onFindNextStep?.()}
+                disabled={isGenerating}
+                className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                style={{
+                  backgroundColor: "var(--foreground)",
+                  color: "var(--background)",
+                }}
+              >
+                What's the next small step?
+              </button>
+              <button
+                onClick={() => {
+                  // Defer current card (set to draft) to allow choosing a new focus
+                  onDeferCard?.(activeCard.id);
+                }}
+                className="w-full px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200"
+                style={{
+                  backgroundColor: "var(--background)",
+                  border: "2px solid var(--border)",
+                  color: "var(--foreground)",
+                }}
+              >
+                Change focus
+              </button>
+            </div>
+          </div>
         ) : state === "suggestion" ? (
           /* SUGGESTION: System suggests next step */
           <>

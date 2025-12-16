@@ -37,6 +37,7 @@ import {
   getMostRelevantCard,
   getCardsNeedingAttention,
   updateCardState,
+  createCard,
 } from "@/lib/card-engine";
 import {
   getActiveSignal,
@@ -199,6 +200,9 @@ export default function OneScreen() {
   
   // Nobody Interaction v0.1
   const { showPrompt, promptData, promptState, handleChoice, openPrompt, retryPrompt, useLastPrompt } = useNobody();
+  
+  // Domain Choice state (First Meaningful Step)
+  const [showDomainChoice, setShowDomainChoice] = useState(false);
   
   // Handle reset param on mount
   useEffect(() => {
@@ -878,8 +882,37 @@ export default function OneScreen() {
           <HomeContent
             state={homeState}
             isLoading={promptState === "loading" || isGenerating}
-            onFindNextStep={openPrompt}
+            onFindNextStep={() => {
+              if (homeState === "empty") {
+                setShowDomainChoice(true);
+              } else {
+                openPrompt();
+              }
+            }}
             isGenerating={isGenerating}
+            showDomainChoice={showDomainChoice}
+            onDomainSelect={(domain) => {
+              // Map domain to card title and intent
+              const domainMap: Record<string, { title: string; intent: string }> = {
+                work: { title: "Work", intent: "work" },
+                health: { title: "Health", intent: "health" },
+                mind: { title: "Mind", intent: "self" },
+                relationships: { title: "Relationships", intent: "relationship" },
+                other: { title: "Something else", intent: "other" },
+              };
+              
+              const { title, intent } = domainMap[domain] || { title: domain, intent: "other" };
+              
+              // Create active card
+              const newCard = createCard(title, intent, "private", "user_choice");
+              
+              // Promote to active
+              updateCardState(newCard.id, "active");
+              
+              // Close choice modal and refresh
+              setShowDomainChoice(false);
+              refreshCards();
+            }}
             activeCard={activeCard || undefined}
             onCompleteCard={(cardId) => completeCard(cardId)}
             onDeferCard={(cardId) => deferCard(cardId)}
