@@ -144,6 +144,17 @@ function getActiveTheme(override: ThemeOverride): ActiveTheme {
   return override;
 }
 
+// Get time phase (dawn/day/sunset/night)
+function getTimePhase(): "dawn" | "day" | "sunset" | "night" {
+  const now = new Date();
+  const hour = now.getHours();
+  
+  if (hour >= 5 && hour < 8) return "dawn";
+  if (hour >= 8 && hour < 17) return "day";
+  if (hour >= 17 && hour < 20) return "sunset";
+  return "night"; // 20:00 - 04:59
+}
+
 // Nobody messages (calm, short, max 12 words)
 const NOBODY_MESSAGES = {
   generating: "Finding what makes sense next.",
@@ -649,6 +660,21 @@ export default function OneScreen() {
 
     return () => clearInterval(interval);
   }, [themeOverride, activeTheme]);
+
+  // Update time phase every 60 seconds
+  useEffect(() => {
+    const updatePhase = () => {
+      setTimePhase(getTimePhase());
+    };
+
+    // Update immediately
+    updatePhase();
+
+    // Update every 60 seconds
+    const interval = setInterval(updatePhase, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Handle theme override toggle
   const handleThemeToggle = () => {

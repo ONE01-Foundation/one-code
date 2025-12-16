@@ -67,10 +67,31 @@ export function HomeContent({
   onAskNobodySubmit,
   completedMessage = "Done",
   isDev = false,
+  timePhase = "day",
 }: HomeContentProps) {
   // Unified layout structure
+  const headerText = getHeaderText({
+    phase: timePhase,
+    homeState: state,
+    scope: scope || "private",
+    uiLang,
+  });
+
   return (
     <div className="w-full max-w-md mx-auto">
+      {/* Dynamic Header Line - Single line, calm, short */}
+      <div className="text-center mb-8">
+        <p
+          className="text-sm opacity-40 font-normal"
+          style={{
+            color: "var(--foreground)",
+            transition: "opacity 1s ease-in-out",
+          }}
+        >
+          {headerText}
+        </p>
+      </div>
+
       {/* Debug state marker (dev only) */}
       {isDev && (
         <div className="text-xs opacity-20 mb-4 text-center">
