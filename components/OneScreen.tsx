@@ -12,7 +12,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LifeState, LifeAction, LifeContext, LifeFocus, Mode } from "@/lib/types";
+import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step } from "@/lib/types";
 import {
   getOrCreateOneID,
   getActiveLifeState,
@@ -23,6 +23,16 @@ import {
   updateLifeActionStatus,
   loadLifeActions,
 } from "@/lib/life-engine";
+import {
+  StepPlan,
+  loadStepPlan,
+  saveStepPlan,
+  clearStepPlan,
+  getCurrentStep,
+  executeStepAction,
+  createOnboardingPlan,
+  isOnboardingComplete,
+} from "@/lib/step-engine";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -77,28 +87,11 @@ function saveMode(mode: Mode) {
   localStorage.setItem("one_mode", mode);
 }
 
-// Welcome flow management
-type WelcomeStep = "initial" | "choice" | "completed";
-
-function hasCompletedWelcome(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem("one_welcome_completed") === "true";
-}
-
-function markWelcomeCompleted() {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("one_welcome_completed", "true");
-}
-
+// Helper to get welcome choice (for step engine initialization)
 function getWelcomeChoice(): "want" | "offer" | null {
   if (typeof window === "undefined") return null;
   const stored = localStorage.getItem("one_welcome_choice");
   return (stored as "want" | "offer") || null;
-}
-
-function saveWelcomeChoice(choice: "want" | "offer") {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("one_welcome_choice", choice);
 }
 
 export default function OneScreen() {
@@ -109,23 +102,49 @@ export default function OneScreen() {
   const [nobodyMessage, setNobodyMessage] = useState<string>(NOBODY_MESSAGES.noAction);
   const [themeOverride, setThemeOverride] = useState<ThemeOverride>(loadThemeOverride());
   const [activeTheme, setActiveTheme] = useState<ActiveTheme>(getActiveTheme(themeOverride));
-  const [welcomeStep, setWelcomeStep] = useState<WelcomeStep>(
-    hasCompletedWelcome() ? "completed" : "initial"
-  );
-  const [showWelcome, setShowWelcome] = useState(!hasCompletedWelcome());
+  
+  // Step Engine state
+  const [stepPlan, setStepPlan] = useState<StepPlan | null>(null);
+  const [currentStep, setCurrentStep] = useState<Step | null>(null);
+  const [isPausing, setIsPausing] = useState(false);
+  const [showSteps, setShowSteps] = useState(false);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
   const context: LifeContext = isPrivate ? "private" : "global";
 
-  // Initialize OneID on mount
+  // Initialize OneID and Step Engine on mount
   useEffect(() => {
-    getOrCreateOneID();
+    const userId = getOrCreateOneID();
     
     // Set initial theme
     const initialTheme = getActiveTheme(themeOverride);
     setActiveTheme(initialTheme);
     document.documentElement.setAttribute("data-theme", initialTheme);
+    
+    // Initialize Step Engine
+    if (!isOnboardingComplete(userId)) {
+      // Check if welcome choice exists (from old flow)
+      const welcomeChoice = getWelcomeChoice();
+      const plan = createOnboardingPlan(userId, welcomeChoice || undefined);
+      setStepPlan(plan);
+      setShowSteps(true);
+      
+      // Load first step with pause
+      const step = getCurrentStep(plan);
+      if (step) {
+        setCurrentStep(step);
+        if (step.pause) {
+          setIsPausing(true);
+          setTimeout(() => {
+            setIsPausing(false);
+          }, step.pause);
+        }
+      }
+    } else {
+      // Onboarding complete, use Life Loop Engine
+      setShowSteps(false);
+    }
   }, []);
 
   // Generate action for a LifeState
@@ -157,9 +176,9 @@ export default function OneScreen() {
   };
 
   // Load active LifeState and LifeAction on mount and when mode changes
-  // Skip if welcome flow is active
+  // Skip if step flow is active
   useEffect(() => {
-    if (showWelcome) return; // Don't load main state during welcome
+    if (showSteps) return; // Don't load main state during steps
     
     if (isGlobal) {
       // Global mode: view only, no actions
@@ -187,7 +206,7 @@ export default function OneScreen() {
       setCurrentLifeAction(null);
       setNobodyMessage(NOBODY_MESSAGES.noAction);
     }
-  }, [mode, isPrivate, isGlobal, context, showWelcome]);
+  }, [mode, isPrivate, isGlobal, context, showSteps]);
 
   // Update theme when override changes
   useEffect(() => {
@@ -298,39 +317,63 @@ export default function OneScreen() {
     }
   };
 
-  // Welcome flow handlers
-  const handleWelcomeContinue = () => {
-    setWelcomeStep("choice");
-  };
-
-  const handleWelcomeChoice = (choice: "want" | "offer") => {
-    saveWelcomeChoice(choice);
-    markWelcomeCompleted();
+  // Step Engine handlers
+  const handleStepAction = async (actionId: string) => {
+    if (!stepPlan) return;
     
-    // Smooth transition to main state
-    setTimeout(() => {
-      setShowWelcome(false);
-      setWelcomeStep("completed");
-      
-      // Initialize main state after welcome
-      if (!isGlobal) {
-        const activeState = getActiveLifeState(context);
-        if (activeState) {
-          setCurrentLifeState(activeState);
-          const activeAction = getActiveLifeAction(activeState.id);
-          if (activeAction) {
-            setCurrentLifeAction(activeAction);
-            setNobodyMessage(NOBODY_MESSAGES.actionReady);
+    // Execute action (async)
+    const { plan, result } = await executeStepAction(stepPlan, actionId);
+    setStepPlan(plan);
+    saveStepPlan(plan.context.userId, plan);
+    
+    // Handle result
+    if (result === "card" || result === "state") {
+      // Card or state created, continue to next step
+    } else if (result === "transition") {
+      // Transitioning to home
+    }
+    
+    // Get next step
+    const nextStep = getCurrentStep(plan);
+    
+    if (!nextStep || nextStep.intent === "home") {
+      // Onboarding complete, transition to home
+      setTimeout(() => {
+        setShowSteps(false);
+        clearStepPlan(plan.context.userId);
+        
+        // Initialize main state
+        if (!isGlobal) {
+          const activeState = getActiveLifeState(context);
+          if (activeState) {
+            setCurrentLifeState(activeState);
+            const activeAction = getActiveLifeAction(activeState.id);
+            if (activeAction) {
+              setCurrentLifeAction(activeAction);
+              setNobodyMessage(NOBODY_MESSAGES.actionReady);
+            } else {
+              generateActionForState(activeState);
+            }
           } else {
-            generateActionForState(activeState);
+            setCurrentLifeState(null);
+            setCurrentLifeAction(null);
+            setNobodyMessage(NOBODY_MESSAGES.noAction);
           }
-        } else {
-          setCurrentLifeState(null);
-          setCurrentLifeAction(null);
-          setNobodyMessage(NOBODY_MESSAGES.noAction);
         }
-      }
-    }, 300); // Calm transition delay
+      }, 400);
+      return;
+    }
+    
+    // Show next step with pause
+    if (nextStep.pause) {
+      setIsPausing(true);
+      setTimeout(() => {
+        setIsPausing(false);
+        setCurrentStep(nextStep);
+      }, nextStep.pause);
+    } else {
+      setCurrentStep(nextStep);
+    }
   };
 
   // Get global data (aggregated, anonymous)
@@ -347,8 +390,8 @@ export default function OneScreen() {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
-      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during welcome */}
-      {!showWelcome && (
+      {/* Top: Theme Toggle (subtle corner) + Mode Toggle - Hidden during steps */}
+      {!showSteps && (
         <div className="flex items-center justify-between pt-4 pb-2 px-4">
           {/* Theme Toggle (minimal, top-left) */}
           <button
@@ -412,60 +455,50 @@ export default function OneScreen() {
 
         {/* Center Content */}
         <div className="relative z-10 w-full max-w-md text-center">
-          {showWelcome ? (
-            /* Welcome Flow */
+          {showSteps && currentStep ? (
+            /* Step Engine Flow */
             <div className="space-y-8 transition-all duration-500">
-              {welcomeStep === "initial" && (
-                /* Step 1: Initial Welcome */
-                <div className="space-y-8">
-                  <div className="space-y-4">
-                    <p className="text-3xl sm:text-4xl leading-relaxed font-normal" style={{ color: "var(--foreground)" }}>
-                      Welcome.
-                    </p>
-                    <p className="text-xl sm:text-2xl leading-relaxed opacity-80" style={{ color: "var(--foreground)" }}>
-                      This is a space to act — not to scroll.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleWelcomeContinue}
-                    className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300"
-                    style={{
-                      backgroundColor: "var(--foreground)",
-                      color: "var(--background)",
-                    }}
-                  >
-                    Continue
-                  </button>
-                </div>
-              )}
-
-              {welcomeStep === "choice" && (
-                /* Step 2: Choice */
-                <div className="space-y-8">
-                  <p className="text-2xl sm:text-3xl leading-relaxed font-normal" style={{ color: "var(--foreground)" }}>
-                    What brings you here right now?
+              {isPausing ? (
+                /* Subtle pause (no spinner) */
+                <div className="space-y-4">
+                  <p className="text-2xl sm:text-3xl leading-relaxed font-normal opacity-50" style={{ color: "var(--foreground)" }}>
+                    {currentStep.message.split("\n")[0]}
                   </p>
+                </div>
+              ) : (
+                /* Current Step */
+                <div className="space-y-8">
+                  {/* Step message (1-2 lines max) */}
+                  <div className="space-y-2">
+                    {currentStep.message.split("\n").map((line, idx) => (
+                      <p
+                        key={idx}
+                        className={`${idx === 0 ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl"} leading-relaxed font-normal`}
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+
+                  {/* Step actions (1 primary or up to 2 choices) */}
                   <div className="space-y-4">
-                    <button
-                      onClick={() => handleWelcomeChoice("want")}
-                      className="w-full px-6 py-5 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 text-left"
-                      style={{
-                        backgroundColor: "var(--foreground)",
-                        color: "var(--background)",
-                      }}
-                    >
-                      I want something
-                    </button>
-                    <button
-                      onClick={() => handleWelcomeChoice("offer")}
-                      className="w-full px-6 py-5 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 text-left"
-                      style={{
-                        backgroundColor: "var(--foreground)",
-                        color: "var(--background)",
-                      }}
-                    >
-                      I can offer something
-                    </button>
+                    {currentStep.actions.map((action) => (
+                      <button
+                        key={action.id}
+                        onClick={() => handleStepAction(action.id)}
+                        disabled={isPausing}
+                        className={`w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-all duration-300 ${
+                          action.type === "choice" ? "text-left" : ""
+                        } disabled:opacity-50`}
+                        style={{
+                          backgroundColor: "var(--foreground)",
+                          color: "var(--background)",
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -568,8 +601,8 @@ export default function OneScreen() {
         </div>
       </div>
 
-      {/* Bottom: Minimal anchor - Hidden during welcome */}
-      {!showWelcome && (
+      {/* Bottom: Minimal anchor - Hidden during steps */}
+      {!showSteps && (
         <div className="flex items-center justify-center pb-6 pt-4">
           <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
         </div>

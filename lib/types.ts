@@ -82,6 +82,39 @@ export interface LifeAction {
   createdAt: string; // ISO timestamp
 }
 
+// Step Engine Models
+export type StepActionType = "primary" | "choice";
+export type StepIntent = "entry" | "welcome" | "choice" | "card_creation" | "transition" | "home";
+
+export interface StepAction {
+  id: string;
+  label: string;
+  type: StepActionType;
+  nextStepId?: string; // Deterministic next step
+  onSelect?: (context: StepContext) => Step | null; // Dynamic next step logic
+  result?: "card" | "state" | "transition"; // What this action produces
+}
+
+export interface StepContext {
+  userId: string;
+  currentStepId: string;
+  previousSteps: string[];
+  userChoices: Record<string, string>; // Store user choices by step
+  cards: Card[];
+  lifeStates: LifeState[];
+}
+
+export interface Step {
+  id: string;
+  intent: StepIntent; // Internal intent
+  message: string; // 1-2 lines max, short presence message
+  pause?: number; // Optional pause in ms (300-700ms)
+  actions: StepAction[]; // 1 primary action or up to 2 choices
+  nextStepId?: string; // Default next step if no action selected
+  onComplete?: (context: StepContext) => void; // Side effects (card creation, state updates)
+  streaming?: boolean; // Support partial reveal
+}
+
 // State Memory - Minimal session-based state with mode separation
 export interface State {
   mode: Mode; // "private" | "global"
