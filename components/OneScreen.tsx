@@ -84,6 +84,7 @@ import { useNobody } from "@/hooks/useNobody";
 import { NobodyPrompt } from "@/components/ui/NobodyPrompt";
 import { determineHomeState, HomeState } from "@/lib/home-state";
 import { handleResetParam } from "@/lib/reset";
+import { HomeContent } from "@/components/ui/HomeContent";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -182,6 +183,9 @@ export default function OneScreen() {
   const [actionLoopPlan, setActionLoopPlan] = useState<ActionLoopPlan | null>(null);
   const [actionLoopState, setActionLoopState] = useState<ActionLoopState>("prompt");
   const [actionInProgress, setActionInProgress] = useState(false);
+  
+  // Completed state (short confirmation before reset)
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
@@ -207,8 +211,23 @@ export default function OneScreen() {
     hasActiveCard: !!activeCard,
     hasSuggestion,
     hasPrompt: showPrompt,
-    isLoading: promptState === "loading" || isGenerating,
+    isLoading: (promptState === "loading" || isGenerating) && !isCompleted,
+    isCompleted,
   });
+  
+  // Auto-reset completed state after short delay
+  useEffect(() => {
+    if (isCompleted) {
+      const timer = setTimeout(() => {
+        setIsCompleted(false);
+        setActionLoopPlan(null);
+        setActionLoopState("prompt");
+        setActionInProgress(false);
+        refreshCards();
+      }, 2000); // 2 second confirmation
+      return () => clearTimeout(timer);
+    }
+  }, [isCompleted, refreshCards]);
   
   // Debug markers (dev only)
   const isDev = process.env.NODE_ENV === "development";
@@ -581,6 +600,9 @@ export default function OneScreen() {
     const { plan, closure } = completeAction(actionLoopPlan);
     const { plan: updatedPlan, hasMore } = await moveToNextStep(plan, closure);
     
+    // Show completed state
+    setIsCompleted(true);
+    
     setActionLoopPlan(updatedPlan);
     saveActionLoopPlan(updatedPlan);
     setActionInProgress(false);
@@ -851,122 +873,33 @@ export default function OneScreen() {
           />
         </div>
 
-        {/* Strict State Machine - Only ONE state renders */}
-        <div className="relative z-20 w-full max-w-md text-center">
-          {homeState === "loading" ? (
-            /* LOADING: Show nothing else */
-            isDev && <div className="text-xs opacity-20">[LOADING]</div>
-          ) : homeState === "active" ? (
-            /* ACTIVE: Active card view */
-            <>
-              {isDev && <div className="text-xs opacity-20 mb-2">[ACTIVE]</div>}
-              <CenterCard
-                card={activeCard!}
-                onComplete={() => completeCard(activeCard!.id)}
-                onDefer={() => deferCard(activeCard!.id)}
-              />
-            </>
-          ) : homeState === "suggestion" ? (
-            /* SUGGESTION: Show one suggested card + buttons */
-            <>
-              {isDev && <div className="text-xs opacity-20 mb-2">[SUGGESTION]</div>}
-              {showPrompt ? (
-                <NobodyPrompt
-                  response={promptData}
-                  state={promptState}
-                  onChoice={(choiceId) => {
-                    handleChoice(choiceId);
-                    setTimeout(() => refreshCards(), 100);
-                  }}
-                  onRetry={retryPrompt}
-                  onUseLast={useLastPrompt}
-                />
-              ) : actionLoopPlan && actionLoopState === "prompt" ? (
-                (() => {
-                  const currentStep = getCurrentActionStep(actionLoopPlan);
-                  if (!currentStep) return null;
-                  
-                  return (
-                    <div className="space-y-6">
-                      {/* Prompt: single clear suggestion */}
-                      <div className="p-6 rounded-lg text-left transition-all duration-500" style={{ border: "2px solid var(--border)" }}>
-                        <div className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
-                          {currentStep.prompt}
-                        </div>
-                        <div className="text-lg sm:text-xl mb-2" style={{ color: "var(--neutral-700)" }}>
-                          {currentStep.action}
-                        </div>
-                        {currentStep.estimatedTime && (
-                          <div className="text-xs mt-4 opacity-50" style={{ color: "var(--neutral-500)" }}>
-                            {currentStep.estimatedTime} min
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Choice: minimal interaction (Do it / Not now / Change) */}
-                      <div className="space-y-3">
-                        <button
-                          onClick={() => handleActionLoopChoice("yes")}
-                          disabled={isGenerating || !isActionSmall(currentStep.estimatedTime)}
-                          className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                          style={{
-                            backgroundColor: "var(--foreground)",
-                            color: "var(--background)",
-                          }}
-                        >
-                          Do it
-                        </button>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => handleActionLoopChoice("not_now")}
-                            disabled={isGenerating}
-                            className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                            style={{
-                              backgroundColor: "var(--background)",
-                              border: "2px solid var(--border)",
-                              color: "var(--foreground)",
-                            }}
-                          >
-                            Not now
-                          </button>
-                          <button
-                            onClick={() => handleActionLoopChoice("change")}
-                            disabled={isGenerating}
-                            className="flex-1 px-6 py-4 rounded-lg font-medium text-base hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                            style={{
-                              backgroundColor: "var(--background)",
-                              border: "2px solid var(--border)",
-                              color: "var(--foreground)",
-                            }}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : null}
-            </>
-          ) : (
-            /* EMPTY: No active card + CTA "Find next step" */
-            <>
-              {isDev && <div className="text-xs opacity-20 mb-2">[EMPTY]</div>}
-              <div className="text-center space-y-4">
-                <button
-                  onClick={openPrompt}
-                  disabled={isGenerating}
-                  className="w-full px-6 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
-                  style={{
-                    backgroundColor: "var(--foreground)",
-                    color: "var(--background)",
-                  }}
-                >
-                  {isGenerating ? "Generating..." : "Find next step"}
-                </button>
-              </div>
-            </>
-          )}
+        {/* Unified UI Structure - Single state only */}
+        <div className="relative z-20 w-full">
+          <HomeContent
+            state={homeState}
+            isLoading={promptState === "loading" || isGenerating}
+            onFindNextStep={openPrompt}
+            isGenerating={isGenerating}
+            activeCard={activeCard || undefined}
+            onCompleteCard={(cardId) => completeCard(cardId)}
+            onDeferCard={(cardId) => deferCard(cardId)}
+            showPrompt={showPrompt}
+            promptData={promptData || undefined}
+            promptState={promptState}
+            onPromptChoice={(choiceId) => {
+              handleChoice(choiceId);
+              setTimeout(() => refreshCards(), 100);
+            }}
+            onPromptRetry={retryPrompt}
+            onPromptUseLast={useLastPrompt}
+            actionLoopPlan={actionLoopPlan || undefined}
+            actionLoopState={actionLoopState}
+            onActionChoice={handleActionLoopChoice}
+            onActionComplete={handleActionComplete}
+            actionInProgress={actionInProgress}
+            completedMessage="Done"
+            isDev={isDev}
+          />
         </div>
 
         {/* Step Engine Flow - Only renders during onboarding */}

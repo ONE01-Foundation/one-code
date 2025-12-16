@@ -4,23 +4,30 @@
  * Strict state machine: Only ONE state renders at a time
  * - loading: Initial fetch, shows nothing else
  * - empty: No active card + CTA "Find next step"
- * - suggestion: Show one suggested card + buttons
- * - active: Active card view
+ * - suggestion: System suggests next step
+ * - active: User is doing a step
+ * - completed: Step done → short confirmation
  */
 
-export type HomeState = "loading" | "empty" | "suggestion" | "active";
+export type HomeState = "loading" | "empty" | "suggestion" | "active" | "completed";
 
 export interface HomeStateContext {
   hasActiveCard: boolean;
   hasSuggestion: boolean;
   hasPrompt: boolean;
   isLoading: boolean;
+  isCompleted: boolean;
 }
 
 export function determineHomeState(context: HomeStateContext): HomeState {
   // Loading wraps initial fetch
   if (context.isLoading) {
     return "loading";
+  }
+  
+  // Completed state (after action done, before reset)
+  if (context.isCompleted) {
+    return "completed";
   }
   
   // Active card takes priority
