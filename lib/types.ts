@@ -90,6 +90,24 @@ export interface LifeAction {
   createdAt: string; // ISO timestamp
 }
 
+// Signal & Timing Engine v0.1
+export type SignalType = "time-based" | "state-based" | "context-based";
+export type SignalStatus = "pending" | "active" | "deferred" | "dismissed" | "completed";
+
+export interface Signal {
+  id: string;
+  type: SignalType; // time-based, state-based, context-based
+  status: SignalStatus; // pending, active, deferred, dismissed, completed
+  message: string; // Subtle text suggestion (1 sentence max)
+  cardId?: string; // Card that triggered this signal
+  stepId?: string; // Step this signal leads to (at most one)
+  scope: CardScope; // private, global, bridge
+  createdAt: string; // ISO timestamp
+  triggeredAt?: string; // When signal was triggered
+  dismissedAt?: string; // When signal was dismissed
+  reason?: string; // Why signal was dismissed (learning signal)
+}
+
 // Step Engine Models
 export type StepActionType = "primary" | "choice";
 export type StepIntent = "entry" | "welcome" | "choice" | "card_creation" | "transition" | "home";

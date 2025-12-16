@@ -12,7 +12,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card } from "@/lib/types";
+import { LifeState, LifeAction, LifeContext, LifeFocus, Mode, Step, Card, Signal } from "@/lib/types";
 import {
   getOrCreateOneID,
   getActiveLifeState,
@@ -38,6 +38,14 @@ import {
   getCardsNeedingAttention,
   updateCardState,
 } from "@/lib/card-engine";
+import {
+  getActiveSignal,
+  checkSignalsOnAppOpen,
+  dismissSignal,
+  completeSignal,
+  generateStateBasedSignal,
+  activateSignal,
+} from "@/lib/signal-engine";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -117,6 +125,10 @@ export default function OneScreen() {
   // Card System state
   const [contextualCard, setContextualCard] = useState<Card | null>(null);
   const [cardHighlight, setCardHighlight] = useState(false);
+  
+  // Signal & Timing Engine state
+  const [activeSignal, setActiveSignal] = useState<Signal | null>(null);
+  const [signalVisible, setSignalVisible] = useState(false);
 
   const isPrivate = mode === "private";
   const isGlobal = mode === "global";
@@ -153,6 +165,16 @@ export default function OneScreen() {
     } else {
       // Onboarding complete, use Life Loop Engine
       setShowSteps(false);
+      
+      // Check for signals on app open (Signal & Timing Engine)
+      // Only if no active user action
+      if (!showSteps && !currentLifeAction) {
+        const signal = checkSignalsOnAppOpen(context, false);
+        if (signal) {
+          setActiveSignal(signal);
+          setSignalVisible(true);
+        }
+      }
     }
   }, []);
 
@@ -235,11 +257,70 @@ export default function OneScreen() {
         // Gently highlight card
         setCardHighlight(true);
         setTimeout(() => setCardHighlight(false), 2000);
+        
+        // Generate state-based signal if card needs attention and no active signal
+        if (!activeSignal && !showSteps && !currentLifeAction) {
+          const hasActiveAction = showSteps || !!currentLifeAction;
+          const signal = generateStateBasedSignal(relevantCard, hasActiveAction);
+          if (signal) {
+            activateSignal(signal.id, context);
+            setActiveSignal(signal);
+            setSignalVisible(true);
+          }
+        }
       }
     } else {
       setContextualCard(null);
     }
-  }, [mode, context, showSteps]);
+  }, [mode, context, showSteps, activeSignal, currentLifeAction]);
+
+  // Check for active signal periodically (but don't interrupt user actions)
+  useEffect(() => {
+    if (showSteps || currentLifeAction) return; // Don't show signals during active actions
+    
+    const checkSignal = () => {
+      const signal = getActiveSignal(context);
+      if (signal && !activeSignal) {
+        setActiveSignal(signal);
+        setSignalVisible(true);
+      } else if (!signal && activeSignal) {
+        setActiveSignal(null);
+        setSignalVisible(false);
+      }
+    };
+    
+    // Check immediately
+    checkSignal();
+    
+    // Check every 30 seconds
+    const interval = setInterval(checkSignal, 30000);
+    
+    return () => clearInterval(interval);
+  }, [showSteps, currentLifeAction, context, activeSignal]);
+
+  // Handle signal dismissal
+  const handleDismissSignal = (reason?: string) => {
+    if (!activeSignal) return;
+    
+    dismissSignal(activeSignal.id, reason);
+    setActiveSignal(null);
+    setSignalVisible(false);
+  };
+
+  // Handle signal completion (user acted on it)
+  const handleCompleteSignal = () => {
+    if (!activeSignal) return;
+    
+    completeSignal(activeSignal.id);
+    setActiveSignal(null);
+    setSignalVisible(false);
+    
+    // If signal has a stepId, trigger that step
+    if (activeSignal.stepId) {
+      // TODO: Trigger step from signal
+      // This would integrate with Step Engine
+    }
+  };
 
   // Update theme when override changes
   useEffect(() => {
@@ -488,6 +569,40 @@ export default function OneScreen() {
 
         {/* Center Content */}
         <div className="relative z-10 w-full max-w-md text-center">
+          {/* Signal UI (subtle, no popups/banners) - only when no active user action */}
+          {activeSignal && signalVisible && !showSteps && !currentLifeAction && (
+            <div className="mb-6 transition-all duration-500">
+              <div
+                className="p-4 rounded-lg text-center"
+                style={{
+                  backgroundColor: "var(--neutral-50)",
+                  border: "1px solid var(--border)",
+                  opacity: 0.8,
+                }}
+              >
+                <p className="text-sm leading-relaxed mb-2" style={{ color: "var(--foreground)" }}>
+                  {activeSignal.message}
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={handleCompleteSignal}
+                    className="text-xs px-3 py-1 rounded opacity-70 hover:opacity-100 transition-opacity"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    Act
+                  </button>
+                  <button
+                    onClick={() => handleDismissSignal("not now")}
+                    className="text-xs px-3 py-1 rounded opacity-50 hover:opacity-70 transition-opacity"
+                    style={{ color: "var(--neutral-500)" }}
+                  >
+                    Later
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showSteps && currentStep ? (
             /* Step Engine Flow */
             <div className="space-y-8 transition-all duration-500">
