@@ -20,7 +20,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardState, State, ClosureType } from "@/lib/types";
+import { Card, CardState, State, ClosureType, Mode, SharedContext, PrivateContext } from "@/lib/types";
 
 type AppState = "entry" | "processing" | "action" | "closure";
 
@@ -48,24 +48,52 @@ function loadState(): State {
   if (typeof window === "undefined") {
     // SSR: return default state
     return {
-      openThread: null,
-      lastSuggestedAction: null,
-      pendingQuestion: null,
+      mode: "private",
+      sharedContext: {
+        systemTime: new Date().toISOString(),
+      },
+      privateContext: {
+        openThread: null,
+        lastSuggestedAction: null,
+        pendingQuestion: null,
+      },
       updatedAt: new Date().toISOString(),
     };
   }
   const stored = localStorage.getItem("one_state");
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Migrate old state format if needed
+      if (!parsed.mode) {
+        return {
+          mode: "private",
+          sharedContext: {
+            systemTime: new Date().toISOString(),
+          },
+          privateContext: {
+            openThread: parsed.openThread || null,
+            lastSuggestedAction: parsed.lastSuggestedAction || null,
+            pendingQuestion: parsed.pendingQuestion || null,
+          },
+          updatedAt: parsed.updatedAt || new Date().toISOString(),
+        };
+      }
+      return parsed;
     } catch {
       // Invalid state, return default
     }
   }
   return {
-    openThread: null,
-    lastSuggestedAction: null,
-    pendingQuestion: null,
+    mode: "private",
+    sharedContext: {
+      systemTime: new Date().toISOString(),
+    },
+    privateContext: {
+      openThread: null,
+      lastSuggestedAction: null,
+      pendingQuestion: null,
+    },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -73,6 +101,7 @@ function loadState(): State {
 function saveState(state: State) {
   if (typeof window === "undefined") return; // SSR: skip
   state.updatedAt = new Date().toISOString();
+  state.sharedContext.systemTime = new Date().toISOString();
   localStorage.setItem("one_state", JSON.stringify(state));
 }
 
@@ -92,6 +121,11 @@ export default function OneScreen() {
   const [closureType, setClosureType] = useState<ClosureType | null>(null);
   const [closureMessage, setClosureMessage] = useState<string | null>(null);
 
+  // Mode management
+  const currentMode = memoryState.mode;
+  const isPrivate = currentMode === "private";
+  const isGlobal = currentMode === "global";
+
   // Load session and state from localStorage
   useEffect(() => {
     const sessionId = localStorage.getItem("one_session_id");
@@ -102,13 +136,32 @@ export default function OneScreen() {
     setMemoryState(loadState());
   }, []);
 
+  // Handle mode switch (user-initiated only)
+  const handleModeSwitch = (newMode: Mode) => {
+    if (newMode === currentMode) return; // No change
+    
+    const updatedState = { ...memoryState };
+    updatedState.mode = newMode;
+    // Update sharedContext systemTime
+    updatedState.sharedContext.systemTime = new Date().toISOString();
+    // Do NOT reset privateContext - mode switch preserves state
+    saveState(updatedState);
+    setMemoryState(updatedState);
+  };
+
   // Closure: DONE
   const applyDoneClosure = () => {
     const newState: State = {
-      openThread: null,
-      lastSuggestedAction: null,
-      pendingQuestion: null,
-      updatedAt: new Date().toISOString(),
+      ...memoryState,
+      privateContext: {
+        openThread: null,
+        lastSuggestedAction: null,
+        pendingQuestion: null,
+      },
+      sharedContext: {
+        ...memoryState.sharedContext,
+        systemTime: new Date().toISOString(),
+      },
     };
     saveState(newState);
     setMemoryState(newState);
@@ -118,9 +171,18 @@ export default function OneScreen() {
 
   // Closure: PAUSED
   const applyPausedClosure = () => {
-    const newState = { ...memoryState };
-    newState.pendingQuestion = null;
-    // Keep lastSuggestedAction (don't clear it)
+    const newState: State = {
+      ...memoryState,
+      privateContext: {
+        ...memoryState.privateContext,
+        pendingQuestion: null,
+        // Keep lastSuggestedAction (don't clear it)
+      },
+      sharedContext: {
+        ...memoryState.sharedContext,
+        systemTime: new Date().toISOString(),
+      },
+    };
     saveState(newState);
     setMemoryState(newState);
     setClosureType("PAUSED");
@@ -130,10 +192,16 @@ export default function OneScreen() {
   // Closure: REDIRECTED
   const applyRedirectedClosure = (newThread: string) => {
     const newState: State = {
-      openThread: newThread,
-      lastSuggestedAction: null,
-      pendingQuestion: null,
-      updatedAt: new Date().toISOString(),
+      ...memoryState,
+      privateContext: {
+        openThread: newThread,
+        lastSuggestedAction: null,
+        pendingQuestion: null,
+      },
+      sharedContext: {
+        ...memoryState.sharedContext,
+        systemTime: new Date().toISOString(),
+      },
     };
     saveState(newState);
     setMemoryState(newState);
@@ -154,26 +222,31 @@ export default function OneScreen() {
     }
   };
 
-  // Process input through AI distillation
+  // Process input through AI distillation (Private mode only)
   const processInput = async (input: string) => {
+    // Global mode: no actions allowed
+    if (isGlobal) {
+      return;
+    }
+    
     setState("processing");
     setShowTextInput(false);
     setUserInput("");
 
     // Check if user is switching topic (ignore pending question)
-    const isSwitchingTopic = memoryState.pendingQuestion && 
-      !input.toLowerCase().includes(memoryState.pendingQuestion.toLowerCase().split(' ')[0]);
+    const isSwitchingTopic = memoryState.privateContext.pendingQuestion && 
+      !input.toLowerCase().includes(memoryState.privateContext.pendingQuestion.toLowerCase().split(' ')[0]);
 
     // Update state: clear pendingQuestion if answered or switching topic
     const currentState = { ...memoryState };
-    if (memoryState.pendingQuestion) {
+    if (memoryState.privateContext.pendingQuestion) {
       if (isSwitchingTopic) {
         // User switched topic, clear thread
-        currentState.pendingQuestion = null;
-        currentState.openThread = null;
+        currentState.privateContext.pendingQuestion = null;
+        currentState.privateContext.openThread = null;
       } else {
         // User answered, clear pending question
-        currentState.pendingQuestion = null;
+        currentState.privateContext.pendingQuestion = null;
       }
     }
 
@@ -183,7 +256,12 @@ export default function OneScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           input,
-          state: currentState.openThread || currentState.pendingQuestion ? currentState : null,
+          state: currentState.privateContext.openThread || currentState.privateContext.pendingQuestion 
+            ? { 
+                openThread: currentState.privateContext.openThread,
+                pendingQuestion: currentState.privateContext.pendingQuestion,
+              } 
+            : null,
         }),
       });
 
@@ -196,45 +274,55 @@ export default function OneScreen() {
       // Update state based on result
       const newState = { ...currentState };
 
-      // If clarification needed, set pendingQuestion
+      // If clarification needed, set pendingQuestion (only in private mode)
       if (result.needs_clarification && result.clarification_question) {
-        newState.pendingQuestion = result.clarification_question;
-        saveState(newState);
-        setMemoryState(newState);
-        setClarificationQuestion(result.clarification_question);
-        setState("entry");
-        return;
+        if (isPrivate) {
+          newState.privateContext.pendingQuestion = result.clarification_question;
+          saveState(newState);
+          setMemoryState(newState);
+          setClarificationQuestion(result.clarification_question);
+          setState("entry");
+          return;
+        }
+        // Global mode: don't set pendingQuestion (no personal questions)
       }
 
       // Check for REDIRECTED closure before updating state
-      const hadOpenThread = newState.openThread !== null;
+      const hadOpenThread = newState.privateContext.openThread !== null;
       let shouldShowRedirected = false;
 
-      // If desire/request, set openThread (unless switching topic)
-      if (result.isDesireOrRequest && !isSwitchingTopic) {
+      // If desire/request, set openThread (unless switching topic) - only in private mode
+      if (isPrivate && result.isDesireOrRequest && !isSwitchingTopic) {
         // Check if thread changed
-        if (hadOpenThread && newState.openThread !== result.intent) {
+        if (hadOpenThread && newState.privateContext.openThread !== result.intent) {
           shouldShowRedirected = true;
         }
-        newState.openThread = result.intent;
-      } else if (isSwitchingTopic) {
+        newState.privateContext.openThread = result.intent;
+      } else if (isSwitchingTopic && isPrivate) {
         // Topic changed
         if (result.isDesireOrRequest && hadOpenThread) {
           // New topic with desire/request - REDIRECTED
           shouldShowRedirected = true;
-          newState.openThread = result.intent;
+          newState.privateContext.openThread = result.intent;
         } else {
-          newState.openThread = null;
+          newState.privateContext.openThread = null;
         }
       }
 
       // Clear lastSuggestedAction (user responded)
-      newState.lastSuggestedAction = null;
+      newState.privateContext.lastSuggestedAction = null;
+
 
       saveState(newState);
       setMemoryState(newState);
 
-      // Create card
+      // Create card (only in private mode)
+      if (!isPrivate) {
+        // Global mode: no card creation, just show info
+        setState("entry");
+        return;
+      }
+
       const card: Card = {
         id: `card_${Date.now()}`,
         intent: result.intent,
@@ -245,7 +333,7 @@ export default function OneScreen() {
         createdAt: new Date().toISOString(),
       };
 
-      // Save card to localStorage
+      // Save card to localStorage (private mode only)
       const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
       cards.push(card);
       localStorage.setItem("one_cards", JSON.stringify(cards));
@@ -289,15 +377,22 @@ export default function OneScreen() {
   const handleDo = () => {
     if (!currentCard) return;
 
-    // Update card state to "done"
-    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
-    const updated = cards.map((c: Card) =>
-      c.id === currentCard.id ? { ...c, state: "done" as CardState } : c
-    );
-    localStorage.setItem("one_cards", JSON.stringify(updated));
-
-    // Apply DONE closure
-    applyDoneClosure();
+      // Update card state to "done" (only in private mode)
+      if (isPrivate) {
+        const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+        const updated = cards.map((c: Card) =>
+          c.id === currentCard.id ? { ...c, state: "done" as CardState } : c
+        );
+        localStorage.setItem("one_cards", JSON.stringify(updated));
+        // Apply DONE closure
+        applyDoneClosure();
+      } else {
+        // Global mode: no card updates, just return to entry
+        setCurrentCard(null);
+        setDistillationResult(null);
+        setState("entry");
+        return;
+      }
 
     // Show closure, then return to entry
     setCurrentCard(null);
@@ -315,15 +410,22 @@ export default function OneScreen() {
   const handleNotNow = () => {
     if (!currentCard) return;
 
-    // Update card state to "skipped"
-    const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
-    const updated = cards.map((c: Card) =>
-      c.id === currentCard.id ? { ...c, state: "skipped" as CardState } : c
-    );
-    localStorage.setItem("one_cards", JSON.stringify(updated));
-
-    // Apply PAUSED closure
-    applyPausedClosure();
+      // Update card state to "skipped" (only in private mode)
+      if (isPrivate) {
+        const cards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+        const updated = cards.map((c: Card) =>
+          c.id === currentCard.id ? { ...c, state: "skipped" as CardState } : c
+        );
+        localStorage.setItem("one_cards", JSON.stringify(updated));
+        // Apply PAUSED closure
+        applyPausedClosure();
+      } else {
+        // Global mode: no card updates, just return to entry
+        setCurrentCard(null);
+        setDistillationResult(null);
+        setState("entry");
+        return;
+      }
 
     // Show closure, then return to entry
     setCurrentCard(null);
@@ -341,25 +443,93 @@ export default function OneScreen() {
   // Handle clearing pending question (user ignores it)
   const handleClearPendingQuestion = () => {
     const newState = { ...memoryState };
-    newState.pendingQuestion = null;
+    newState.privateContext.pendingQuestion = null;
     saveState(newState);
     setMemoryState(newState);
     setClarificationQuestion(null);
   };
 
+  // Get aggregated global data (anonymous, no personal data)
+  const getGlobalData = () => {
+    // In a real implementation, this would come from an API endpoint
+    // For now, calculate from local cards (simulating aggregated data)
+    const allCards = JSON.parse(localStorage.getItem("one_cards") || "[]");
+    
+    // Aggregate counts (anonymous)
+    const totalCards = allCards.length;
+    const cardsByStatus = {
+      pending: allCards.filter((c: Card) => c.state === "pending").length,
+      done: allCards.filter((c: Card) => c.state === "done").length,
+      skipped: allCards.filter((c: Card) => c.state === "skipped").length,
+    };
+    
+    // Aggregate by category (anonymous)
+    const cardsByCategory: Record<string, number> = {};
+    allCards.forEach((c: Card) => {
+      if (c.category) {
+        cardsByCategory[c.category] = (cardsByCategory[c.category] || 0) + 1;
+      }
+    });
+    
+    // Active domains (top categories)
+    const activeDomains = Object.entries(cardsByCategory)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([category]) => category);
+    
+    return {
+      totalCards,
+      cardsByStatus,
+      activeDomains,
+    };
+  };
+
   const suggestedOptions = getSuggestedOptions();
+
+  // Get data for current mode
+  const globalData = isGlobal ? getGlobalData() : null;
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col">
+      {/* Top: Mode Toggle */}
+      <div className="flex items-center justify-center pt-4 pb-2">
+        <div className="flex gap-1 border border-black rounded-full px-1 py-1">
+          <button
+            onClick={() => handleModeSwitch("private")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
+              isPrivate
+                ? "bg-black text-white"
+                : "text-black hover:opacity-70"
+            }`}
+          >
+            Private
+          </button>
+          <button
+            onClick={() => handleModeSwitch("global")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-opacity duration-200 ${
+              isGlobal
+                ? "bg-black text-white"
+                : "text-black hover:opacity-70"
+            }`}
+          >
+            Global
+          </button>
+        </div>
+      </div>
+
       {/* Top: Context Line */}
-      <div className="flex items-center justify-center pt-8 pb-6 px-6">
+      <div className="flex items-center justify-center pt-4 pb-6 px-6">
         <h1 className="text-4xl sm:text-5xl font-normal text-black text-center">
           {state === "entry"
-            ? "What do you need right now?"
+            ? isPrivate
+              ? "What do you need right now?"
+              : "Global view"
             : state === "processing"
             ? "Processing..."
             : state === "action"
-            ? "Do you want to do this now?"
+            ? isPrivate
+              ? "Do you want to do this now?"
+              : "View only"
             : state === "closure"
             ? ""
             : "Next step available."}
@@ -382,85 +552,154 @@ export default function OneScreen() {
         <div className="relative z-10 w-full max-w-md text-center">
           {state === "entry" && (
             <div className="space-y-6">
-              {/* Clarification question if needed */}
-              {clarificationQuestion && (
-                <div className="space-y-4">
-                  <p className="text-lg text-neutral-700 leading-relaxed">
-                    {clarificationQuestion}
-                  </p>
-                  <button
-                    onClick={handleClearPendingQuestion}
-                    className="text-sm text-neutral-500 hover:text-black"
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
+              {isPrivate ? (
+                <>
+                  {/* Private Mode: Interactive */}
+                  {/* Clarification question if needed */}
+                  {clarificationQuestion && (
+                    <div className="space-y-4">
+                      <p className="text-lg text-neutral-700 leading-relaxed">
+                        {clarificationQuestion}
+                      </p>
+                      <button
+                        onClick={handleClearPendingQuestion}
+                        className="text-sm text-neutral-500 hover:text-black"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
 
-              {/* 2 Suggested Options */}
-              {!showTextInput && !clarificationQuestion && (
-                <div className="space-y-3">
-                  {suggestedOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleOptionSelect(option.label)}
-                      className="w-full px-6 py-4 bg-white border-2 border-black rounded-lg text-left hover:bg-black hover:text-white transition-colors duration-200"
-                    >
-                      <div className="font-medium text-lg">{option.label}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+                  {/* 2 Suggested Options */}
+                  {!showTextInput && !clarificationQuestion && (
+                    <div className="space-y-3">
+                      {suggestedOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleOptionSelect(option.label)}
+                          className="w-full px-6 py-4 bg-white border-2 border-black rounded-lg text-left hover:bg-black hover:text-white transition-colors duration-200"
+                        >
+                          <div className="font-medium text-lg">{option.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-              {/* Text Input (explicitly invoked) */}
-              {showTextInput ? (
-                <form onSubmit={handleTextSubmit} className="space-y-4">
-                  <input
-                    type="text"
-                    value={userInput}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.length <= 120) {
-                        setUserInput(val);
-                      }
-                    }}
-                    placeholder="Type your intent (max 120 chars)..."
-                    className="w-full px-4 py-3 border-2 border-black rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-black"
-                    autoFocus
-                    maxLength={120}
-                  />
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={userInput.trim().length === 0}
-                      className="flex-1 px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Continue
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTextInput(false);
-                        setUserInput("");
-                      }}
-                      className="flex-1 px-6 py-3 bg-white border-2 border-black text-black rounded-lg font-medium hover:opacity-90"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="text-xs text-neutral-400">
-                    {userInput.length}/120
-                  </div>
-                </form>
+                  {/* Text Input (explicitly invoked) */}
+                  {showTextInput ? (
+                    <form onSubmit={handleTextSubmit} className="space-y-4">
+                      <input
+                        type="text"
+                        value={userInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.length <= 120) {
+                            setUserInput(val);
+                          }
+                        }}
+                        placeholder="Type your intent (max 120 chars)..."
+                        className="w-full px-4 py-3 border-2 border-black rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-black"
+                        autoFocus
+                        maxLength={120}
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          type="submit"
+                          disabled={userInput.trim().length === 0}
+                          className="flex-1 px-6 py-3 bg-black text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Continue
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowTextInput(false);
+                            setUserInput("");
+                          }}
+                          className="flex-1 px-6 py-3 bg-white border-2 border-black text-black rounded-lg font-medium hover:opacity-90"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="text-xs text-neutral-400">
+                        {userInput.length}/120
+                      </div>
+                    </form>
+                  ) : (
+                    !clarificationQuestion && (
+                      <button
+                        onClick={() => setShowTextInput(true)}
+                        className="text-sm text-neutral-500 hover:text-black transition-colors"
+                      >
+                        Or type your intent
+                      </button>
+                    )
+                  )}
+                </>
               ) : (
-                !clarificationQuestion && (
-                  <button
-                    onClick={() => setShowTextInput(true)}
-                    className="text-sm text-neutral-500 hover:text-black transition-colors"
-                  >
-                    Or type your intent
-                  </button>
-                )
+                <>
+                  {/* Global Mode: View Only - Aggregated Anonymous Data */}
+                  {globalData && (
+                    <div className="space-y-4">
+                      <p className="text-base text-neutral-600">
+                        Anonymous aggregates
+                      </p>
+                      <div className="space-y-3">
+                        <div className="p-4 border border-black rounded-lg">
+                          <div className="text-2xl font-bold text-black">
+                            {globalData.totalCards}
+                          </div>
+                          <div className="text-xs text-neutral-500 mt-1">
+                            Total cards
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-3 border border-black rounded-lg text-center">
+                            <div className="text-lg font-bold text-black">
+                              {globalData.cardsByStatus.pending}
+                            </div>
+                            <div className="text-xs text-neutral-500 mt-1">
+                              Pending
+                            </div>
+                          </div>
+                          <div className="p-3 border border-black rounded-lg text-center">
+                            <div className="text-lg font-bold text-black">
+                              {globalData.cardsByStatus.done}
+                            </div>
+                            <div className="text-xs text-neutral-500 mt-1">
+                              Done
+                            </div>
+                          </div>
+                          <div className="p-3 border border-black rounded-lg text-center">
+                            <div className="text-lg font-bold text-black">
+                              {globalData.cardsByStatus.skipped}
+                            </div>
+                            <div className="text-xs text-neutral-500 mt-1">
+                              Skipped
+                            </div>
+                          </div>
+                        </div>
+                        {globalData.activeDomains && globalData.activeDomains.length > 0 && (
+                          <div className="p-4 border border-black rounded-lg">
+                            <div className="text-sm text-neutral-500 mb-2">
+                              Active domains
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {globalData.activeDomains.map((domain, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2 py-1 text-xs border border-neutral-300 rounded"
+                                >
+                                  {domain}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -481,21 +720,27 @@ export default function OneScreen() {
                 {currentCard.action_text}
               </p>
 
-              {/* 2 Choices: Do / Not now */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleDo}
-                  className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-                >
-                  Do
-                </button>
-                <button
-                  onClick={handleNotNow}
-                  className="w-full px-6 py-4 bg-white border-2 border-black text-black rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
-                >
-                  Not now
-                </button>
-              </div>
+              {/* 2 Choices: Do / Not now (only in private mode) */}
+              {isPrivate ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleDo}
+                    className="w-full px-6 py-4 bg-black text-white rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                  >
+                    Do
+                  </button>
+                  <button
+                    onClick={handleNotNow}
+                    className="w-full px-6 py-4 bg-white border-2 border-black text-black rounded-lg font-medium text-lg hover:opacity-90 transition-opacity duration-200"
+                  >
+                    Not now
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-500">
+                  View only mode
+                </p>
+              )}
             </div>
           )}
 

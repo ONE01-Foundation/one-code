@@ -65,12 +65,14 @@ export async function POST(req: Request) {
     }
 
     // Build context from state (quiet continuity only)
+    // Only use privateContext if in private mode
     let contextNote = "";
-    if (currentState) {
-      if (currentState.pendingQuestion) {
-        contextNote = `\n\nContext: There is a pending question: "${currentState.pendingQuestion}". If the user's input answers it, continue that thread. Otherwise, treat as new topic.`;
-      } else if (currentState.openThread) {
-        contextNote = `\n\nContext: There is an open thread about: "${currentState.openThread}". If the user's input relates to it, continue naturally. If it's a different topic, start fresh.`;
+    if (currentState && currentState.mode === "private" && currentState.privateContext) {
+      const privateCtx = currentState.privateContext;
+      if (privateCtx.pendingQuestion) {
+        contextNote = `\n\nContext: There is a pending question: "${privateCtx.pendingQuestion}". If the user's input answers it, continue that thread. Otherwise, treat as new topic.`;
+      } else if (privateCtx.openThread) {
+        contextNote = `\n\nContext: There is an open thread about: "${privateCtx.openThread}". If the user's input relates to it, continue naturally. If it's a different topic, start fresh.`;
       }
     }
 

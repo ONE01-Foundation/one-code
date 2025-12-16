@@ -30,11 +30,29 @@ export interface Card {
 // Closure Types - Every interaction must end in ONE of these
 export type ClosureType = "DONE" | "PAUSED" | "REDIRECTED";
 
-// State Memory - Minimal session-based state
-export interface State {
+// Mode Types
+export type Mode = "private" | "global";
+
+// Shared Context (read-only, available in both modes)
+export interface SharedContext {
+  // No personal data, only system-level info
+  systemTime: string; // ISO timestamp
+  activeDomains?: string[]; // Anonymous domain categories (e.g., ["health", "work"])
+}
+
+// Private Context (isolated, only in private mode)
+export interface PrivateContext {
   openThread: string | null; // Set when DESIRE/REQUEST intent appears
   lastSuggestedAction: string | null; // Set when suggestion is explicitly made
   pendingQuestion: string | null; // Set when system asks a question
+  userCards?: Card[]; // User's personal cards (never in Global)
+}
+
+// State Memory - Minimal session-based state with mode separation
+export interface State {
+  mode: Mode; // "private" | "global"
+  sharedContext: SharedContext; // Read-only, available in both modes
+  privateContext: PrivateContext; // Isolated, only in private mode
   updatedAt: string; // ISO timestamp
 }
 
