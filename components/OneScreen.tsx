@@ -1410,6 +1410,33 @@ export default function OneScreen() {
         
         {/* Unified UI Structure - Single state only */}
         <div className="relative z-20 w-full">
+          {/* Nobody Header - Living header based on mood, state, scope */}
+          {(() => {
+            const mood = getSkyMoodByHour();
+            const headerState: "loading" | "empty" | "suggestion" | "active" | "completed" = 
+              isGeneratingStep ? "loading" :
+              showCompletedMessage ? "completed" :
+              homeState === "empty" ? "empty" :
+              homeState === "suggestion" ? "suggestion" :
+              homeState === "active" ? "active" :
+              "empty";
+            
+            const headerText = getNobodyHeader({
+              lang: headerLang,
+              mood,
+              state: headerState,
+              scope,
+            });
+            
+            return (
+              <NobodyHeader
+                title={headerText.title}
+                subtitle={headerText.subtitle}
+                lang={headerLang}
+              />
+            );
+          })()}
+          
           <HomeContent
             state={homeState}
             isLoading={isGeneratingStep}
