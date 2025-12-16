@@ -1095,8 +1095,53 @@ export default function OneScreen() {
     }, 1500);
   };
   
-  // Handle bubble click
-  const handleBubbleClick = (bubble: Bubble) => {
+  // Handle bubble slot selection (3-slot navigation)
+  const handleBubbleSelect = (slot: BubbleSlot) => {
+    if (homeState !== "active") return; // Only allow in active state
+
+    const bubble = bubbles[slot];
+    if (!bubble) return;
+
+    if (slot === "last") {
+      // LAST: Open CardDetailView (minimal, in-place)
+      if (bubble.card) {
+        // Toggle: if same card is selected, close it
+        if (selectedCard && selectedCard.id === bubble.card.id) {
+          setSelectedCard(null);
+        } else {
+          setSelectedCard(bubble.card);
+        }
+      }
+    } else if (slot === "next") {
+      // NEXT: Promote to active or trigger prompt
+      if (bubble.id === "next_suggestion" && stepSuggestion) {
+        // If it's a stepSuggestion, show it (HomeContent will handle)
+        // No explicit action needed
+      } else if (bubble.card) {
+        // Promote queued/deferred card to active
+        const cardId = bubble.card.id;
+        if (bubble.card.status === "suggested" || bubble.card.status === "skipped") {
+          updateStepCardStatus(cardId, "active");
+          setActiveCardId(cardId);
+          setActiveStepCard(bubble.card);
+          setStepSuggestion(null); // Clear suggestion if we activate a card
+          updateBubbles();
+        }
+      } else {
+        // No card available -> trigger prompt to get suggestion
+        if (scope === "private") {
+          handleOpenAsk();
+        }
+      }
+    } else if (slot === "now") {
+      // NOW: Toggle between compact and focus view (just spacing change)
+      // For now, this is a no-op (could add state for view mode later)
+      // The card is already shown in center, this is just visual feedback
+    }
+  };
+
+  // Legacy handler (deprecated - keeping for reference)
+  const handleBubbleClick = (bubble: any) => {
     if (bubble.kind === "next") {
       // NEXT bubble clicked
       if (bubble.id === "next_suggestion" && stepSuggestion) {
@@ -1352,7 +1397,8 @@ export default function OneScreen() {
         {homeState === "active" && (
           <SideBubbles
             bubbles={bubbles}
-            onBubbleClick={handleBubbleClick}
+            onSelect={handleBubbleSelect}
+            uiLang={uiLang}
           />
         )}
         
@@ -1566,14 +1612,16 @@ export default function OneScreen() {
       {showDebug && (
         <DebugPanel
           scope={scope}
-          cards={bubbles.map((b) => ({
-            id: b.id,
-            title: b.title,
-            subtitle: b.meta || "",
-            status: b.kind === "done" ? "completed" : "active",
-            createdAt: new Date().toISOString(),
-            scope: scope,
-          }))}
+          cards={Object.values(bubbles)
+            .filter((b): b is BubbleItem => !!b)
+            .map((b) => ({
+              id: b.id,
+              title: b.title,
+              subtitle: "",
+              status: b.state === "done" ? "completed" : b.state === "active" ? "active" : "pending",
+              createdAt: new Date().toISOString(),
+              scope: scope,
+            }))}
           dataSource="buildBubbles()"
         />
       )}
