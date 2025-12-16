@@ -58,11 +58,13 @@ import {
 } from "@/lib/owo-engine";
 import {
   initializeIdentity,
+  loadIdentity,
   trackActivity,
   canKeepPath,
   keepPath,
   getActivitySummary,
   shouldOfferIdentity,
+  shouldOfferPathName,
   getCurrentTier,
 } from "@/lib/iwe-engine";
 import {
@@ -100,6 +102,7 @@ import {
 } from "@/lib/step-card";
 import { DeckView } from "@/components/ui/DeckView";
 import { CardDetailView } from "@/components/ui/CardDetailView";
+import { NamePathModal } from "@/components/ui/NamePathModal";
 
 // Theme types
 type ThemeOverride = "auto" | "light" | "dark";
@@ -193,6 +196,7 @@ export default function OneScreen() {
   // Identity Without Exposure (IWE) state
   const [showStatePanel, setShowStatePanel] = useState(false);
   const [showKeepPath, setShowKeepPath] = useState(false);
+  const [showNamePathModal, setShowNamePathModal] = useState(false);
   
   // Action Loop v0.1 state
   const [actionLoopPlan, setActionLoopPlan] = useState<ActionLoopPlan | null>(null);
@@ -774,9 +778,43 @@ export default function OneScreen() {
 
   // Handle "Keep this path" (IWE)
   const handleKeepPath = () => {
-    keepPath();
+    const identity = keepPath();
     setShowKeepPath(false);
+    
+    // If path was created, ensure it exists in path storage
+    if (identity && identity.pathId) {
+      const { ensurePath } = require("@/lib/path");
+      ensurePath(identity.pathId);
+    }
     // No success message - identity emerges from action
+  };
+  
+  // Handle "Name this path"
+  const handleNamePath = () => {
+    setShowNamePathModal(true);
+  };
+  
+  const handleSavePathName = (name: string) => {
+    const { setPathName, markPathNameOffered } = require("@/lib/path");
+    const identity = loadIdentity();
+    
+    if (identity && identity.pathId) {
+      // Ensure path exists
+      const { ensurePath } = require("@/lib/path");
+      ensurePath(identity.pathId);
+      
+      // Set name
+      setPathName(name);
+      markPathNameOffered();
+    }
+    
+    setShowNamePathModal(false);
+  };
+  
+  const handleCancelPathName = () => {
+    const { markPathNameOffered } = require("@/lib/path");
+    markPathNameOffered(); // Mark as offered so we don't show again for 24h
+    setShowNamePathModal(false);
   };
 
   // Handle State Panel toggle
@@ -971,6 +1009,7 @@ export default function OneScreen() {
   // Compute state panel data before return (no IIFE in JSX)
   const summary = getActivitySummary();
   const canShowPath = summary.pathEligible && canKeepPath();
+  const shouldShowNamePath = shouldOfferPathName();
   const showDebug = process.env.NODE_ENV === "development";
 
   return (
@@ -1153,7 +1192,7 @@ export default function OneScreen() {
 
           {/* "Keep this path" offer (only when eligible) */}
           {showKeepPath && canKeepPath() && (
-          <button
+            <button
               onClick={handleKeepPath}
               className="text-xs px-3 py-1 rounded opacity-60 hover:opacity-100 transition-opacity"
               style={{
@@ -1163,8 +1202,23 @@ export default function OneScreen() {
               }}
             >
               Keep this path
-          </button>
-        )}
+            </button>
+          )}
+
+          {/* "Name this path" offer (only when eligible) */}
+          {shouldShowNamePath && (
+            <button
+              onClick={handleNamePath}
+              className="text-xs px-3 py-1 rounded opacity-60 hover:opacity-100 transition-opacity"
+              style={{
+                backgroundColor: "var(--neutral-100)",
+                color: "var(--foreground)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              Name this path
+            </button>
+          )}
 
           <div className="text-xs" style={{ color: "var(--neutral-400)" }}>ONE01</div>
         </div>
@@ -1268,6 +1322,14 @@ export default function OneScreen() {
         <CardDetailView
           card={selectedCard}
           onClose={() => setSelectedCard(null)}
+        />
+      )}
+
+      {/* Name Path Modal */}
+      {showNamePathModal && (
+        <NamePathModal
+          onSave={handleSavePathName}
+          onCancel={handleCancelPathName}
         />
       )}
     </div>

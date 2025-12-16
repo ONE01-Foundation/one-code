@@ -74,6 +74,17 @@ export function trackActivity(): Identity {
   }
   
   saveIdentity(identity);
+  
+  // Update Path lastActiveAt if path exists
+  if (identity.pathId) {
+    const { loadPath, savePath } = require("./path");
+    const path = loadPath();
+    if (path && path.pathId === identity.pathId) {
+      path.lastActiveAt = Date.now();
+      savePath(path);
+    }
+  }
+  
   return identity;
 }
 
@@ -189,6 +200,38 @@ export function getActivitySummary(): {
     pathEligible: identity.pathEligible,
     anchorEligible: identity.anchorEligible,
   };
+}
+
+// Check if path name should be offered
+export function shouldOfferPathName(): boolean {
+  const identity = loadIdentity();
+  if (!identity) return false;
+  
+  // Need path to exist or be eligible
+  const hasPath = !!identity.pathId;
+  const pathEligible = identity.pathEligible;
+  if (!hasPath && !pathEligible) return false;
+  
+  // Need 3+ activities
+  if (identity.activityCount < 3) return false;
+  
+  // Check if path exists and has no name
+  const { loadPath, canOfferPathNameAgain } = require("./path");
+  const path = loadPath();
+  if (!path) {
+    // Path doesn't exist yet, but user is eligible - create it
+    if (hasPath && identity.pathId) {
+      const { ensurePath } = require("./path");
+      ensurePath(identity.pathId);
+      return true; // Offer name for new path
+    }
+    return false;
+  }
+  
+  // Path exists, check if name is empty and can offer again
+  if (path.name && path.name.trim().length > 0) return false;
+  
+  return canOfferPathNameAgain();
 }
 
 // Check if identity should be offered (only when user benefits)
