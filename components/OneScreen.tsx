@@ -279,8 +279,12 @@ export default function OneScreen() {
   const [showDeck, setShowDeck] = useState(false);
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [showCompletedMessage, setShowCompletedMessage] = useState(false);
+
+  // Deck state
+  const [activeDeck, setActiveDeck] = useState<Deck | null>(null);
+  const [isDoing, setIsDoing] = useState(false);
   
-  // Hydrate cards on mount and update recent cards
+  // Hydrate cards and deck on mount
   useEffect(() => {
     const { getActiveCardId, getActiveStepCard, setActiveCardId } = require("@/lib/step-card");
     const activeId = getActiveCardId();
@@ -292,6 +296,14 @@ export default function OneScreen() {
         setActiveCardId(null);
       }
     }
+    
+    // Hydrate active deck
+    const deck = getActiveDeck();
+    if (deck && deck.status === "active") {
+      setActiveDeck(deck);
+      setIsDoing(true); // Enter doing mode if deck is active
+    }
+    
     // Build bubbles on mount
     updateBubbles();
   }, []);
@@ -316,14 +328,15 @@ export default function OneScreen() {
     handleResetParam();
   }, []);
   
-  // Determine home state (strict state machine) - StepCard only
-  const hasActiveStepCard = !!activeStepCard;
+  // Determine home state (strict state machine) - Deck > StepCard > Suggestion
+  const hasActiveDeck = !!activeDeck && activeDeck.status === "active";
+  const hasActiveStepCard = !!activeStepCard && !hasActiveDeck; // Only if no active deck
   const hasSuggestion = !!stepSuggestion || isGeneratingStep;
   const homeState: HomeState = determineHomeState({
-    hasActiveCard: hasActiveStepCard,
-    hasSuggestion,
+    hasActiveCard: hasActiveDeck || hasActiveStepCard, // Deck counts as active
+    hasSuggestion: hasSuggestion && !hasActiveDeck, // Only show suggestion if no active deck
     hasPrompt: false, // Legacy - not used in MVP
-    isLoading: isGeneratingStep && !showCompletedMessage,
+    isLoading: isGeneratingStep && !showCompletedMessage && !hasActiveDeck,
     isCompleted: showCompletedMessage,
   });
   
@@ -1023,10 +1036,14 @@ export default function OneScreen() {
 
   const handleStepDo = () => {
     if (!stepSuggestion) return;
-    const card = createStepCardFromSuggestion(stepSuggestion, "active");
-    saveStepCard(card);
-    setActiveCardId(card.id);
-    setActiveStepCard(card);
+    
+    // Create deck from suggestion
+    const deck = createDeckFromSuggestion(stepSuggestion, scope);
+    deck.status = "active";
+    saveDeck(deck);
+    setActiveDeckId(deck.id);
+    setActiveDeck(deck);
+    setIsDoing(true); // Enter doing mode immediately
     setStepSuggestion(null);
     // Refresh bubbles
     updateBubbles();
@@ -1046,6 +1063,15 @@ export default function OneScreen() {
     
     // Style Memory v0.1: User wants easier step
     saveStyle({ stepDifficulty: "easier" });
+    
+    // If there's an active deck, mark it skipped
+    if (activeDeck) {
+      activeDeck.status = "skipped";
+      updateDeck(activeDeck);
+      setActiveDeckId(null);
+      setActiveDeck(null);
+      setIsDoing(false);
+    }
     
     if (stepSuggestion) {
       const card = createStepCardFromSuggestion(stepSuggestion, "skipped");
@@ -1419,34 +1445,141 @@ export default function OneScreen() {
         
         {/* Unified UI Structure - Single state only */}
         <div className="relative z-20 w-full">
-          {/* Nobody Header - Living header based on mood, state, scope */}
-          {(() => {
-            const mood = getSkyMoodByHour();
-            const headerState: "loading" | "empty" | "suggestion" | "active" | "completed" = 
-              isGeneratingStep ? "loading" :
-              showCompletedMessage ? "completed" :
-              homeState === "empty" ? "empty" :
-              homeState === "suggestion" ? "suggestion" :
-              homeState === "active" ? "active" :
-              "empty";
-            
-            const headerText = getNobodyHeader({
-              lang: headerLang,
-              mood,
-              state: headerState,
-              scope,
-            });
-            
-            return (
-              <NobodyHeader
-                title={headerText.title}
-                subtitle={headerText.subtitle}
-                lang={headerLang}
-              />
-            );
-          })()}
-          
-          <HomeContent
+          {/* Doing Mode - Active deck step */}
+          {isDoing && activeDeck && activeDeck.steps[activeDeck.activeStepIndex] ? (
+            <DoingStep
+              deck={activeDeck}
+              step={activeDeck.steps[activeDeck.activeStepIndex]}
+              onDone={() => {
+                // Complete current step
+                const nextIndex = activeDeck.activeStepIndex + 1;
+                if (nextIndex >= activeDeck.steps.length) {
+                  // Last step completed
+                  activeDeck.status = "done";
+                  activeDeck.activeStepIndex = 0;
+                  updateDeck(activeDeck);
+                  setActiveDeckId(null);
+                  setActiveDeck(null);
+                  setIsDoing(false);
+                  setShowCompletedMessage(true);
+                  setTimeout(() => {
+                    setShowCompletedMessage(false);
+                  }, 2000);
+                } else {
+                  // Move to next step
+                  activeDeck.activeStepIndex = nextIndex;
+                  updateDeck(activeDeck);
+                  setActiveDeck({ ...activeDeck });
+                }
+              }}
+              onBack={() => {
+                // Exit doing mode (keep deck active)
+                setIsDoing(false);
+              }}
+              uiLang={uiLang}
+            />
+          ) : activeDeck && activeDeck.status === "active" && !isDoing ? (
+            /* Deck preview (if active but not doing) */
+            <div className="w-full max-w-md mx-auto space-y-6 py-12">
+              <div className="text-center space-y-4">
+                <h2
+                  className="text-2xl sm:text-3xl font-normal"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  {activeDeck.title}
+                </h2>
+                <p
+                  className="text-base opacity-70"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  {activeDeck.why}
+                </p>
+              </div>
+              <div className="space-y-2">
+                {activeDeck.steps.map((step, index) => (
+                  <div
+                    key={step.id}
+                    className={`p-4 rounded-lg ${
+                      index === activeDeck.activeStepIndex
+                        ? "border-2"
+                        : "border"
+                    }`}
+                    style={{
+                      backgroundColor: index === activeDeck.activeStepIndex ? "var(--neutral-100)" : "transparent",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-base"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        {index + 1}. {step.title}
+                      </span>
+                      {index < activeDeck.activeStepIndex && (
+                        <span style={{ color: "var(--foreground)" }}>✓</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setIsDoing(true)}
+                className="w-full px-8 py-4 rounded-lg font-medium text-lg hover:opacity-90 transition-opacity"
+                style={{
+                  backgroundColor: "var(--foreground)",
+                  color: "var(--background)",
+                }}
+              >
+                {t(uiLang, "start") || "Start"}
+              </button>
+              <button
+                onClick={() => {
+                  activeDeck.status = "skipped";
+                  updateDeck(activeDeck);
+                  setActiveDeckId(null);
+                  setActiveDeck(null);
+                }}
+                className="w-full px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+                style={{
+                  backgroundColor: "var(--background)",
+                  border: "2px solid var(--border)",
+                  color: "var(--foreground)",
+                }}
+              >
+                {t(uiLang, "notNow")}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Nobody Header - Living header based on mood, state, scope */}
+              {(() => {
+                const mood = getSkyMoodByHour();
+                const headerState: "loading" | "empty" | "suggestion" | "active" | "completed" = 
+                  isGeneratingStep ? "loading" :
+                  showCompletedMessage ? "completed" :
+                  homeState === "empty" ? "empty" :
+                  homeState === "suggestion" ? "suggestion" :
+                  homeState === "active" ? "active" :
+                  "empty";
+                
+                const headerText = getNobodyHeader({
+                  lang: headerLang,
+                  mood,
+                  state: headerState,
+                  scope,
+                });
+                
+                return (
+                  <NobodyHeader
+                    title={headerText.title}
+                    subtitle={headerText.subtitle}
+                    lang={headerLang}
+                  />
+                );
+              })()}
+              
+              <HomeContent
             state={homeState}
             isLoading={isGeneratingStep}
             onFindNextStep={() => {
