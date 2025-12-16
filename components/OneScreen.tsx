@@ -1196,8 +1196,21 @@ export default function OneScreen() {
     setSelectedCard(null);
   };
 
+  // Time Atmosphere v0.1
+  const timeAtmosphere = getTimeAtmosphere();
+  const nobodyHeadline = getNobodyHeadline(timeAtmosphere.atmosphere, homeState);
+
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
+    <div 
+      className="fixed inset-0 flex flex-col" 
+      style={{ 
+        backgroundColor: "var(--background)", 
+        color: "var(--foreground)",
+        // Time Atmosphere: Apply subtle gradient
+        background: `linear-gradient(135deg, ${timeAtmosphere.gradientStart} 0%, ${timeAtmosphere.gradientEnd} 100%), var(--background)`,
+        transition: "background 300s ease-in-out", // Very slow, calm transition
+      }}
+    >
       {/* TopBar Gate Inspector (dev only) - Always visible for debugging */}
       {showDebug && (
         <div className="fixed top-0 left-0 z-[10000] pointer-events-auto p-2 text-xs font-mono" style={{ backgroundColor: "rgba(0,0,0,0.8)", color: "#fff", border: "1px solid #fff" }}>
