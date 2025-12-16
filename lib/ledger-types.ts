@@ -16,14 +16,19 @@
  * RawInput - What the user actually said or typed
  * 
  * No structure, no interpretation, just the source material
+ * 
+ * NOTE: Full RawInput definition is in lib/input-types.ts
+ * This is a minimal reference for the ledger flow
  */
 export interface RawInput {
   id: string; // Unique identifier
   text: string; // The actual input text (speech-to-text or typed)
-  source: "voice" | "text" | "import"; // How it was captured
+  language: import("./input-types").LanguageContext; // Detected language
+  source: "voice" | "keyboard" | "import" | "api"; // How it was captured
   timestamp: number; // Unix timestamp
   sessionId: string; // Anonymous session identifier
   scope: "private" | "global"; // Where it was captured (context)
+  isValid: boolean; // Is this input valid for processing?
 }
 
 // ============================================================================
