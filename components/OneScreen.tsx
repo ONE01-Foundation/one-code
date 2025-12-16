@@ -1603,6 +1603,8 @@ export default function OneScreen() {
             completedMessage="Done"
             isDev={isDev}
           />
+            </>
+          )}
         </div>
 
         {/* Step Engine Flow - Only renders during onboarding */}
