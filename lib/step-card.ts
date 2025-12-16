@@ -134,3 +134,29 @@ export function getLastStepCards(limit: number = 10): StepCard[] {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, limit);
 }
+
+// Get recent step cards for SideBubbles (max 3)
+// Order: done (newest first), skipped, active (older)
+export function getRecentStepCards(limit: number = 3): StepCard[] {
+  const cards = loadStepCards();
+  const activeId = getActiveCardId();
+  
+  // Separate by status
+  const done = cards.filter((c) => c.status === "done");
+  const skipped = cards.filter((c) => c.status === "skipped");
+  const active = cards.filter((c) => c.status === "active" && c.id !== activeId); // Exclude current active
+  
+  // Sort done by updatedAt (newest first)
+  done.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  
+  // Sort skipped by updatedAt (newest first)
+  skipped.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  
+  // Sort active by createdAt (older first)
+  active.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  
+  // Combine: done first, then skipped, then active
+  const result = [...done, ...skipped, ...active];
+  
+  return result.slice(0, limit);
+}

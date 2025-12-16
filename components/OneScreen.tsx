@@ -93,6 +93,7 @@ import {
   updateStepCardStatus,
   getActiveStepCard,
   getLastStepCards,
+  getRecentStepCards,
   setActiveCardId,
   getActiveCardId,
   createStepCardFromSuggestion,
@@ -208,8 +209,8 @@ export default function OneScreen() {
   // Scope layer (Global ↔ Private Mirror)
   const { scope, toggleScope, mounted: scopeMounted } = useScope();
   
-  // Cards Lifecycle v0.1
-  const { activeCard, visibleCards, completeCard, deferCard, refresh: refreshCards } = useCards(scope);
+  // Recent StepCards for SideBubbles (continuity layer)
+  const [recentStepCards, setRecentStepCards] = useState<StepCard[]>([]);
   
   // Nobody Interaction v0.1
   const { showPrompt, promptData, promptState, handleChoice, openPrompt, retryPrompt, useLastPrompt } = useNobody();
@@ -232,7 +233,7 @@ export default function OneScreen() {
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [showCompletedMessage, setShowCompletedMessage] = useState(false);
   
-  // Hydrate cards on mount
+  // Hydrate cards on mount and update recent cards
   useEffect(() => {
     const { getActiveCardId, getActiveStepCard, setActiveCardId } = require("@/lib/step-card");
     const activeId = getActiveCardId();
@@ -244,7 +245,14 @@ export default function OneScreen() {
         setActiveCardId(null);
       }
     }
+    // Load recent cards for SideBubbles
+    setRecentStepCards(getRecentStepCards(3));
   }, []);
+  
+  // Update recent cards when activeStepCard changes
+  useEffect(() => {
+    setRecentStepCards(getRecentStepCards(3));
+  }, [activeStepCard]);
   
   // Handle reset param on mount
   useEffect(() => {
@@ -262,17 +270,7 @@ export default function OneScreen() {
     isCompleted: showCompletedMessage,
   });
   
-  // Show Nobody when active card first loads
-  useEffect(() => {
-    if (activeCard && homeState === "active" && !showStepPrompt) {
-      // Show Nobody on first load of active card
-      setShowNobody(true);
-    } else if (!activeCard) {
-      // Reset Nobody when no active card
-      setShowNobody(false);
-      setShowStepPrompt(false);
-    }
-  }, [activeCard, homeState, showStepPrompt]);
+  // Note: Nobody presence flow removed - using StepCard flow only
   
   // Auto-reset completed state after short delay
   useEffect(() => {
@@ -282,11 +280,11 @@ export default function OneScreen() {
         setActionLoopPlan(null);
         setActionLoopState("prompt");
         setActionInProgress(false);
-        refreshCards();
+        setRecentStepCards(getRecentStepCards(3));
       }, 2000); // 2 second confirmation
       return () => clearTimeout(timer);
     }
-  }, [isCompleted, refreshCards]);
+  }, [isCompleted]);
   
   // Debug markers (dev only)
   const isDev = process.env.NODE_ENV === "development";
@@ -831,6 +829,8 @@ export default function OneScreen() {
     setActiveCardId(card.id);
     setActiveStepCard(card);
     setStepSuggestion(null);
+    // Refresh recent cards
+    setRecentStepCards(getRecentStepCards(3));
   };
 
   const handleStepNotNow = () => {
@@ -838,6 +838,8 @@ export default function OneScreen() {
     const card = createStepCardFromSuggestion(stepSuggestion, "skipped");
     saveStepCard(card);
     setStepSuggestion(null);
+    // Refresh recent cards
+    setRecentStepCards(getRecentStepCards(3));
   };
 
   const handleStepChange = async () => {
@@ -887,6 +889,8 @@ export default function OneScreen() {
     setActiveCardId(null);
     setActiveStepCard(null);
     setShowCompletedMessage(true);
+    // Refresh recent cards
+    setRecentStepCards(getRecentStepCards(3));
     // Auto-return to empty after 1500ms (between 1200-2000ms)
     setTimeout(() => {
       setShowCompletedMessage(false);
@@ -1030,8 +1034,13 @@ export default function OneScreen() {
 
       {/* Center: Focus Zone - Strict State Machine (ONE state only) */}
       <div className="flex-1 flex items-center justify-center px-6 relative overflow-hidden">
-        {/* Side Bubbles (next/context/last done - max 3) - Only show in active state */}
-        {homeState === "active" && <SideBubbles cards={visibleCards} />}
+        {/* Side Bubbles (recent StepCards - max 3) - Only show in active state */}
+        {homeState === "active" && (
+          <SideBubbles
+            cards={recentStepCards}
+            onCardClick={(card) => setSelectedCard(card)}
+          />
+        )}
         
         {/* Nobody Presence - Subtle Light Movement */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -1242,15 +1251,23 @@ export default function OneScreen() {
       {showDebug && (
         <DebugPanel
           scope={scope}
-          cards={visibleCards.map((c) => ({
+          cards={recentStepCards.map((c) => ({
             id: c.id,
             title: c.title,
-            subtitle: c.intent || "",
-            status: c.state === "done" ? "completed" : "active",
+            subtitle: c.why || "",
+            status: c.status === "done" ? "completed" : "active",
             createdAt: c.createdAt,
-            scope: c.scope as Scope,
+            scope: scope,
           }))}
-          dataSource="useCards()"
+          dataSource="getRecentStepCards()"
+        />
+      )}
+
+      {/* Card Detail View Overlay */}
+      {selectedCard && (
+        <CardDetailView
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
         />
       )}
     </div>
