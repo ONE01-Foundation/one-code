@@ -16,7 +16,6 @@ import { OneNavPreview } from "./OneNavPreview";
 import { UnitsDisplay } from "./UnitsDisplay";
 import { TimeScrubber } from "./TimeScrubber";
 import { LivingSummary } from "./LivingSummary";
-import { AnchorButton } from "./AnchorButton";
 import { InputBar } from "./InputBar";
 import { OneMicOverlay } from "./OneMicOverlay";
 import { OneStepResult } from "./OneStepResult";
@@ -142,9 +141,6 @@ export function CoreOneView() {
   const bubbles = mode === "private" ? coreStore.privateBubbles : coreStore.globalBubbles;
   const currentBubble = currentContext ? bubbles[currentContext] : null;
   
-  // Anchor icon: show current bubble icon if inside, home if at root
-  const anchorIcon = currentBubble?.icon || "🏠";
-  
   return (
     <div
       className="fixed inset-0 flex flex-col items-center justify-center"
@@ -220,17 +216,6 @@ export function CoreOneView() {
         />
       </div>
       
-      {/* Anchor Button (bottom center) */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-        <AnchorButton
-          currentSphereId={currentBubble?.id || null}
-          spheres={{}}
-          icon={anchorIcon}
-          onTap={goBack}
-          onLongPress={goHome}
-          onVoiceStart={() => setIsMicOpen(true)}
-        />
-      </div>
       
       {/* Mic Overlay */}
       <OneMicOverlay
