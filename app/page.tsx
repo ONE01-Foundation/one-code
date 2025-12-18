@@ -1,7 +1,7 @@
 "use client";
 
-import OneScreen from "@/components/OneScreen";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <OneScreen />;
+  redirect("/one01");
 }
