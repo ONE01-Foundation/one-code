@@ -19,14 +19,16 @@ interface AnchorButtonProps {
   onTap: () => void;
   onLongPress: () => void;
   onVoiceStart: () => void;
+  icon?: string; // Optional icon override (for CoreOneView)
 }
 
-export function AnchorButton({ currentSphereId, spheres, onTap, onLongPress, onVoiceStart }: AnchorButtonProps) {
+export function AnchorButton({ currentSphereId, spheres, onTap, onLongPress, onVoiceStart, icon }: AnchorButtonProps) {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const tapHandledRef = useRef(false);
   
-  const currentSphere = currentSphereId ? spheres[currentSphereId] : spheres["root"];
-  const iconKey = currentSphere?.iconKey || "home";
+  // Use provided icon or fallback to sphere icon or home
+  const currentSphere = currentSphereId ? spheres[currentSphereId] : null;
+  const iconKey = icon || currentSphere?.iconKey || "🏠";
   
   const {
     mode,
@@ -116,7 +118,7 @@ export function AnchorButton({ currentSphereId, spheres, onTap, onLongPress, onV
       title="Hold: Voice | Drag: Navigate | Tap: Back"
     >
       <div className="text-2xl">
-        {isVoiceActive ? "🎤" : (iconKey || "🏠")}
+        {isVoiceActive ? "🎤" : (typeof iconKey === "string" && iconKey.length <= 2 ? iconKey : getIcon(iconKey))}
       </div>
     </div>
   );

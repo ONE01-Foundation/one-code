@@ -27,6 +27,9 @@ export function CoreOneView() {
   const bubbles = navigation.mode === "private" ? store.privateBubbles : store.globalBubbles;
   const currentBubble = currentParentId ? bubbles[currentParentId] : null;
   
+  // Anchor icon: show current bubble icon if inside, home if at root
+  const anchorIcon = currentBubble?.icon || "🏠";
+  
   return (
     <div
       className="fixed inset-0 flex flex-col items-center justify-center"
@@ -72,7 +75,8 @@ export function CoreOneView() {
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
         <AnchorButton
           currentSphereId={currentBubble?.id || null}
-          spheres={currentBubble ? { [currentBubble.id]: { iconKey: currentBubble.icon, name: currentBubble.title } } : {}}
+          spheres={{}}
+          icon={anchorIcon}
           onTap={goBack}
           onLongPress={goHome}
           onVoiceStart={() => {}}
