@@ -46,23 +46,28 @@ export function CoreOneView() {
     
     // Auto-compress yesterday's day at midnight
     const checkDailyCompression = () => {
-      const now = new Date();
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
-      
-      // Check if we need to compress yesterday
-      const yesterdaySlice = timeStore.getTimeSlice("day", yesterdayStr);
-      if (yesterdaySlice && !yesterdaySlice.compressed) {
-        timeStore.compressDay(yesterdayStr);
+      try {
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+        
+        // Check if we need to compress yesterday
+        const yesterdaySlice = timeStore.getTimeSlice("day", yesterdayStr);
+        if (yesterdaySlice && !yesterdaySlice.compressed) {
+          timeStore.compressDay(yesterdayStr);
+        }
+      } catch (error) {
+        console.error("Error in daily compression check:", error);
       }
     };
     
     // Check on mount and set interval for daily check
-    checkDailyCompression();
-    const interval = setInterval(checkDailyCompression, 60 * 60 * 1000); // Check every hour
-    
-    return () => clearInterval(interval);
+    if (typeof window !== "undefined") {
+      checkDailyCompression();
+      const interval = setInterval(checkDailyCompression, 60 * 60 * 1000); // Check every hour
+      return () => clearInterval(interval);
+    }
   }, [initialize, unitsStore, timeStore]);
   
   // Handle voice confirm

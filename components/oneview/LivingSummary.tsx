@@ -20,7 +20,8 @@ interface LivingSummaryProps {
 }
 
 export function LivingSummary({ unit, onDrillDown }: LivingSummaryProps) {
-  const { currentTime, getCurrentSlice, getSummaryForSlice } = useTimeStore();
+  const timeStore = useTimeStore();
+  const { currentTime, getCurrentSlice, getSummaryForSlice } = timeStore;
   
   const slice = getCurrentSlice(unit);
   const summary = slice ? getSummaryForSlice(slice.id) : null;

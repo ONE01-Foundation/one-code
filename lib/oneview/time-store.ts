@@ -117,14 +117,15 @@ function getTimeUnitBounds(unit: TimeUnit, date: string): { start: string; end: 
 }
 
 export const useTimeStore = create<TimeState>((set, get) => {
-  const loaded = loadTimeData();
+  // Load initial data (only on client)
+  const initialData = typeof window !== "undefined" ? loadTimeData() : { timeSlices: {}, moments: {}, summaries: {} };
   
   return {
     // Initial state
     currentTime: new Date().toISOString(),
-    timeSlices: loaded.timeSlices,
-    moments: loaded.moments,
-    summaries: loaded.summaries,
+    timeSlices: initialData.timeSlices,
+    moments: initialData.moments,
+    summaries: initialData.summaries,
     
     // Set current time
     setCurrentTime: (time) => {
