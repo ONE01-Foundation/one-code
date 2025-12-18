@@ -116,7 +116,7 @@ export function AnchorButton({ currentSphereId, spheres, onTap, onLongPress, onV
       title="Hold: Voice | Drag: Navigate | Tap: Back"
     >
       <div className="text-2xl">
-        {isVoiceActive ? "🎤" : getIcon(iconKey)}
+        {isVoiceActive ? "🎤" : (iconKey || "🏠")}
       </div>
     </div>
   );

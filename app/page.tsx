@@ -2,8 +2,8 @@
 
 "use client";
 
-import { OneView } from "@/components/oneview/OneView";
+import { CoreOneView } from "@/components/oneview/CoreOneView";
 
 export default function Home() {
-  return <OneView />;
+  return <CoreOneView />;
 }
