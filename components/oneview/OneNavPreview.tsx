@@ -21,6 +21,7 @@ export function OneNavPreview() {
   const { focusedNodeId, mode } = navStore;
   const { privateBubbles, globalBubbles, getBubblePreview, importToPrivate } = coreStore;
   
+  // Only show preview if bubble is near center (preview state)
   if (!focusedNodeId) return null;
   
   const bubbles = mode === "private" ? privateBubbles : globalBubbles;
@@ -28,6 +29,9 @@ export function OneNavPreview() {
   const preview = getBubblePreview(focusedNodeId);
   
   if (!bubble || !preview) return null;
+  
+  // Show preview only when bubble is in preview state (near center)
+  // This is handled by OneNavigation component
   
   const isGlobal = mode === "global";
   const hasChildren = bubble.childrenIds && bubble.childrenIds.length > 0;

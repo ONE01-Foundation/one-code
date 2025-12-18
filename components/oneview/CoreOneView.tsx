@@ -11,10 +11,8 @@ import { useOneViewCoreStore } from "@/lib/oneview/core-store";
 import { useNavStore } from "@/lib/oneview/nav-store";
 import { useUnitsStore } from "@/lib/oneview/units-store";
 import { useTimeStore } from "@/lib/oneview/time-store";
-import { OneNavBubbleField } from "./OneNavBubbleField";
+import { OneNavigation } from "./OneNavigation";
 import { OneNavPreview } from "./OneNavPreview";
-import { OneJoystick } from "./OneJoystick";
-import { OneNavBackButton } from "./OneNavBackButton";
 import { UnitsDisplay } from "./UnitsDisplay";
 import { TimeScrubber } from "./TimeScrubber";
 import { LivingSummary } from "./LivingSummary";
@@ -205,14 +203,10 @@ export function CoreOneView() {
       
       {/* Center Stage */}
       <div className="relative w-full h-full flex items-center justify-center">
-        <OneJoystick />
-        <OneNavBubbleField />
+        <OneNavigation />
         <OneNavPreview />
         <LivingSummary unit="day" />
       </div>
-      
-      {/* Back Button */}
-      <OneNavBackButton />
       
       {/* Input Bar (optional, can be hidden for MVP) */}
       <div className="absolute bottom-24 left-0 right-0 z-10 px-4 opacity-0 pointer-events-none">
