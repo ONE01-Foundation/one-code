@@ -140,6 +140,7 @@ const dict: Record<UILang, Record<UITextKey, string>> = {
     reset: "Réinitialiser",
     back: "Retour",
   },
+  // @ts-expect-error - "auto" is a special case that falls back to English
   auto: {
     // Auto falls back to English
     findStep: "Find next step",

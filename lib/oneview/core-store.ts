@@ -99,7 +99,7 @@ export const useOneViewCoreStore = create<OneViewCoreStore>((set, get) => ({
   // Initial state
   privateBubbles: {},
   globalBubbles: getAllBubbles("global"),
-  cards: {},
+  cards: {} as Record<string, Card>,
   navigation: {
     stack: [],
     centeredBubbleId: null,

@@ -978,7 +978,7 @@ export default function OneScreen() {
     const answerStyle = trimmed.length > 80 ? "standard" : "short";
     const currentStyle = loadStyle();
     // Only save valid language codes (exclude "auto")
-    const langToSave = detectedUILang === "auto" ? undefined : detectedUILang as "en" | "he" | "ar" | "es" | "fr";
+    const langToSave: UILang | undefined = (detectedUILang as any) === "auto" ? undefined : detectedUILang;
     saveStyle({
       uiLang: langToSave,
       lastEntry: "ask",
