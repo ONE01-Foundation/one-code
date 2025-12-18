@@ -8,8 +8,11 @@
 
 import { useEffect, useState } from "react";
 import { useOneViewCoreStore } from "@/lib/oneview/core-store";
-import { CoreBubbleField } from "./CoreBubbleField";
-import { CoreCenterPreview } from "./CoreCenterPreview";
+import { useNavStore } from "@/lib/oneview/nav-store";
+import { OneNavBubbleField } from "./OneNavBubbleField";
+import { OneNavPreview } from "./OneNavPreview";
+import { OneJoystick } from "./OneJoystick";
+import { OneNavBackButton } from "./OneNavBackButton";
 import { AnchorButton } from "./AnchorButton";
 import { InputBar } from "./InputBar";
 import { OneMicOverlay } from "./OneMicOverlay";
@@ -19,8 +22,11 @@ import { OneStep } from "@/lib/oneview/onestep-types";
 import { UILang } from "@/lib/lang";
 
 export function CoreOneView() {
-  const store = useOneViewCoreStore();
-  const { navigation, initialize, setMode, goBack, goHome, setCenteredBubble } = store;
+  const coreStore = useOneViewCoreStore();
+  const navStore = useNavStore();
+  
+  const { initialize } = coreStore;
+  const { mode, setMode, goBack, goHome } = navStore;
   
   const [isMicOpen, setIsMicOpen] = useState(false);
   const [oneStepResult, setOneStepResult] = useState<OneStep | null>(null);
@@ -42,8 +48,8 @@ export function CoreOneView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userText: text,
-          mode: navigation.mode,
-          currentPath: navigation.stack,
+          mode: mode,
+          currentPath: navStore.pathStack,
           userLocale: lang,
         }),
       });
@@ -69,25 +75,22 @@ export function CoreOneView() {
   // Handle step action (apply to tree)
   const handleStepAction = (step: OneStep) => {
     // Apply to private tree
-    const result = applyOneStepToPrivateTree(step, store);
+    const result = applyOneStepToPrivateTree(step, coreStore);
     
     // Focus on created/updated bubble
     if (result.createdBubbles.length > 0) {
       const lastBubbleId = result.createdBubbles[result.createdBubbles.length - 1];
-      setCenteredBubble(lastBubbleId);
-      
-      // Navigate to the bubble's parent path
-      // For now, just center it
+      navStore.setFocusedNode(lastBubbleId);
     } else if (result.updatedBubbles.length > 0) {
       const lastBubbleId = result.updatedBubbles[result.updatedBubbles.length - 1];
-      setCenteredBubble(lastBubbleId);
+      navStore.setFocusedNode(lastBubbleId);
     }
     
     // Clear result
     setOneStepResult(null);
     
     // Refresh store
-    store.initialize();
+    coreStore.initialize();
   };
   
   // Handle edit card title
@@ -103,10 +106,10 @@ export function CoreOneView() {
     }
   };
   
-  // Get current sphere for anchor icon
-  const currentParentId = store.getCurrentParentId();
-  const bubbles = navigation.mode === "private" ? store.privateBubbles : store.globalBubbles;
-  const currentBubble = currentParentId ? bubbles[currentParentId] : null;
+  // Get current context for anchor icon
+  const currentContext = navStore.getCurrentContext();
+  const bubbles = mode === "private" ? coreStore.privateBubbles : coreStore.globalBubbles;
+  const currentBubble = currentContext ? bubbles[currentContext] : null;
   
   // Anchor icon: show current bubble icon if inside, home if at root
   const anchorIcon = currentBubble?.icon || "🏠";
@@ -123,15 +126,15 @@ export function CoreOneView() {
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
         {/* Mode Toggle */}
         <button
-          onClick={() => setMode(navigation.mode === "private" ? "global" : "private")}
+          onClick={() => setMode(mode === "private" ? "global" : "private")}
           className="px-4 py-2 rounded-full text-xs font-medium transition-opacity hover:opacity-80"
           style={{
-            backgroundColor: navigation.mode === "private" ? "var(--foreground)" : "transparent",
-            color: navigation.mode === "private" ? "var(--background)" : "var(--foreground)",
+            backgroundColor: mode === "private" ? "var(--foreground)" : "transparent",
+            color: mode === "private" ? "var(--background)" : "var(--foreground)",
             border: "1px solid var(--border)",
           }}
         >
-          {navigation.mode === "private" ? "Private" : "Global"}
+          {mode === "private" ? "Private" : "Global"}
         </button>
         
         {/* Mic Button */}
@@ -161,9 +164,13 @@ export function CoreOneView() {
       
       {/* Center Stage */}
       <div className="relative w-full h-full flex items-center justify-center">
-        <CoreBubbleField />
-        <CoreCenterPreview />
+        <OneJoystick />
+        <OneNavBubbleField />
+        <OneNavPreview />
       </div>
+      
+      {/* Back Button */}
+      <OneNavBackButton />
       
       {/* Input Bar (optional, can be hidden for MVP) */}
       <div className="absolute bottom-24 left-0 right-0 z-10 px-4 opacity-0 pointer-events-none">
@@ -172,12 +179,12 @@ export function CoreOneView() {
           onChange={() => {}}
           onSubmit={() => {}}
           onLongPress={() => {}}
-          mode={navigation.mode}
+          mode={mode}
           isSubmitting={false}
         />
       </div>
       
-      {/* Anchor Button */}
+      {/* Anchor Button (bottom center) */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
         <AnchorButton
           currentSphereId={currentBubble?.id || null}
