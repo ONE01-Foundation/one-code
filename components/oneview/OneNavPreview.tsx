@@ -11,10 +11,12 @@
 
 import { useNavStore } from "@/lib/oneview/nav-store";
 import { useOneViewCoreStore } from "@/lib/oneview/core-store";
+import { useUnitsStore } from "@/lib/oneview/units-store";
 
 export function OneNavPreview() {
   const navStore = useNavStore();
   const coreStore = useOneViewCoreStore();
+  const unitsStore = useUnitsStore();
   
   const { focusedNodeId, mode } = navStore;
   const { privateBubbles, globalBubbles, getBubblePreview, importToPrivate } = coreStore;
@@ -29,6 +31,8 @@ export function OneNavPreview() {
   
   const isGlobal = mode === "global";
   const hasChildren = bubble.childrenIds && bubble.childrenIds.length > 0;
+  const canAffordImport = unitsStore.canAfford(1);
+  const unitsBalance = unitsStore.getBalance();
   
   const handleOpen = () => {
     if (hasChildren) {
@@ -37,10 +41,24 @@ export function OneNavPreview() {
   };
   
   const handleImport = () => {
-    importToPrivate(bubble.id);
-    // After import, switch to private mode and focus the imported bubble
-    navStore.setMode("private");
-    // The imported bubble will be in private tree now
+    if (!canAffordImport) {
+      alert(`Insufficient Units. You need 1 Unit to import. Current balance: ${unitsBalance}`);
+      return;
+    }
+    
+    // Get reference summary from global bubble
+    const referenceSummary = preview.aiSummary || preview.metric || `Imported from Global: ${bubble.title}`;
+    
+    const newBubbleId = importToPrivate(bubble.id, referenceSummary);
+    
+    if (newBubbleId) {
+      // After import, switch to private mode and enter the new bubble
+      navStore.setMode("private");
+      navStore.setFocusedNode(newBubbleId);
+      navStore.enterNode(newBubbleId);
+    } else {
+      alert("Failed to import. Please check your Units balance.");
+    }
   };
   
   return (
@@ -73,30 +91,32 @@ export function OneNavPreview() {
         )}
         
         {/* CTA */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-col gap-2 pt-2">
           {isGlobal ? (
             <>
               <button
                 onClick={handleImport}
-                className="flex-1 px-3 py-2 rounded text-sm font-medium transition-opacity hover:opacity-80"
+                disabled={!canAffordImport}
+                className="w-full px-3 py-2 rounded text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: "var(--neutral-100)",
+                  backgroundColor: canAffordImport ? "var(--foreground)" : "var(--neutral-100)",
                   border: "1px solid var(--border)",
-                  color: "var(--foreground)",
+                  color: canAffordImport ? "var(--background)" : "var(--foreground)",
                 }}
               >
-                Import to Private
+                {canAffordImport ? `Use this for me (1 Unit)` : `Need 1 Unit (you have ${unitsBalance})`}
               </button>
               {hasChildren && (
                 <button
                   onClick={handleOpen}
-                  className="flex-1 px-3 py-2 rounded text-sm font-medium transition-opacity hover:opacity-80"
+                  className="w-full px-3 py-2 rounded text-sm font-medium transition-opacity hover:opacity-80"
                   style={{
-                    backgroundColor: "var(--foreground)",
-                    color: "var(--background)",
+                    backgroundColor: "transparent",
+                    border: "1px solid var(--border)",
+                    color: "var(--foreground)",
                   }}
                 >
-                  Open
+                  Explore (read-only)
                 </button>
               )}
             </>

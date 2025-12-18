@@ -6,6 +6,7 @@
 
 import { OneStep } from "./onestep-types";
 import { Bubble, Card } from "./core-types";
+import { useUnitsStore } from "./units-store";
 import { useOneViewCoreStore } from "./core-store";
 
 /**
@@ -45,6 +46,29 @@ export function applyOneStepToPrivateTree(
     );
     
     if (!existingBubble) {
+      // Check Units (creating a sphere costs 1 Unit) - only for root-level bubbles
+      if (i === 0) {
+        try {
+          const unitsStore = useUnitsStore.getState();
+          unitsStore.initialize();
+          
+          if (!unitsStore.canAfford(1)) {
+            console.warn(`Cannot create sphere "${bubbleName}": insufficient Units`);
+            // Continue with existing bubbles only
+            break;
+          }
+          
+          // Spend 1 Unit
+          const spent = unitsStore.spend(1, `Create sphere: ${bubbleName}`);
+          if (!spent) {
+            break;
+          }
+        } catch (error) {
+          console.error("Failed to check Units:", error);
+          // Continue without Units check (fallback)
+        }
+      }
+      
       // Create new bubble
       const newBubble: Bubble = {
         id: `private_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -57,6 +81,10 @@ export function applyOneStepToPrivateTree(
           lastUpdated: new Date().toISOString(),
         },
         childrenIds: [],
+        trust: {
+          level: "self-declared",
+          verifiedAt: new Date().toISOString(),
+        },
       };
       
       // Add to store

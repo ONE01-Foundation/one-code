@@ -24,7 +24,7 @@ interface OneViewCoreStore {
   enterBubble: (bubbleId: string) => void;
   goBack: () => void;
   goHome: () => void;
-  importToPrivate: (bubbleId: string) => void;
+  importToPrivate: (bubbleId: string, referenceSummary?: string) => string | null;
   
   // Getters
   getCurrentBubbles: () => Bubble[];
@@ -195,25 +195,62 @@ export const useOneViewCoreStore = create<OneViewCoreStore>((set, get) => ({
     saveLastPath([]);
   },
   
-  // Import global bubble to private
-  importToPrivate: (bubbleId) => {
+  // Import global bubble to private (creates NEW sphere, not copy)
+  importToPrivate: (bubbleId, referenceSummary) => {
     const { globalBubbles, privateBubbles } = get();
     const globalBubble = globalBubbles[bubbleId];
     
-    if (!globalBubble) return;
+    if (!globalBubble) return null;
     
-    // Create private copy
-    const privateCopy: Bubble = {
-      ...globalBubble,
+    // Check Units (import costs 1 Unit)
+    try {
+      const unitsModule = require("./units-store");
+      const unitsStore = unitsModule.useUnitsStore.getState();
+      unitsStore.initialize();
+      
+      if (!unitsStore.canAfford(1)) {
+        console.warn("Cannot import: insufficient Units");
+        return null;
+      }
+      
+      // Spend 1 Unit
+      const spent = unitsStore.spend(1, `Import sphere: ${globalBubble.title}`);
+      if (!spent) {
+        return null;
+      }
+    } catch (error) {
+      console.error("Failed to check Units:", error);
+      return null;
+    }
+    
+    // Create NEW private sphere (fork, not copy)
+    const newPrivateSphere: Bubble = {
       id: `private_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      mode: "private",
+      title: globalBubble.title,
+      icon: globalBubble.icon,
       parentId: null, // Import as root level
+      mode: "private",
+      stats: {
+        progress: 0,
+        lastUpdated: new Date().toISOString(),
+      },
+      childrenIds: [], // Empty structure (user builds it)
+      tags: [],
+      // Import metadata
+      importedFrom: globalBubble.id, // Reference only (not linked)
+      referenceSummary: referenceSummary || globalBubble.stats?.lastUpdated || "Imported from Global",
+      trust: {
+        level: "self-declared",
+        verifiedAt: new Date().toISOString(),
+      },
     };
     
     // Add to private bubbles
-    const updated = { ...privateBubbles, [privateCopy.id]: privateCopy };
+    const updated = { ...privateBubbles, [newPrivateSphere.id]: newPrivateSphere };
     set({ privateBubbles: updated });
     savePrivateBubbles(updated);
+    
+    return newPrivateSphere.id;
   },
   
   // Get current bubbles (based on mode and parent)

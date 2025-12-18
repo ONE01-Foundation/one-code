@@ -9,10 +9,12 @@
 import { useEffect, useState } from "react";
 import { useOneViewCoreStore } from "@/lib/oneview/core-store";
 import { useNavStore } from "@/lib/oneview/nav-store";
+import { useUnitsStore } from "@/lib/oneview/units-store";
 import { OneNavBubbleField } from "./OneNavBubbleField";
 import { OneNavPreview } from "./OneNavPreview";
 import { OneJoystick } from "./OneJoystick";
 import { OneNavBackButton } from "./OneNavBackButton";
+import { UnitsDisplay } from "./UnitsDisplay";
 import { AnchorButton } from "./AnchorButton";
 import { InputBar } from "./InputBar";
 import { OneMicOverlay } from "./OneMicOverlay";
@@ -24,6 +26,7 @@ import { UILang } from "@/lib/lang";
 export function CoreOneView() {
   const coreStore = useOneViewCoreStore();
   const navStore = useNavStore();
+  const unitsStore = useUnitsStore();
   
   const { initialize } = coreStore;
   const { mode, setMode, goBack, goHome } = navStore;
@@ -35,7 +38,8 @@ export function CoreOneView() {
   // Initialize on mount
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    unitsStore.initialize(); // Initialize Units (check daily refill)
+  }, [initialize, unitsStore]);
   
   // Handle voice confirm
   const handleVoiceConfirm = async (text: string, lang: UILang) => {
@@ -137,18 +141,23 @@ export function CoreOneView() {
           {mode === "private" ? "Private" : "Global"}
         </button>
         
-        {/* Mic Button */}
-        <button
-          onClick={() => setIsMicOpen(true)}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
-          style={{
-            backgroundColor: "var(--neutral-100)",
-            border: "1px solid var(--border)",
-          }}
-          title="Voice input"
-        >
-          🎤
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Units Display */}
+          <UnitsDisplay />
+          
+          {/* Mic Button */}
+          <button
+            onClick={() => setIsMicOpen(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+            style={{
+              backgroundColor: "var(--neutral-100)",
+              border: "1px solid var(--border)",
+            }}
+            title="Voice input"
+          >
+            🎤
+          </button>
+        </div>
       </div>
       
       {/* OneStep Result (if exists) */}

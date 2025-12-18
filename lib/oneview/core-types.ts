@@ -22,6 +22,10 @@ export interface Bubble {
   };
   childrenIds: string[];
   tags?: string[]; // e.g., ["Hot", "Trending"]
+  // Import metadata (if imported from Global)
+  importedFrom?: string; // Original global sphere ID (reference only, not linked)
+  referenceSummary?: string; // AI-generated summary from Global (read-only reference)
+  trust?: import("./trust-types").TrustMetadata; // Trust level
 }
 
 export interface Card {
