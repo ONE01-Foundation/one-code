@@ -108,7 +108,7 @@ export function OneView() {
           spheres={store.spheres}
           onTap={store.navigateBack}
           onLongPress={store.navigateHome}
-          onDoubleTap={handleVoiceModeOpen}
+          onVoiceStart={handleVoiceModeOpen}
         />
       </div>
       

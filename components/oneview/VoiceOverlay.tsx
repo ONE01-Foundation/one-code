@@ -29,17 +29,21 @@ export function VoiceOverlay({ isOpen, onClose, onConfirm, onSubmit }: VoiceOver
   } = useVoiceInput({
     onTranscript: () => {},
     onFinalTranscript: () => {},
-    enabled: isOpen,
+    enabled: false, // We'll control it manually
   });
 
   // Auto-start when opened
   useEffect(() => {
-    if (isOpen && isSupported) {
-      startListening();
-    } else if (!isOpen) {
+    if (isOpen) {
+      if (isSupported) {
+        startListening();
+      }
+      // If not supported, fallback text input is already shown
+    } else {
       stopListening();
       setFallbackText("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isSupported]);
 
   if (!isOpen) return null;

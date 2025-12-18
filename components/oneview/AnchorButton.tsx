@@ -1,87 +1,123 @@
 /**
  * Anchor Button - Bottom fixed anchor bubble
  * 
- * Tap: go back one level
- * Long-press: go Home (root)
- * Double-tap: open Voice Mode
+ * Hold-to-Talk: Hold without movement for 350ms => Voice Mode
+ * Joystick: Drag > 12px => Navigate bubbles
+ * Tap: go back one level (if no hold/joystick)
+ * Long-press: go Home (root) - TODO: implement if needed
  */
 
 "use client";
 
 import { useState, useRef } from "react";
 import { Sphere } from "@/lib/oneview/types";
+import { useAnchorGesture } from "@/hooks/useAnchorGesture";
 
 interface AnchorButtonProps {
   currentSphereId: string | null;
   spheres: Record<string, Sphere>;
   onTap: () => void;
   onLongPress: () => void;
-  onDoubleTap: () => void;
+  onVoiceStart: () => void;
 }
 
-export function AnchorButton({ currentSphereId, spheres, onTap, onLongPress, onDoubleTap }: AnchorButtonProps) {
+export function AnchorButton({ currentSphereId, spheres, onTap, onLongPress, onVoiceStart }: AnchorButtonProps) {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const [tapTimer, setTapTimer] = useState<NodeJS.Timeout | null>(null);
-  const tapCountRef = useRef(0);
+  const tapHandledRef = useRef(false);
   
   const currentSphere = currentSphereId ? spheres[currentSphereId] : spheres["root"];
   const iconKey = currentSphere?.iconKey || "home";
   
-  const handleMouseDown = () => {
-    // Start long-press timer
+  const {
+    mode,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+  } = useAnchorGesture({
+    onJoystickStart: () => {
+      // Joystick started - cancel any tap/long-press
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
+      }
+      tapHandledRef.current = true;
+    },
+    onJoystickMove: (dx, dy) => {
+      // Joystick movement - handle bubble navigation
+      // This would be handled by BubbleField or OneView
+      tapHandledRef.current = true;
+    },
+    onJoystickEnd: () => {
+      tapHandledRef.current = false;
+    },
+    onVoiceStart: () => {
+      // Cancel long-press timer
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
+      }
+      tapHandledRef.current = true;
+      onVoiceStart();
+    },
+    onVoiceEnd: () => {
+      // Voice mode ends but overlay stays open until user confirms/cancels
+      tapHandledRef.current = false;
+    },
+  });
+  
+  const handleDown = (e: React.PointerEvent) => {
+    // Start long-press timer (for Home navigation)
     const timer = setTimeout(() => {
-      onLongPress();
+      if (mode === "idle" || mode === "voicePending") {
+        onLongPress();
+      }
       setLongPressTimer(null);
-      tapCountRef.current = 0; // Reset tap count on long-press
-    }, 500); // 500ms for long-press
+    }, 500);
     setLongPressTimer(timer);
+    
+    // Start gesture detection
+    handlePointerDown(e);
   };
   
-  const handleMouseUp = () => {
-    // Cancel long-press if it was a tap
+  const handleUp = (e: React.PointerEvent) => {
+    // Cancel long-press timer
     if (longPressTimer) {
       clearTimeout(longPressTimer);
       setLongPressTimer(null);
-      
-      // Handle double-tap detection
-      tapCountRef.current += 1;
-      
-      if (tapCountRef.current === 1) {
-        // First tap - wait for potential second tap
-        const timer = setTimeout(() => {
-          // Single tap - execute back navigation
-          if (tapCountRef.current === 1) {
-            onTap();
-          }
-          tapCountRef.current = 0;
-          setTapTimer(null);
-        }, 300); // 300ms window for double-tap
-        setTapTimer(timer);
-      } else if (tapCountRef.current === 2) {
-        // Double tap detected
-        if (tapTimer) {
-          clearTimeout(tapTimer);
-          setTapTimer(null);
-        }
-        onDoubleTap();
-        tapCountRef.current = 0;
-      }
     }
+    
+    // Handle gesture end
+    handlePointerUp();
+    
+    // If no gesture was handled, treat as tap (back navigation)
+    if (!tapHandledRef.current && mode === "idle") {
+      onTap();
+    }
+    tapHandledRef.current = false;
   };
+  
+  // Show visual feedback for voice mode
+  const isVoiceActive = mode === "voiceActive" || mode === "voicePending";
   
   return (
     <div
-      className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-80"
+      className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200"
       style={{
-        backgroundColor: "var(--foreground)",
-        color: "var(--background)",
+        backgroundColor: isVoiceActive ? "var(--neutral-100)" : "var(--foreground)",
+        color: isVoiceActive ? "var(--foreground)" : "var(--background)",
+        border: isVoiceActive ? "2px solid var(--border)" : "none",
+        transform: isVoiceActive ? "scale(1.1)" : "scale(1)",
       }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      title="Tap: Back | Long-press: Home"
+      onPointerDown={handleDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handleUp}
+      onPointerCancel={handlePointerCancel}
+      title="Hold: Voice | Drag: Navigate | Tap: Back"
     >
-      <div className="text-2xl">{getIcon(iconKey)}</div>
+      <div className="text-2xl">
+        {isVoiceActive ? "🎤" : getIcon(iconKey)}
+      </div>
     </div>
   );
 }
