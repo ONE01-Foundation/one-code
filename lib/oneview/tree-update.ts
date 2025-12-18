@@ -7,6 +7,7 @@
 import { OneStep } from "./onestep-types";
 import { Bubble, Card } from "./core-types";
 import { useUnitsStore } from "./units-store";
+import { useTimeStore } from "./time-store";
 import { useOneViewCoreStore } from "./core-store";
 
 /**
@@ -130,6 +131,23 @@ export function applyOneStepToPrivateTree(
     // Store card in store
     store.cards = { ...store.cards, [newCard.id]: newCard };
     createdCardId = newCard.id;
+    
+    // Add moment to time store
+    try {
+      const timeStore = useTimeStore.getState();
+      timeStore.addMoment({
+        type: "completion",
+        content: oneStep.card.title,
+        domain: oneStep.domain,
+        cardId: newCard.id,
+      });
+      
+      // Earn 1 Unit for completing a card
+      const unitsStore = useUnitsStore.getState();
+      unitsStore.earn(1, `Complete card: ${oneStep.card.title}`);
+    } catch (error) {
+      console.error("Failed to add moment:", error);
+    }
   }
   
   // Persist to localStorage

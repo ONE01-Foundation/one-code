@@ -10,11 +10,14 @@ import { useEffect, useState } from "react";
 import { useOneViewCoreStore } from "@/lib/oneview/core-store";
 import { useNavStore } from "@/lib/oneview/nav-store";
 import { useUnitsStore } from "@/lib/oneview/units-store";
+import { useTimeStore } from "@/lib/oneview/time-store";
 import { OneNavBubbleField } from "./OneNavBubbleField";
 import { OneNavPreview } from "./OneNavPreview";
 import { OneJoystick } from "./OneJoystick";
 import { OneNavBackButton } from "./OneNavBackButton";
 import { UnitsDisplay } from "./UnitsDisplay";
+import { TimeScrubber } from "./TimeScrubber";
+import { LivingSummary } from "./LivingSummary";
 import { AnchorButton } from "./AnchorButton";
 import { InputBar } from "./InputBar";
 import { OneMicOverlay } from "./OneMicOverlay";
@@ -27,6 +30,7 @@ export function CoreOneView() {
   const coreStore = useOneViewCoreStore();
   const navStore = useNavStore();
   const unitsStore = useUnitsStore();
+  const timeStore = useTimeStore();
   
   const { initialize } = coreStore;
   const { mode, setMode, goBack, goHome } = navStore;
@@ -39,7 +43,27 @@ export function CoreOneView() {
   useEffect(() => {
     initialize();
     unitsStore.initialize(); // Initialize Units (check daily refill)
-  }, [initialize, unitsStore]);
+    
+    // Auto-compress yesterday's day at midnight
+    const checkDailyCompression = () => {
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
+      
+      // Check if we need to compress yesterday
+      const yesterdaySlice = timeStore.getTimeSlice("day", yesterdayStr);
+      if (yesterdaySlice && !yesterdaySlice.compressed) {
+        timeStore.compressDay(yesterdayStr);
+      }
+    };
+    
+    // Check on mount and set interval for daily check
+    checkDailyCompression();
+    const interval = setInterval(checkDailyCompression, 60 * 60 * 1000); // Check every hour
+    
+    return () => clearInterval(interval);
+  }, [initialize, unitsStore, timeStore]);
   
   // Handle voice confirm
   const handleVoiceConfirm = async (text: string, lang: UILang) => {
@@ -126,6 +150,9 @@ export function CoreOneView() {
         color: "var(--foreground)",
       }}
     >
+      {/* Time Scrubber */}
+      <TimeScrubber />
+      
       {/* Top Bar */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
         {/* Mode Toggle */}
@@ -176,6 +203,7 @@ export function CoreOneView() {
         <OneJoystick />
         <OneNavBubbleField />
         <OneNavPreview />
+        <LivingSummary unit="day" />
       </div>
       
       {/* Back Button */}
