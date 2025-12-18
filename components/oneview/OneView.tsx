@@ -15,6 +15,7 @@ import { CenterStage } from "./CenterStage";
 import { AnchorButton } from "./AnchorButton";
 import { InputBar } from "./InputBar";
 import { StagedOutput } from "./StagedOutput";
+import { VoiceOverlay } from "./VoiceOverlay";
 
 export function OneView() {
   const store = useOneViewStore();
@@ -22,6 +23,7 @@ export function OneView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stagedOutput, setStagedOutput] = useState<any>(null);
   const [showLedger, setShowLedger] = useState(false);
+  const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
   
   // Update time cursor every minute
   useEffect(() => {
@@ -31,7 +33,7 @@ export function OneView() {
     return () => clearInterval(interval);
   }, [store]);
   
-  // Handle input submit
+  // Handle input submit (shared by text input and voice)
   const handleSubmit = async (text: string) => {
     if (!text.trim()) return;
     
@@ -48,6 +50,16 @@ export function OneView() {
     }
     
     setIsSubmitting(false);
+  };
+  
+  // Handle voice mode open
+  const handleVoiceModeOpen = () => {
+    setIsVoiceModeOpen(true);
+  };
+  
+  // Handle voice mode close
+  const handleVoiceModeClose = () => {
+    setIsVoiceModeOpen(false);
   };
   
   // Handle long-press on input (toggle mode)
@@ -72,7 +84,7 @@ export function OneView() {
       </div>
       
       {/* Center Stage */}
-      <div className="relative w-full h-full flex items-center justify-center">
+      <div className={`relative w-full h-full flex items-center justify-center ${isVoiceModeOpen ? "pointer-events-none opacity-50" : ""}`}>
         <BubbleField />
         <CenterStage />
       </div>
@@ -96,8 +108,19 @@ export function OneView() {
           spheres={store.spheres}
           onTap={store.navigateBack}
           onLongPress={store.navigateHome}
+          onDoubleTap={handleVoiceModeOpen}
         />
       </div>
+      
+      {/* Voice Overlay */}
+      <VoiceOverlay
+        isOpen={isVoiceModeOpen}
+        onClose={handleVoiceModeClose}
+        onConfirm={(text) => {
+          // onConfirm is called before onSubmit, but we'll use onSubmit directly
+        }}
+        onSubmit={handleSubmit}
+      />
       
       {/* Dev: Ledger Toggle */}
       {process.env.NODE_ENV === "development" && (
