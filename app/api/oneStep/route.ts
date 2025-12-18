@@ -8,8 +8,36 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { OneStepSchema, OneStepRequest, OneStepResponse } from "@/lib/oneview/onestep-types";
 import { z } from "zod";
+
+// Minimal OneStep schema (keeping API structure but removing OneView dependencies)
+const OneStepSchema = z.object({
+  assistantLine: z.string(),
+  intent: z.enum(["create_card", "log", "plan", "import_global", "clarify"]),
+  domain: z.enum(["health", "money", "career", "relationships", "learning", "other"]),
+  bubblePath: z.array(z.string()),
+  card: z.object({
+    title: z.string(),
+    summary: z.string(),
+    estimatedMinutes: z.number(),
+    energyLevel: z.enum(["low", "medium", "high"]),
+    type: z.enum(["task", "log"]),
+  }).nullable(),
+  metricsHint: z.string().nullable(),
+  needsClarification: z.boolean(),
+  clarifyingQuestion: z.string().nullable(),
+});
+
+type OneStepRequest = {
+  userText: string;
+  currentPath?: string[];
+};
+
+type OneStepResponse = {
+  success: boolean;
+  step?: z.infer<typeof OneStepSchema>;
+  error?: string;
+};
 
 // System prompt for AI
 const SYSTEM_PROMPT = `You are a calm assistant that returns ONE actionable step only. Never return multiple steps or lists.
@@ -68,7 +96,7 @@ export async function POST(request: NextRequest) {
       // Fallback: return deterministic step based on keywords
       return NextResponse.json<OneStepResponse>({
         success: true,
-        step: generateFallbackStep(body.userText, body.currentPath),
+        step: generateFallbackStep(body.userText, body.currentPath || []),
       });
     }
     
@@ -96,7 +124,7 @@ export async function POST(request: NextRequest) {
       console.error("OpenAI error:", error);
       return NextResponse.json<OneStepResponse>({
         success: true,
-        step: generateFallbackStep(body.userText, body.currentPath),
+        step: generateFallbackStep(body.userText, body.currentPath || []),
       });
     }
     
@@ -106,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (!content) {
       return NextResponse.json<OneStepResponse>({
         success: true,
-        step: generateFallbackStep(body.userText, body.currentPath),
+        step: generateFallbackStep(body.userText, body.currentPath || []),
       });
     }
     
@@ -117,7 +145,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json<OneStepResponse>({
         success: true,
-        step: generateFallbackStep(body.userText, body.currentPath),
+        step: generateFallbackStep(body.userText, body.currentPath || []),
       });
     }
     
@@ -128,7 +156,7 @@ export async function POST(request: NextRequest) {
       console.error("Schema validation error:", validation.error);
       return NextResponse.json<OneStepResponse>({
         success: true,
-        step: generateFallbackStep(body.userText, body.currentPath),
+        step: generateFallbackStep(body.userText, body.currentPath || []),
       });
     }
     
@@ -197,4 +225,3 @@ function generateFallbackStep(userText: string, currentPath: string[]): z.infer<
     clarifyingQuestion: intent === "clarify" ? "What would you like to focus on?" : null,
   };
 }
-
