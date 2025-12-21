@@ -31,28 +31,31 @@ export function InputBar() {
         nodeIds: [], // Will attach to relevant nodes
       });
 
-      // Auto-attach to relevant nodes (simple keyword matching for now)
+      // Auto-attach to relevant nodes across worlds (keyword matching)
+      // Match against all nodes (spheres, clusters, worlds)
       const relevantNodes = Object.values(store.nodes).filter((node) => {
         const nodeName = node.name.toLowerCase();
         const textLower = text.toLowerCase();
         return textLower.includes(nodeName) || nodeName.includes(textLower);
       });
 
-      if (relevantNodes.length > 0) {
-        // Update moment with node IDs
-        moment.nodeIds = relevantNodes.map((n) => n.id);
-      } else if (classification.nodeName) {
-        // Create new node if suggested
-        const worldId = classification.domain === "health" ? "health" :
-                        classification.domain === "money" ? "money" : "career";
-        const newNode = store.createNode({
-          type: "sphere",
-          name: classification.nodeName,
-          parentId: null,
-          worldId,
-        });
-        moment.nodeIds = [newNode.id];
+      // Also match by domain to World nodes
+      if (classification.domain) {
+        const worldNode = Object.values(store.nodes).find(
+          (n) => n.type === "world" && n.worldId === classification.domain
+        );
+        if (worldNode && !relevantNodes.find((n) => n.id === worldNode.id)) {
+          relevantNodes.push(worldNode);
+        }
       }
+
+      if (relevantNodes.length > 0) {
+        // Attach moment to relevant nodes (can be multiple across worlds)
+        moment.nodeIds = relevantNodes.map((n) => n.id);
+      }
+      
+      // DO NOT auto-create new top-level nodes - only attach to existing ones
+      // User must explicitly create spheres via commands like "create sphere X under Y"
 
       setText("");
     } catch (error) {

@@ -11,11 +11,27 @@ import { useState } from "react";
 export function CardsList() {
   const store = useMVPStore();
   const { focusedNodeId, viewMode } = store;
+  const [showCreateCard, setShowCreateCard] = useState(false);
+  const [newCardTitle, setNewCardTitle] = useState("");
 
   if (viewMode !== "cards" || !focusedNodeId) return null;
 
   const cards = store.getCardsForNode(focusedNodeId);
   const node = store.nodes[focusedNodeId];
+
+  const handleCreateCard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCardTitle.trim()) return;
+
+    store.createCard({
+      nodeId: focusedNodeId,
+      title: newCardTitle.trim(),
+      status: "open",
+    });
+
+    setNewCardTitle("");
+    setShowCreateCard(false);
+  };
 
   return (
     <div
@@ -27,8 +43,46 @@ export function CardsList() {
     >
       {/* Header */}
       <div className="p-4 border-b border-white border-opacity-10">
-        <h1 className="text-xl font-medium">{node?.name}</h1>
-        <div className="text-sm opacity-60 mt-1">{cards.length} cards</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-medium">{node?.name}</h1>
+            <div className="text-sm opacity-60 mt-1">{cards.length} cards</div>
+          </div>
+          <button
+            onClick={() => setShowCreateCard(!showCreateCard)}
+            className="px-3 py-1 text-sm rounded transition-opacity hover:opacity-80"
+            style={{
+              backgroundColor: "rgba(255, 255, 255, 0.1)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+            }}
+          >
+            + Card
+          </button>
+        </div>
+        
+        {/* Create Card Input */}
+        {showCreateCard && (
+          <form onSubmit={handleCreateCard} className="mt-4">
+            <input
+              type="text"
+              value={newCardTitle}
+              onChange={(e) => setNewCardTitle(e.target.value)}
+              placeholder="Card title..."
+              autoFocus
+              className="w-full px-3 py-2 rounded text-sm"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                color: "#ffffff",
+              }}
+              onBlur={() => {
+                if (!newCardTitle.trim()) {
+                  setShowCreateCard(false);
+                }
+              }}
+            />
+          </form>
+        )}
       </div>
 
       {/* Cards List */}

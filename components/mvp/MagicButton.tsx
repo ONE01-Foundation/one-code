@@ -20,11 +20,47 @@ export function MagicButton({ nodeId }: MagicButtonProps) {
   const handleClick = async () => {
     setIsLoading(true);
     
-    // Get recent moments for this node
-    const nodeMoments = store.moments.filter((m) => m.nodeIds.includes(nodeId));
-    const momentTexts = nodeMoments.map((m) => m.rawText);
+    const node = store.nodes[nodeId];
+    if (!node) {
+      setIsLoading(false);
+      return;
+    }
     
-    // Generate insight
+    let momentTexts: string[] = [];
+    
+    // If World: aggregate from all descendants
+    if (node.type === "world") {
+      const allDescendants = Object.values(store.nodes).filter((n) => {
+        const isDescendant = (nid: string): boolean => {
+          const n = store.nodes[nid];
+          if (!n) return false;
+          if (n.id === nodeId) return true;
+          if (n.parentId === nodeId) return true;
+          if (n.parentId && isDescendant(n.parentId)) return true;
+          return false;
+        };
+        return n.id !== nodeId && isDescendant(n.id);
+      });
+      const descendantIds = [nodeId, ...allDescendants.map((n) => n.id)];
+      const allMoments = store.moments.filter((m) =>
+        m.nodeIds.some((nid) => descendantIds.includes(nid))
+      );
+      momentTexts = allMoments.map((m) => m.rawText);
+    } else if (node.type === "cluster") {
+      // Cluster: use its cards + moments
+      const clusterCards = store.getCardsForNode(nodeId);
+      const clusterMoments = store.moments.filter((m) => m.nodeIds.includes(nodeId));
+      momentTexts = [
+        ...clusterCards.map((c) => c.title),
+        ...clusterMoments.map((m) => m.rawText),
+      ];
+    } else {
+      // Sphere or other: use its moments
+      const nodeMoments = store.moments.filter((m) => m.nodeIds.includes(nodeId));
+      momentTexts = nodeMoments.map((m) => m.rawText);
+    }
+    
+    // Generate insight from collected texts
     const result = await generateInsight(nodeId, momentTexts);
     setInsight(result);
     setIsLoading(false);

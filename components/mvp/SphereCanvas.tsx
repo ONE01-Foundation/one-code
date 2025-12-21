@@ -48,17 +48,24 @@ export function SphereCanvas() {
     };
   }, []);
 
-  // Handle drag move
+  // Handle drag move with magnetic snap
   const handleNodeDragMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging || !dragStartRef.current) return;
 
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    const dx = e.clientX - centerX;
+    const dy = e.clientY - centerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // If dragged to center area (within 100px), focus it
-    if (distance < 100) {
-      store.setFocusedNode(dragStartRef.current.nodeId);
+    // Magnetic snap: smooth threshold at 120px
+    const snapThreshold = 120;
+    if (distance < snapThreshold) {
+      // Smooth magnetic effect
+      const snapStrength = 1 - (distance / snapThreshold);
+      if (snapStrength > 0.3) {
+        store.setFocusedNode(dragStartRef.current.nodeId);
+      }
     }
   }, [isDragging, store]);
 

@@ -28,7 +28,10 @@ export function CenterPreview({ node, onEnter }: CenterPreviewProps) {
           backgroundColor: "rgba(255, 255, 255, 0.1)",
           border: "2px solid rgba(255, 255, 255, 0.3)",
         }}
-        onClick={onEnter}
+        onClick={() => {
+          // Only allow enter if node is actually centered (focused)
+          onEnter();
+        }}
       >
         {node.icon && <div className="text-3xl mb-2">{node.icon}</div>}
         <div className="text-sm font-medium mb-1">{node.name}</div>

@@ -64,74 +64,120 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
     const nodes: Record<string, SphereNode> = {};
     const now = new Date().toISOString();
     
-    // Create initial spheres under each world
+    // Create World nodes (these are the top-level nodes shown on Home)
+    const worldNodeIds: Record<WorldId, string> = {} as any;
+    
     worlds.forEach((world) => {
-      if (world.id === "health") {
-        nodes[generateId()] = {
-          id: generateId(),
-          type: "sphere",
-          name: "Nutrition",
-          icon: "🥗",
-          parentId: null,
-          worldId: world.id,
-          createdAt: now,
-          lastActivityAt: now,
-        };
-        nodes[generateId()] = {
-          id: generateId(),
-          type: "sphere",
-          name: "Fitness",
-          icon: "💪",
-          parentId: null,
-          worldId: world.id,
-          createdAt: now,
-          lastActivityAt: now,
-        };
-      } else if (world.id === "money") {
-        nodes[generateId()] = {
-          id: generateId(),
-          type: "sphere",
-          name: "Income",
-          icon: "📈",
-          parentId: null,
-          worldId: world.id,
-          createdAt: now,
-          lastActivityAt: now,
-        };
-        nodes[generateId()] = {
-          id: generateId(),
-          type: "sphere",
-          name: "Expenses",
-          icon: "📉",
-          parentId: null,
-          worldId: world.id,
-          createdAt: now,
-          lastActivityAt: now,
-        };
-      } else if (world.id === "career") {
-        const projectsId = generateId();
-        nodes[projectsId] = {
-          id: projectsId,
-          type: "cluster",
-          name: "Projects",
-          icon: "🚀",
-          parentId: null,
-          worldId: world.id,
-          createdAt: now,
-          lastActivityAt: now,
-        };
-        nodes[generateId()] = {
-          id: generateId(),
-          type: "sphere",
-          name: "Skills",
-          icon: "🎯",
-          parentId: null,
-          worldId: world.id,
-          createdAt: now,
-          lastActivityAt: now,
-        };
-      }
+      const worldNodeId = `world_${world.id}`;
+      worldNodeIds[world.id] = worldNodeId;
+      nodes[worldNodeId] = {
+        id: worldNodeId,
+        type: "world",
+        name: world.name,
+        icon: world.icon,
+        parentId: null, // Worlds are root level
+        worldId: world.id,
+        createdAt: now,
+        lastActivityAt: now,
+      };
     });
+    
+    // Create Health children: Nutrition, Fitness, Sleep
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Nutrition",
+      icon: "🥗",
+      parentId: worldNodeIds.health,
+      worldId: "health",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Fitness",
+      icon: "💪",
+      parentId: worldNodeIds.health,
+      worldId: "health",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Sleep",
+      icon: "😴",
+      parentId: worldNodeIds.health,
+      worldId: "health",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    
+    // Create Money children: Income, Expenses, Debts
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Income",
+      icon: "📈",
+      parentId: worldNodeIds.money,
+      worldId: "money",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Expenses",
+      icon: "📉",
+      parentId: worldNodeIds.money,
+      worldId: "money",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Debts",
+      icon: "💳",
+      parentId: worldNodeIds.money,
+      worldId: "money",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    
+    // Create Career children: Projects, Clients, Skills
+    const projectsId = generateId();
+    nodes[projectsId] = {
+      id: projectsId,
+      type: "cluster",
+      name: "Projects",
+      icon: "🚀",
+      parentId: worldNodeIds.career,
+      worldId: "career",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Clients",
+      icon: "🤝",
+      parentId: worldNodeIds.career,
+      worldId: "career",
+      createdAt: now,
+      lastActivityAt: now,
+    };
+    nodes[generateId()] = {
+      id: generateId(),
+      type: "sphere",
+      name: "Skills",
+      icon: "🎯",
+      parentId: worldNodeIds.career,
+      worldId: "career",
+      createdAt: now,
+      lastActivityAt: now,
+    };
     
     set({ worlds, nodes });
   },
@@ -210,6 +256,10 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
     const node = get().nodes[id];
     if (!node) return;
     
+    // Only allow entering if node is actually focused (centered)
+    const { focusedNodeId } = get();
+    if (focusedNodeId !== id) return;
+    
     const children = get().getChildren(id);
     
     if (children.length > 0) {
@@ -220,7 +270,7 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
         focusedNodeId: children[0]?.id || null,
       });
     } else {
-      // No children - show cards
+      // No children - show cards (for clusters/projects)
       set({
         currentPath: [...get().currentPath, node.name],
         viewMode: "cards",
@@ -282,6 +332,15 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
   
   getChildren: (parentId) => {
     const { nodes } = get();
+    
+    // If parentId is null, return only World nodes (top-level)
+    if (parentId === null) {
+      return Object.values(nodes).filter(
+        (n) => n.type === "world" && !n.hidden
+      );
+    }
+    
+    // Otherwise return direct children
     return Object.values(nodes).filter(
       (n) => n.parentId === parentId && !n.hidden
     );
