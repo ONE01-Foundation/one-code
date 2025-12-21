@@ -4,11 +4,11 @@
 
 "use client";
 
-import { SphereNode } from "@/lib/one/types";
+import { Sphere as SphereType } from "@/lib/one/types";
 import { Sphere } from "./Sphere";
 
 interface OrbitProps {
-  spheres: SphereNode[];
+  spheres: SphereType[];
   rotation: number;
   onSphereTap: (id: string) => void;
 }
@@ -39,7 +39,7 @@ export function Orbit({ spheres, rotation, onSphereTap }: OrbitProps) {
               onSphereTap(sphere.id);
             }}
           >
-            <Sphere node={sphere} />
+            <Sphere sphere={sphere} />
           </div>
         );
       })}

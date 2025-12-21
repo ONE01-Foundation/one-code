@@ -1,6 +1,6 @@
 "use client";
 
-import { OneView } from "@/components/one/OneView";
+import { OneView } from "@/components/mvp/OneView";
 
 export default function Home() {
   return <OneView />;
