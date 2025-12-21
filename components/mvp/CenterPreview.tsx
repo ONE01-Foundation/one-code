@@ -15,6 +15,7 @@ interface CenterPreviewProps {
 export function CenterPreview({ node, onEnter }: CenterPreviewProps) {
   const store = useMVPStore();
   const metrics = store.getMetrics(node.id);
+  const unitsToday = store.getUnitsToday(node.id);
 
   return (
     <div
@@ -40,6 +41,7 @@ export function CenterPreview({ node, onEnter }: CenterPreviewProps) {
         <div className="text-xs opacity-60 mt-2 space-y-1">
           <div>{metrics.openCards} open cards</div>
           <div>{metrics.momentsToday} moments today</div>
+          <div>{unitsToday} units today</div>
         </div>
       </div>
       

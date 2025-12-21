@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useMVPStore } from "@/lib/mvp/store";
 import { classifyInput } from "@/lib/mvp/ai";
+import { DraftMoment } from "@/lib/mvp/types";
 
 export function InputBar() {
   const store = useMVPStore();

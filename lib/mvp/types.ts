@@ -40,6 +40,19 @@ export interface Moment {
   intent?: string;
   domain?: string;
   nodeIds: string[]; // Attached sphere nodes
+  cardId?: string; // Optional link to card
+  units: number; // Word count
   createdAt: string;
+}
+
+export interface DraftMoment {
+  text: string;
+  proposedTags: string[]; // Node names
+  proposedWorldIds: WorldId[];
+  proposedNodeIds: string[]; // Node IDs
+  confidence?: number;
+  suggestedCardTitle?: string;
+  suggestedCardType?: string;
+  suggestedNextStep?: string;
 }
 

@@ -6,7 +6,7 @@
  */
 
 import { create } from "zustand";
-import { World, SphereNode, Card, Moment, WorldId, NodeType } from "./types";
+import { World, SphereNode, Card, Moment, WorldId, NodeType, DraftMoment } from "./types";
 
 interface MVPStore {
   // Data
@@ -19,19 +19,25 @@ interface MVPStore {
   focusedNodeId: string | null;
   currentPath: string[]; // Breadcrumb path
   viewMode: "home" | "drill" | "cards";
+  draftMoment: DraftMoment | null;
+  showMomentPreview: boolean;
   
   // Actions
   initialize: () => void;
   createNode: (node: Omit<SphereNode, "id" | "createdAt" | "lastActivityAt">) => SphereNode;
   updateNode: (id: string, updates: Partial<SphereNode>) => void;
   createCard: (card: Omit<Card, "id" | "createdAt" | "updatedAt">) => Card;
-  createMoment: (moment: Omit<Moment, "id" | "createdAt">) => Moment;
+  createMoment: (moment: Omit<Moment, "id" | "createdAt" | "units">) => Moment;
+  createDraftMoment: (draft: DraftMoment) => void;
+  commitDraftMoment: (options: { createCard?: boolean; cardTitle?: string; selectedNodeIds: string[] }) => void;
+  cancelDraftMoment: () => void;
   setFocusedNode: (id: string | null) => void;
   enterNode: (id: string) => void;
   goBack: () => void;
   getChildren: (parentId: string | null) => SphereNode[];
   getCardsForNode: (nodeId: string) => Card[];
   getMetrics: (nodeId: string) => { openCards: number; momentsToday: number };
+  getUnitsToday: (nodeId: string) => number;
   updateCard: (id: string, updates: Partial<Card>) => void;
 }
 
@@ -53,6 +59,8 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
   focusedNodeId: null,
   currentPath: [],
   viewMode: "home",
+  draftMoment: null,
+  showMomentPreview: false,
   
   initialize: () => {
     const worlds: World[] = [
@@ -231,9 +239,13 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
   },
   
   createMoment: (data) => {
+    // Calculate units (word count)
+    const wordCount = data.rawText.trim().split(/\s+/).filter(w => w.length > 0).length;
+    
     const moment: Moment = {
       id: generateId(),
       ...data,
+      units: wordCount,
       createdAt: new Date().toISOString(),
     };
     set((state) => ({
@@ -246,6 +258,76 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
     });
     
     return moment;
+  },
+  
+  createDraftMoment: (draft) => {
+    set({
+      draftMoment: draft,
+      showMomentPreview: true,
+    });
+  },
+  
+  commitDraftMoment: (options) => {
+    const { draftMoment } = get();
+    if (!draftMoment) return;
+    
+    // Create the actual moment
+    const moment = get().createMoment({
+      rawText: draftMoment.text,
+      intent: "log",
+      domain: draftMoment.proposedWorldIds[0] || "other",
+      nodeIds: options.selectedNodeIds,
+    });
+    
+    // Create card if requested
+    if (options.createCard && options.cardTitle) {
+      // Determine best parent node
+      let parentNodeId: string | null = null;
+      
+      // Default parent = current focused node if not root
+      const { focusedNodeId, viewMode } = get();
+      if (focusedNodeId && viewMode !== "home") {
+        const focusedNode = get().nodes[focusedNodeId];
+        if (focusedNode && focusedNode.type !== "world") {
+          parentNodeId = focusedNodeId;
+        }
+      }
+      
+      // Else parent = first selected node (if it's a sphere/cluster)
+      if (!parentNodeId && options.selectedNodeIds.length > 0) {
+        const firstNode = get().nodes[options.selectedNodeIds[0]];
+        if (firstNode && (firstNode.type === "sphere" || firstNode.type === "cluster")) {
+          parentNodeId = firstNode.id;
+        }
+      }
+      
+      if (parentNodeId) {
+        const card = get().createCard({
+          nodeId: parentNodeId,
+          title: options.cardTitle,
+          status: "open",
+        });
+        
+        // Link moment to card
+        moment.cardId = card.id;
+        set((state) => ({
+          moments: state.moments.map((m) => m.id === moment.id ? moment : m),
+        }));
+      }
+    }
+    
+    // Clear draft
+    set({
+      draftMoment: null,
+      showMomentPreview: false,
+    });
+  },
+  
+  cancelDraftMoment: () => {
+    set({
+      draftMoment: null,
+      showMomentPreview: false,
+    });
   },
   
   setFocusedNode: (id) => {
@@ -351,8 +433,79 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
     return Object.values(cards).filter((c) => c.nodeId === nodeId);
   },
   
+  getUnitsToday: (nodeId) => {
+    const { moments, nodes } = get();
+    const node = nodes[nodeId];
+    if (!node) return 0;
+    
+    const todayStart = getTodayStart();
+    
+    // If World, aggregate from descendants
+    if (node.type === "world") {
+      const allDescendants = Object.values(nodes).filter((n) => {
+        const isDescendant = (nid: string): boolean => {
+          const n = nodes[nid];
+          if (!n) return false;
+          if (n.id === nodeId) return true;
+          if (n.parentId === nodeId) return true;
+          if (n.parentId && isDescendant(n.parentId)) return true;
+          return false;
+        };
+        return n.id !== nodeId && isDescendant(n.id);
+      });
+      const descendantIds = [nodeId, ...allDescendants.map((n) => n.id)];
+      const allMoments = moments.filter((m) =>
+        m.nodeIds.some((nid) => descendantIds.includes(nid)) &&
+        m.createdAt >= todayStart
+      );
+      return allMoments.reduce((sum, m) => sum + m.units, 0);
+    }
+    
+    // For non-World nodes
+    const nodeMoments = moments.filter(
+      (m) => m.nodeIds.includes(nodeId) && m.createdAt >= todayStart
+    );
+    return nodeMoments.reduce((sum, m) => sum + m.units, 0);
+  },
+  
   getMetrics: (nodeId) => {
-    const { cards, moments } = get();
+    const { cards, moments, nodes } = get();
+    const node = nodes[nodeId];
+    if (!node) return { openCards: 0, momentsToday: 0 };
+    
+    // If it's a World, aggregate from all descendants
+    if (node.type === "world") {
+      const allDescendants = Object.values(nodes).filter((n) => {
+        const isDescendant = (nid: string): boolean => {
+          const n = nodes[nid];
+          if (!n) return false;
+          if (n.id === nodeId) return true;
+          if (n.parentId === nodeId) return true;
+          if (n.parentId && isDescendant(n.parentId)) return true;
+          return false;
+        };
+        return n.id !== nodeId && isDescendant(n.id);
+      });
+      
+      const descendantIds = allDescendants.map((n) => n.id);
+      const allCards = Object.values(cards).filter((c) => 
+        descendantIds.includes(c.nodeId)
+      );
+      const openCards = allCards.filter((c) => c.status === "open").length;
+      
+      const todayStart = getTodayStart();
+      const allMoments = moments.filter((m) => 
+        m.nodeIds.some((nid) => descendantIds.includes(nid) || nid === nodeId) && 
+        m.createdAt >= todayStart
+      );
+      
+      return {
+        openCards,
+        momentsToday: allMoments.length,
+      };
+    }
+    
+    // For non-World nodes, calculate normally
     const nodeCards = Object.values(cards).filter((c) => c.nodeId === nodeId);
     const openCards = nodeCards.filter((c) => c.status === "open").length;
     
