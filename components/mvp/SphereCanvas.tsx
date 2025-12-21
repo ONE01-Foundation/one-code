@@ -95,11 +95,12 @@ export function SphereCanvas() {
           const x = Math.cos(angle) * radius;
           const y = Math.sin(angle) * radius;
 
-          // Calculate opacity based on recency
-          const lastActivity = new Date(node.lastActivityAt).getTime();
-          const now = Date.now();
-          const daysSinceActivity = (now - lastActivity) / (1000 * 60 * 60 * 24);
-          const opacity = Math.max(0.3, 1.0 - daysSinceActivity * 0.1);
+          // Calculate heat-based opacity and scale
+          const heat = store.getNodeHeat(node.id);
+          const opacity = 0.35 + 0.65 * heat;
+          const scale = node.type === "world" 
+            ? Math.min(1.03, 0.92 + 0.12 * heat) // Clamp Worlds to max 1.03
+            : 0.92 + 0.12 * heat;
 
           return (
             <SphereNode
@@ -109,6 +110,7 @@ export function SphereCanvas() {
               y={y}
               isFocused={isFocused}
               opacity={opacity}
+              scale={scale}
               onDragStart={(e) => handleNodeDragStart(node.id, e)}
               onTap={() => store.setFocusedNode(node.id)}
               onLongPress={() => {
@@ -130,7 +132,12 @@ export function SphereCanvas() {
 
       {/* Magic Button */}
       {focusedNode && (
-        <MagicButton nodeId={focusedNode.id} />
+        <MagicButton 
+          nodeId={focusedNode.id}
+          onInsightGenerated={(insight) => {
+            window.dispatchEvent(new CustomEvent("magic:insight", { detail: { insight } }));
+          }}
+        />
       )}
 
       {/* Breadcrumb Bar */}

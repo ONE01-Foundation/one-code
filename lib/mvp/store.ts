@@ -21,6 +21,7 @@ interface MVPStore {
   viewMode: "home" | "drill" | "cards";
   draftMoment: DraftMoment | null;
   showMomentPreview: boolean;
+  isListening: boolean; // Voice-ready UI state
   
   // Actions
   initialize: () => void;
@@ -38,7 +39,9 @@ interface MVPStore {
   getCardsForNode: (nodeId: string) => Card[];
   getMetrics: (nodeId: string) => { openCards: number; momentsToday: number };
   getUnitsToday: (nodeId: string) => number;
+  getNodeHeat: (nodeId: string) => number; // 0..1 heat value
   updateCard: (id: string, updates: Partial<Card>) => void;
+  setListening: (listening: boolean) => void;
 }
 
 function generateId(): string {
@@ -61,6 +64,7 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
   viewMode: "home",
   draftMoment: null,
   showMomentPreview: false,
+  isListening: false,
   
   initialize: () => {
     const worlds: World[] = [
@@ -534,6 +538,45 @@ export const useMVPStore = create<MVPStore>((set, get) => ({
         },
       };
     });
+  },
+  
+  setListening: (listening) => {
+    set({ isListening: listening });
+  },
+  
+  getNodeHeat: (nodeId) => {
+    const { nodes, moments, cards } = get();
+    const node = nodes[nodeId];
+    if (!node) return 0;
+    
+    // Don't apply heat to Worlds (too strong)
+    if (node.type === "world") return 0.5; // Fixed moderate value
+    
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const lastActivity = new Date(node.lastActivityAt).getTime();
+    
+    // Recent activity (within 7 days) => 0..1
+    const recent = lastActivity >= sevenDaysAgo 
+      ? 1 - (now - lastActivity) / (7 * 24 * 60 * 60 * 1000)
+      : 0;
+    
+    // Moments today
+    const todayStart = getTodayStart();
+    const nodeMoments = moments.filter(
+      (m) => m.nodeIds.includes(nodeId) && m.createdAt >= todayStart
+    );
+    const momentsScore = Math.min(1, nodeMoments.length / 5);
+    
+    // Open cards
+    const nodeCards = Object.values(cards).filter((c) => c.nodeId === nodeId);
+    const openCards = nodeCards.filter((c) => c.status === "open").length;
+    const cardsScore = Math.min(1, openCards / 5);
+    
+    // Weighted heat: 0.5*recent + 0.3*moments + 0.2*openCards
+    const heat = 0.5 * recent + 0.3 * momentsScore + 0.2 * cardsScore;
+    
+    return Math.max(0, Math.min(1, heat));
   },
 }));
 

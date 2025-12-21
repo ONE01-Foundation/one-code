@@ -13,6 +13,7 @@ interface SphereNodeProps {
   y: number;
   isFocused: boolean;
   opacity: number;
+  scale: number;
   onDragStart: (e: React.PointerEvent) => void;
   onTap: () => void;
   onLongPress: () => void;
@@ -24,11 +25,13 @@ export function SphereNode({
   y,
   isFocused,
   opacity,
+  scale,
   onDragStart,
   onTap,
   onLongPress,
 }: SphereNodeProps) {
-  const size = isFocused ? 80 : 60;
+  const baseSize = isFocused ? 80 : 60;
+  const size = baseSize * scale;
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -55,7 +58,7 @@ export function SphereNode({
       style={{
         left: `calc(50% + ${x}px)`,
         top: `calc(50% + ${y}px)`,
-        transform: "translate(-50%, -50%)",
+        transform: `translate(-50%, -50%) scale(${isFocused ? 1.1 : scale})`,
         width: `${size}px`,
         height: `${size}px`,
         backgroundColor: isFocused
@@ -65,7 +68,6 @@ export function SphereNode({
           isFocused ? "rgba(255, 255, 255, 0.4)" : "rgba(255, 255, 255, 0.2)"
         }`,
         opacity,
-        scale: isFocused ? 1.1 : 1.0,
       }}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}

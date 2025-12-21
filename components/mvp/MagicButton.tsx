@@ -10,9 +10,10 @@ import { generateInsight } from "@/lib/mvp/ai";
 
 interface MagicButtonProps {
   nodeId: string;
+  onInsightGenerated?: (insight: string) => void;
 }
 
-export function MagicButton({ nodeId }: MagicButtonProps) {
+export function MagicButton({ nodeId, onInsightGenerated }: MagicButtonProps) {
   const store = useMVPStore();
   const [insight, setInsight] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +64,7 @@ export function MagicButton({ nodeId }: MagicButtonProps) {
     // Generate insight from collected texts
     const result = await generateInsight(nodeId, momentTexts);
     setInsight(result);
+    onInsightGenerated?.(result);
     setIsLoading(false);
   };
 
