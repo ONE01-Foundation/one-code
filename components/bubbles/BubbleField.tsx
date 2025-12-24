@@ -57,8 +57,11 @@ export default function BubbleField({
 
   const updatePositions = useCallback(() => {
     if (containerRef.current) {
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
+      // Use actual viewport dimensions with safe area
+      const rect = containerRef.current.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+      
       const positions = generateHoneycombPositions(
         bubbles.length,
         width,
@@ -68,13 +71,21 @@ export default function BubbleField({
       
       // Center the home bubble initially
       // The first bubble (home) is generated at centerX, centerY
-      // So panOffset should be 0,0 to center it on screen
+      // Calculate actual viewport center accounting for safe areas
       if (positions.length > 0) {
         const homeIndex = bubbles.findIndex((b) => b.id === homeBubble.id);
         if (homeIndex === 0 && positions[0]) {
-          // Home bubble is at index 0, positioned at center
-          // No offset needed - it's already at screen center
-          setPanOffset({ x: 0, y: 0 });
+          const viewportCenterX = width / 2;
+          const viewportCenterY = height / 2;
+          const homePos = positions[0];
+          
+          // Calculate offset to center the home bubble
+          const offset = {
+            x: viewportCenterX - homePos.x,
+            y: viewportCenterY - homePos.y,
+          };
+          
+          setPanOffset(offset);
           setVelocity({ x: 0, y: 0 });
           // Immediately notify that home bubble is centered
           setTimeout(() => {
@@ -86,14 +97,29 @@ export default function BubbleField({
   }, [bubbles.length, bubbles, homeBubble, onCenteredBubbleChange]);
 
   useEffect(() => {
-    updatePositions();
+    // Initial positioning
+    const timer = setTimeout(() => {
+      updatePositions();
+    }, 100);
     
     const handleResize = () => {
       updatePositions();
     };
     
+    const handleOrientationChange = () => {
+      setTimeout(() => {
+        updatePositions();
+      }, 200);
+    };
+    
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleOrientationChange);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleOrientationChange);
+    };
   }, [updatePositions]);
 
   // Find closest bubble to center
@@ -301,7 +327,12 @@ export default function BubbleField({
     <div
       ref={containerRef}
       className="absolute inset-0 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing touch-none"
-      style={{ touchAction: "none" }}
+      style={{ 
+        touchAction: "none",
+        width: "100vw",
+        minHeight: "100vh",
+        height: "100dvh",
+      }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

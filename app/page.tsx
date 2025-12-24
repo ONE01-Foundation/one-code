@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import TopBar from "@/components/bubbles/TopBar";
 import BottomBar from "@/components/bubbles/BottomBar";
 import BubbleField from "@/components/bubbles/BubbleField";
+import InputBar from "@/components/bubbles/InputBar";
 
 export type Bubble = {
   id: string;
@@ -50,7 +51,15 @@ export default function Home() {
   }, []);
 
   const handleThemeToggle = useCallback(() => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    setTheme((prev) => {
+      const newTheme = prev === "light" ? "dark" : "light";
+      // Update theme-color meta tag
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) {
+        meta.setAttribute("content", newTheme === "dark" ? "#000000" : "#FFFFFF");
+      }
+      return newTheme;
+    });
   }, []);
 
   const handleCenteredBubbleChange = useCallback((bubble: Bubble | null) => {
@@ -66,11 +75,28 @@ export default function Home() {
     setTargetBubble(homeBubble);
   }, [homeBubble]);
 
+  // Update theme-color on mount and theme change
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
+    }
+  }, [theme]);
+
   return (
     <div
       className={`fixed inset-0 overflow-hidden transition-colors duration-300 ${
         theme === "dark" ? "bg-black" : "bg-white"
       }`}
+      style={{
+        width: "100vw",
+        minHeight: "100vh",
+        height: "100dvh",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
+      }}
       dir={isRTL ? "rtl" : "ltr"}
     >
       <TopBar
@@ -91,13 +117,19 @@ export default function Home() {
       />
 
 
-      {!isHomeBubbleCentered && centeredBubble && (
+      {centeredBubble && (
         <BottomBar
           theme={theme}
           onBackToHome={handleBackToHome}
           isRTL={isRTL}
+          isHomeBubble={isHomeBubbleCentered}
         />
       )}
+
+      <InputBar
+        theme={theme}
+        isRTL={isRTL}
+      />
     </div>
   );
 }

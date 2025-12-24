@@ -6,18 +6,26 @@ interface BottomBarProps {
   theme: "light" | "dark";
   onBackToHome: () => void;
   isRTL: boolean;
+  isHomeBubble?: boolean;
 }
 
 export default function BottomBar({
   theme,
   onBackToHome,
   isRTL,
+  isHomeBubble = false,
 }: BottomBarProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(!isHomeBubble);
   const [isHovered, setIsHovered] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // For home bubble, always show icon-only
+    if (isHomeBubble) {
+      setIsExpanded(false);
+      return;
+    }
+    
     // Start expanded, then collapse after 3 seconds
     setIsExpanded(true);
     
@@ -35,7 +43,7 @@ export default function BottomBar({
         timeoutRef.current = null;
       }
     };
-  }, [isHovered]);
+  }, [isHovered, isHomeBubble]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -67,16 +75,22 @@ export default function BottomBar({
   return (
     <div
       className={`fixed bottom-0 left-0 right-0 z-40 pointer-events-none
-        h-32 bg-gradient-to-t ${
+        h-40 bg-gradient-to-t ${
           theme === "dark"
             ? "from-black via-black/80 to-transparent"
             : "from-white via-white/80 to-transparent"
         }`}
+      style={{
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
     >
       <div
-        className={`absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center justify-center
+        className={`absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center justify-center
           ${isRTL ? "flex-row-reverse" : ""}
         `}
+        style={{
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 3rem)",
+        }}
       >
         <button
           onClick={onBackToHome}
@@ -100,11 +114,13 @@ export default function BottomBar({
           aria-label="Back to Home"
           title="Back to Home"
         >
-          <span className={`text-sm font-medium transition-all duration-300 ${
-            isExpanded ? "opacity-100 max-w-[200px]" : "opacity-0 max-w-0 overflow-hidden"
-          }`}>
-            Back to Home
-          </span>
+          {!isHomeBubble && (
+            <span className={`text-sm font-medium transition-all duration-300 ${
+              isExpanded ? "opacity-100 max-w-[200px]" : "opacity-0 max-w-0 overflow-hidden"
+            }`}>
+              Back to Home
+            </span>
+          )}
           <span className="text-lg flex-shrink-0">🏠</span>
         </button>
       </div>

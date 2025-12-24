@@ -45,13 +45,14 @@ export default function TopBar({ theme, aiText, isRTL }: TopBarProps) {
         }`}
     >
       <div
-        className={`absolute top-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-8
+        className={`absolute top-16 left-1/2 -translate-x-1/2 w-full max-w-2xl px-8
           transition-opacity duration-500 ${isVisible ? "opacity-100" : "opacity-0"}
           text-center
         `}
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         <p
-          className={`text-sm ${
+          className={`text-base md:text-lg ${
             theme === "dark" ? "text-white/80" : "text-black/80"
           }`}
         >
