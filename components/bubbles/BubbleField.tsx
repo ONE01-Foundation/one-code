@@ -67,16 +67,14 @@ export default function BubbleField({
       setBubblePositions(positions);
       
       // Center the home bubble initially
+      // The first bubble (home) is generated at centerX, centerY
+      // So panOffset should be 0,0 to center it on screen
       if (positions.length > 0) {
-        const center = { x: width / 2, y: height / 2 };
         const homeIndex = bubbles.findIndex((b) => b.id === homeBubble.id);
-        if (homeIndex >= 0 && positions[homeIndex]) {
-          const homePos = positions[homeIndex];
-          const offset = {
-            x: center.x - homePos.x,
-            y: center.y - homePos.y,
-          };
-          setPanOffset(offset);
+        if (homeIndex === 0 && positions[0]) {
+          // Home bubble is at index 0, positioned at center
+          // No offset needed - it's already at screen center
+          setPanOffset({ x: 0, y: 0 });
           setVelocity({ x: 0, y: 0 });
           // Immediately notify that home bubble is centered
           setTimeout(() => {
