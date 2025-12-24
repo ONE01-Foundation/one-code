@@ -45,6 +45,16 @@ export default function BubbleField({
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
 
+  // Calculate center point (viewport center)
+  const getCenterPoint = useCallback((): Position => {
+    if (!containerRef.current) return { x: 0, y: 0 };
+    const rect = containerRef.current.getBoundingClientRect();
+    return {
+      x: rect.width / 2,
+      y: rect.height / 2,
+    };
+  }, []);
+
   const updatePositions = useCallback(() => {
     if (containerRef.current) {
       const positions = generateHoneycombPositions(
@@ -53,8 +63,22 @@ export default function BubbleField({
         containerRef.current.clientHeight
       );
       setBubblePositions(positions);
+      
+      // Center the home bubble initially
+      if (positions.length > 0) {
+        const center = getCenterPoint();
+        const homeIndex = bubbles.findIndex((b) => b.id === homeBubble.id);
+        if (homeIndex >= 0 && positions[homeIndex]) {
+          const homePos = positions[homeIndex];
+          setPanOffset({
+            x: center.x - homePos.x,
+            y: center.y - homePos.y,
+          });
+          setVelocity({ x: 0, y: 0 });
+        }
+      }
     }
-  }, [bubbles.length]);
+  }, [bubbles.length, bubbles, homeBubble, getCenterPoint]);
 
   useEffect(() => {
     updatePositions();
@@ -66,16 +90,6 @@ export default function BubbleField({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [updatePositions]);
-
-  // Calculate center point (viewport center)
-  const getCenterPoint = useCallback((): Position => {
-    if (!containerRef.current) return { x: 0, y: 0 };
-    const rect = containerRef.current.getBoundingClientRect();
-    return {
-      x: rect.width / 2,
-      y: rect.height / 2,
-    };
-  }, []);
 
   // Find closest bubble to center
   const findClosestBubble = useCallback((): BubbleType | null => {
@@ -232,15 +246,20 @@ export default function BubbleField({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Prevent default to avoid scrolling issues on mobile
+    e.preventDefault();
     const touch = e.touches[0];
     setIsDragging(true);
     setDragStart({ x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y });
     setVelocity({ x: 0, y: 0 });
+    setLastMovePos({ x: touch.clientX - dragStart.x, y: touch.clientY - dragStart.y });
+    setLastMoveTime(Date.now());
     handleInteraction();
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
+    e.preventDefault(); // Prevent scrolling on mobile
     handleInteraction();
     
     const touch = e.touches[0];
@@ -269,7 +288,8 @@ export default function BubbleField({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
+      className="absolute inset-0 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing touch-none"
+      style={{ touchAction: "none" }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -327,7 +347,8 @@ function generateHoneycombPositions(
   height: number = 1080
 ): Position[] {
   const positions: Position[] = [];
-  const spacing = 180;
+  // Adjust spacing based on screen size (smaller on mobile)
+  const spacing = Math.min(180, Math.min(width, height) * 0.25);
   const centerX = width / 2;
   const centerY = height / 2;
 
