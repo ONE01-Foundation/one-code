@@ -47,10 +47,14 @@ export default function BubbleField({
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
 
-  // Calculate center point (viewport center)
+  // Calculate center point (viewport center) - use visualViewport when available
   const getCenterPoint = useCallback((): Position => {
     if (!containerRef.current) return { x: 0, y: 0 };
+    
+    // Prefer visualViewport for mobile (accounts for keyboard, etc.)
+    const vp = window.visualViewport || window;
     const rect = containerRef.current.getBoundingClientRect();
+    
     return {
       x: rect.width / 2,
       y: rect.height / 2,
@@ -160,11 +164,17 @@ export default function BubbleField({
     
     window.addEventListener("resize", handleResize);
     window.addEventListener("orientationchange", handleOrientationChange);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleResize);
+    }
     
     return () => {
       clearTimeout(timer);
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("orientationchange", handleOrientationChange);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", handleResize);
+      }
     };
   }, [updatePositions]);
 

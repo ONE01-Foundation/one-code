@@ -41,13 +41,6 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
             clearInterval(wordIntervalRef.current);
             wordIntervalRef.current = null;
           }
-          // Show caret briefly before "Now?"
-          setTimeout(() => {
-            if (!isFocused && !inputValue) {
-              setShowCaret(true);
-              setTimeout(() => setShowCaret(false), 1000);
-            }
-          }, 500);
           return next;
         }
         return next;
@@ -82,17 +75,37 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
     };
   }, [isFocused, inputValue]);
 
+  // Show blinking caret occasionally when at "Now?" and not focused
+  useEffect(() => {
+    if (isFocused || inputValue || currentWordIndex !== PLACEHOLDER_WORDS.length - 1) {
+      setShowCaret(false);
+      return;
+    }
+
+    // Show caret occasionally (every 3-5 seconds)
+    const showCaretInterval = setInterval(() => {
+      if (!isFocused && !inputValue && currentWordIndex === PLACEHOLDER_WORDS.length - 1) {
+        setShowCaret(true);
+        setTimeout(() => setShowCaret(false), 1500);
+      }
+    }, 4000);
+
+    return () => clearInterval(showCaretInterval);
+  }, [isFocused, inputValue, currentWordIndex]);
+
   const handleModeToggle = () => {
     setMode((prev) => {
       const newMode = prev === "private" ? "global" : "private";
       
-      // Show mode text temporarily
+      // Replace placeholder text with mode text
       setShowModeText(true);
       if (modeTextTimeoutRef.current) {
         clearTimeout(modeTextTimeoutRef.current);
       }
       modeTextTimeoutRef.current = setTimeout(() => {
         setShowModeText(false);
+        // Return to "Now?" after showing mode text
+        setCurrentWordIndex(PLACEHOLDER_WORDS.length - 1);
       }, 1000) as NodeJS.Timeout;
       
       return newMode;
@@ -112,6 +125,7 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
       wordIntervalRef.current = null;
     }
     setShowCaret(false);
+    setShowModeText(false);
     // Clear placeholder text
     if (!inputValue) {
       setInputValue("");

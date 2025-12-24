@@ -36,19 +36,6 @@ function getAutoTheme(): "light" | "dark" {
   return "dark";
 }
 
-function lerpColor(
-  color1: string,
-  color2: string,
-  factor: number
-): string {
-  // Simple lerp for hex colors (black/white)
-  if (color1 === "#000000" && color2 === "#FFFFFF") {
-    const gray = Math.round(255 * factor);
-    return `rgb(${gray}, ${gray}, ${gray})`;
-  }
-  return factor > 0.5 ? color2 : color1;
-}
-
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">(getAutoTheme());
   const [autoTheme, setAutoTheme] = useState(true);
@@ -57,6 +44,7 @@ export default function Home() {
   const [targetBubble, setTargetBubble] = useState<Bubble | null>(null);
   const [lang, setLang] = useState<"en" | "he">("en");
   const [isRTL, setIsRTL] = useState(false);
+  const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
 
   // First bubble is the origin/home bubble
   const originBubble = bubbles[0];
@@ -93,15 +81,26 @@ export default function Home() {
 
   const handleThemeToggle = useCallback(() => {
     setAutoTheme(false); // Disable auto theme when manually toggled
-    setTheme((prev) => {
-      const newTheme = prev === "light" ? "dark" : "light";
-      // Update theme-color meta tag
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) {
-        meta.setAttribute("content", newTheme === "dark" ? "#000000" : "#FFFFFF");
-      }
-      return newTheme;
-    });
+    
+    // Animate bars out
+    setIsThemeTransitioning(true);
+    
+    setTimeout(() => {
+      setTheme((prev) => {
+        const newTheme = prev === "light" ? "dark" : "light";
+        // Update theme-color meta tag
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+          meta.setAttribute("content", newTheme === "dark" ? "#000000" : "#FFFFFF");
+        }
+        return newTheme;
+      });
+      
+      // Animate bars back in
+      setTimeout(() => {
+        setIsThemeTransitioning(false);
+      }, 50);
+    }, 300);
   }, []);
 
   const handleCenteredBubbleChange = useCallback((bubble: Bubble | null) => {
@@ -132,9 +131,6 @@ export default function Home() {
         width: "100vw",
         minHeight: "100vh",
         height: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         paddingLeft: "env(safe-area-inset-left, 0px)",
@@ -158,21 +154,22 @@ export default function Home() {
         centeredBubble={centeredBubble}
       />
 
-      {/* Layer 3: Top overlay bar */}
+      {/* Layer 3: Top overlay bar - always present */}
       <TopBar
         theme={theme}
         aiText={centeredBubble?.aiText || null}
         isRTL={isRTL}
+        isTransitioning={isThemeTransitioning}
       />
 
-      {/* Layer 4: Bottom overlay + InputBar + Action button */}
-      {!isOriginBubbleCentered && centeredBubble && (
-        <BottomBar
-          theme={theme}
-          onBackToHome={handleBackToHome}
-          isRTL={isRTL}
-        />
-      )}
+      {/* Layer 4: Bottom overlay - always present, action button only when needed */}
+      <BottomBar
+        theme={theme}
+        onBackToHome={handleBackToHome}
+        isRTL={isRTL}
+        showActionButton={!isOriginBubbleCentered && centeredBubble !== null}
+        isTransitioning={isThemeTransitioning}
+      />
 
       <InputBar
         theme={theme}
