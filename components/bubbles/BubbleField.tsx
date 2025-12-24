@@ -560,15 +560,12 @@ export default function BubbleField({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing touch-none z-10"
-      style={{ 
-        touchAction: "none",
-        width: "100vw",
-        minHeight: "100vh",
-        height: "100dvh",
-      }}
+      <div
+        ref={containerRef}
+        className="absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing touch-none z-10"
+        style={{ 
+          touchAction: "none",
+        }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

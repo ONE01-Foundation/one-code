@@ -25,19 +25,9 @@ const MOCK_BUBBLES: Bubble[] = Array.from({ length: 30 }, (_, i) => ({
   aiText: `Selected: Bubble ${i + 1}`,
 }));
 
-// Auto theme by time - interpolate between light and dark
-function getAutoTheme(): "light" | "dark" {
-  const hour = new Date().getHours();
-  // 6 AM - 6 PM: light, 6 PM - 6 AM: dark
-  // Smooth transition around 6 AM and 6 PM
-  if (hour >= 6 && hour < 18) {
-    return "light";
-  }
-  return "dark";
-}
-
 export default function Home() {
-  const [theme, setTheme] = useState<"light" | "dark">(getAutoTheme());
+  // Initialize with a safe default - will be updated on client-side mount
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [autoTheme, setAutoTheme] = useState(true);
   const [bubbles] = useState<Bubble[]>(MOCK_BUBBLES);
   const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(bubbles[0]);
@@ -50,13 +40,16 @@ export default function Home() {
   const originBubble = bubbles[0];
   const isOriginBubbleCentered = centeredBubble?.id === originBubble.id;
 
-  // Auto theme by time - only update if theme actually changed
+  // Auto theme by time - always calculated on client-side (after mount) to use correct timezone
   useEffect(() => {
     if (!autoTheme) return;
 
     const updateTheme = () => {
-      const newTheme = getAutoTheme();
-      // Only update if theme actually changed to avoid unnecessary re-renders
+      // Always use client-side Date (correct timezone)
+      const hour = new Date().getHours();
+      const newTheme: "light" | "dark" = (hour >= 6 && hour < 18) ? "light" : "dark";
+      
+      // Update theme if it changed
       setTheme((currentTheme) => {
         if (currentTheme !== newTheme) {
           return newTheme;
@@ -65,10 +58,10 @@ export default function Home() {
       });
     };
 
-    // Initial update
+    // Initial update on client mount (uses client timezone)
     updateTheme();
     
-    // Check every minute to catch theme transitions (simpler and more reliable)
+    // Check every minute to catch theme transitions
     const intervalId = setInterval(updateTheme, 60000);
 
     return () => {
