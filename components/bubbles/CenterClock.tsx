@@ -35,19 +35,20 @@ export default function CenterClock({ theme, onToggle }: CenterClockProps) {
   return (
     <button
       onClick={onToggle}
-      className={`px-4 py-2 rounded-full transition-all duration-200
-        ${theme === "dark" 
-          ? "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white/100" 
-          : "bg-black/10 text-black/80 hover:bg-black/20 hover:text-black/100"
-        }
-        backdrop-blur-sm border ${
-          theme === "dark" ? "border-white/20" : "border-black/20"
-        }`}
+      className="bg-transparent border-none outline-none cursor-pointer p-0"
       aria-label="Toggle theme"
     >
       <div className="flex flex-col items-center gap-0.5">
-        <span className="text-base font-mono tracking-wider">{time}</span>
-        <span className="text-[10px] font-medium opacity-70">{date}</span>
+        <span className={`text-2xl font-mono font-semibold tracking-wider ${
+          theme === "dark" ? "text-white/90" : "text-black/90"
+        }`}>
+          {time}
+        </span>
+        <span className={`text-xs font-medium ${
+          theme === "dark" ? "text-white/70" : "text-black/70"
+        }`}>
+          {date}
+        </span>
       </div>
     </button>
   );

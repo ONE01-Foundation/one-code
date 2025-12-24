@@ -15,13 +15,14 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false }
 
   useEffect(() => {
     if (aiText) {
+      // Show text as whole words (no typing animation)
       setDisplayText(aiText);
       setIsVisible(true);
       
-      // Hide after 4 seconds
+      // Hide after 3 seconds
       const timer = setTimeout(() => {
         setIsVisible(false);
-      }, 4000);
+      }, 3000);
 
       return () => clearTimeout(timer);
     } else {
@@ -32,28 +33,31 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false }
   return (
     <div
       className={`fixed top-0 left-0 right-0 z-30 pointer-events-none
-        h-40 transition-all duration-300 ${
+        transition-all duration-300 ${
           isTransitioning ? "opacity-0 -translate-y-full" : "opacity-100 translate-y-0"
         }`}
       style={{
+        height: "25vh",
+        minHeight: "200px",
         paddingTop: "env(safe-area-inset-top, 0px)",
         background: theme === "dark"
-          ? "radial-gradient(ellipse 100% 60% at 50% 0%, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0.5) 60%, transparent 100%)"
-          : "radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 30%, rgba(255,255,255,0.5) 60%, transparent 100%)",
+          ? "linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.3) 70%, transparent 100%)"
+          : "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 40%, rgba(255,255,255,0.3) 70%, transparent 100%)",
       }}
     >
       <div
-        className={`absolute top-28 left-1/2 -translate-x-1/2 w-full max-w-2xl px-8
-          transition-opacity duration-500 ${isVisible ? "opacity-100" : "opacity-0"}
-          text-center
-        `}
+        className="absolute inset-0 flex items-center justify-center w-full px-8"
+        style={{
+          transition: "opacity 0.6s ease-out",
+          opacity: isVisible ? 1 : 0,
+        }}
       >
         <p
-          className={`text-xl md:text-2xl font-medium ${
+          className={`text-2xl md:text-3xl lg:text-4xl font-medium ${
             theme === "dark" ? "text-white/90" : "text-black/90"
           }`}
           style={{
-            lineHeight: "1.5",
+            lineHeight: "1.4",
             textAlign: "center",
           }}
         >

@@ -8,6 +8,7 @@ interface InputBarProps {
 }
 
 const PLACEHOLDER_WORDS = ["Think", "Feel", "Do", "Now?"];
+const LONG_IDLE_TIME = 30000; // 30 seconds of idle before hint cycle restarts
 
 export default function InputBar({ theme, isRTL }: InputBarProps) {
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -16,27 +17,30 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
   const [showModeText, setShowModeText] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const wordIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const caretIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const modeTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
+  const hasRunInitialCycleRef = useRef<boolean>(false);
 
-  // Cycle through placeholder words
+  // Cycle through placeholder words - only on first open or after very long idle
   useEffect(() => {
-    if (isFocused || inputValue) return; // Don't cycle when focused or has value
+    if (isFocused || inputValue || hasInteracted) return; // Don't cycle when focused, has value, or user has interacted
     
     let isCycling = true;
 
     const cycleWords = () => {
-      if (!isCycling || isFocused || inputValue) return;
+      if (!isCycling || isFocused || inputValue || hasInteracted) return;
       
       setCurrentWordIndex((prev) => {
         const next = (prev + 1) % PLACEHOLDER_WORDS.length;
         // Stop at "Now?" (last word)
         if (next === PLACEHOLDER_WORDS.length - 1) {
           isCycling = false;
+          hasRunInitialCycleRef.current = true;
           if (wordIntervalRef.current) {
             clearInterval(wordIntervalRef.current);
             wordIntervalRef.current = null;
@@ -47,33 +51,33 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
       });
     };
 
-    // Initial delay before starting cycle
-    const initialTimer = setTimeout(() => {
-      if (!isFocused && !inputValue) {
-        wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
-      }
-    }, 1000);
-
-    // Check for idle and restart cycle
-    const idleCheck = setInterval(() => {
-      const timeSinceInteraction = Date.now() - lastInteractionRef.current;
-      if (timeSinceInteraction > 8000 && !isCycling && !isFocused && !inputValue) {
-        isCycling = true;
-        setCurrentWordIndex(0);
-        lastInteractionRef.current = Date.now();
-        if (wordIntervalRef.current) {
-          clearInterval(wordIntervalRef.current);
+    // Run cycle on first app open (if not already run)
+    if (!hasRunInitialCycleRef.current) {
+      const initialTimer = setTimeout(() => {
+        if (!isFocused && !inputValue && !hasInteracted) {
+          wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
         }
-        wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
-      }
-    }, 1000);
+      }, 1000);
+      return () => clearTimeout(initialTimer);
+    }
 
-    return () => {
-      clearTimeout(initialTimer);
-      if (wordIntervalRef.current) clearInterval(wordIntervalRef.current);
-      clearInterval(idleCheck);
-    };
-  }, [isFocused, inputValue]);
+    // Check for very long idle and restart cycle (only if user hasn't interacted yet)
+    if (hasRunInitialCycleRef.current && !hasInteracted) {
+      const idleCheck = setInterval(() => {
+        const timeSinceInteraction = Date.now() - lastInteractionRef.current;
+        if (timeSinceInteraction > LONG_IDLE_TIME && !isCycling && !isFocused && !inputValue) {
+          isCycling = true;
+          setCurrentWordIndex(0);
+          lastInteractionRef.current = Date.now();
+          if (wordIntervalRef.current) {
+            clearInterval(wordIntervalRef.current);
+          }
+          wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
+        }
+      }, 1000);
+      return () => clearInterval(idleCheck);
+    }
+  }, [isFocused, inputValue, hasInteracted]);
 
   // Show blinking caret occasionally when at "Now?" and not focused
   useEffect(() => {
@@ -94,6 +98,7 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
   }, [isFocused, inputValue, currentWordIndex]);
 
   const handleModeToggle = () => {
+    setHasInteracted(true);
     setMode((prev) => {
       const newMode = prev === "private" ? "global" : "private";
       
@@ -111,14 +116,26 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
       return newMode;
     });
     lastInteractionRef.current = Date.now();
+    // Stop hint cycle permanently
+    if (wordIntervalRef.current) {
+      clearInterval(wordIntervalRef.current);
+      wordIntervalRef.current = null;
+    }
   };
 
   const handleMicClick = () => {
+    setHasInteracted(true);
     lastInteractionRef.current = Date.now();
+    // Stop hint cycle permanently
+    if (wordIntervalRef.current) {
+      clearInterval(wordIntervalRef.current);
+      wordIntervalRef.current = null;
+    }
   };
 
   const handleInputFocus = () => {
     setIsFocused(true);
+    setHasInteracted(true);
     // Stop hint animation immediately
     if (wordIntervalRef.current) {
       clearInterval(wordIntervalRef.current);
@@ -126,31 +143,21 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
     }
     setShowCaret(false);
     setShowModeText(false);
-    // Clear placeholder text
-    if (!inputValue) {
-      setInputValue("");
-    }
   };
 
   const handleInputBlur = () => {
     setIsFocused(false);
-    // If input is empty, restart hint cycle after delay
-    if (!inputValue) {
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
-      restartTimeoutRef.current = setTimeout(() => {
-        if (!isFocused && !inputValue) {
-          setCurrentWordIndex(0);
-          lastInteractionRef.current = Date.now();
-        }
-      }, 3000) as NodeJS.Timeout;
-    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
+    setHasInteracted(true);
     lastInteractionRef.current = Date.now();
+    // Stop hint cycle permanently once user types
+    if (wordIntervalRef.current) {
+      clearInterval(wordIntervalRef.current);
+      wordIntervalRef.current = null;
+    }
   };
 
   const isLight = theme === "light";
@@ -162,28 +169,35 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
     <div
       className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-none"
       style={{
-        bottom: "calc(50% - 100px)",
+        top: "calc(50% + 60px)", // Position slightly below center
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       <div
         className={`
-          flex items-center gap-3 px-5 py-3 rounded-2xl
+          flex items-center rounded-3xl
           transition-all duration-300 pointer-events-auto
           ${isLight 
-            ? "bg-white/15 backdrop-blur-md border border-black/10" 
-            : "bg-black/15 backdrop-blur-md border border-white/10"
+            ? "bg-white/20 backdrop-blur-sm border border-black/10" 
+            : "bg-black/20 backdrop-blur-sm border border-white/10"
           }
         `}
         style={{
-          minWidth: "280px",
+          gap: "0px",
+          width: "153px",
+          minWidth: "152px",
+          height: "45px",
+          paddingTop: "0px",
+          paddingBottom: "0px",
+          paddingLeft: "5px",
+          paddingRight: "5px",
         }}
       >
         {/* Mode toggle button */}
         <button
           onClick={handleModeToggle}
           className={`
-            w-9 h-9 rounded-full flex items-center justify-center
+            w-8 h-8 rounded-full flex items-center justify-center
             transition-all duration-200 flex-shrink-0
             ${isLight
               ? "bg-black/10 hover:bg-black/20"
@@ -195,8 +209,8 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
           <img
             src={mode === "private" ? "/private-icon.svg" : "/global-icon.svg"}
             alt={mode === "private" ? "Private" : "Global"}
-            width={18}
-            height={18}
+            width={22}
+            height={22}
             className={isLight ? "opacity-70" : "opacity-70 brightness-0 invert"}
           />
         </button>
@@ -210,9 +224,10 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
             >
               <span
                 className={`
-                  text-base font-medium
+                  text-base font-extralight
                   ${isLight ? "text-black/70" : "text-white/70"}
                 `}
+                style={{ fontWeight: 200 }}
               >
                 {displayText}
                 {showCaret && displayText === "Now?" && (
@@ -230,10 +245,11 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
               onBlur={handleInputBlur}
               className={`
                 w-full bg-transparent border-none outline-none
-                text-base font-medium
+                text-base font-extralight
                 ${isLight ? "text-black/70" : "text-white/70"}
               `}
               style={{
+                fontWeight: 200,
                 textAlign: "center",
               }}
             />
@@ -244,7 +260,7 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
         <button
           onClick={handleMicClick}
           className={`
-            w-9 h-9 flex items-center justify-center
+            w-8 h-8 flex items-center justify-center
             transition-all duration-200 flex-shrink-0
             bg-transparent border-none outline-none
           `}
@@ -253,8 +269,8 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
           <img
             src="/microphone-icon.svg"
             alt="Microphone"
-            width={18}
-            height={18}
+            width={22}
+            height={22}
             className={`${isLight ? "opacity-50" : "opacity-50 brightness-0 invert"}`}
           />
         </button>

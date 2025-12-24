@@ -131,7 +131,21 @@ export default function BottomBar({
                 Home
               </span>
             )}
-            <span className="text-lg flex-shrink-0">🏠</span>
+            <svg 
+              width="20" 
+              height="20" 
+              viewBox="0 0 46 46" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
+              className="flex-shrink-0"
+            >
+              <path 
+                fillRule="evenodd" 
+                clipRule="evenodd" 
+                d="M36.5664 15.9252L27.9488 8.80004C25.0459 6.39999 20.9541 6.39999 18.0512 8.80004L9.43355 15.9252C7.88094 17.2089 7 19.1553 7 21.1861V32.2974C7 35.9056 9.77464 39 13.4 39H16.6C18.3673 39 19.8 37.5674 19.8 35.8V30.5965C19.8 28.5685 21.3234 27.0939 23 27.0939C24.6766 27.0939 26.2 28.5685 26.2 30.5965V35.8C26.2 37.5674 27.6326 39 29.4 39H32.6C36.2254 39 39 35.9056 39 32.2974V21.1861C39 19.1553 38.119 17.2089 36.5664 15.9252Z" 
+                fill={theme === "dark" ? "white" : "black"}
+              />
+            </svg>
           </button>
         </div>
       )}

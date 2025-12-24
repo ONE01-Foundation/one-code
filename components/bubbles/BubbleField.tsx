@@ -43,6 +43,7 @@ export default function BubbleField({
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
   const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const movingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [edgeBubbles, setEdgeBubbles] = useState<Position[]>([]);
 
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
@@ -204,6 +205,165 @@ export default function BubbleField({
     return closest;
   }, [bubbles, panOffset, getCenterPoint, bubblePositions]);
 
+  // Smooth snap to center if a bubble is close enough
+  const smoothSnapToCenter = useCallback(() => {
+    if (panOffset === null || bubblePositions.length === 0 || isDragging) return;
+    
+    // Cancel any ongoing inertia animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    const center = getCenterPoint();
+    const snapThreshold = 120; // Distance threshold for snapping
+    
+    let closestBubble: BubbleType | null = null;
+    let closestIndex = -1;
+    let minDistance = Infinity;
+
+    bubbles.forEach((bubble, index) => {
+      if (!bubblePositions[index]) return;
+      const pos = bubblePositions[index];
+      const screenX = pos.x + panOffset.x;
+      const screenY = pos.y + panOffset.y;
+      const distance = Math.sqrt(
+        Math.pow(screenX - center.x, 2) + Math.pow(screenY - center.y, 2)
+      );
+
+      if (distance < minDistance && distance < snapThreshold) {
+        minDistance = distance;
+        closestBubble = bubble;
+        closestIndex = index;
+      }
+    });
+
+    // If we found a bubble close enough, smoothly snap it to center
+    if (closestBubble && closestIndex >= 0 && bubblePositions[closestIndex]) {
+      const targetPos = bubblePositions[closestIndex];
+      const targetOffset = {
+        x: center.x - targetPos.x,
+        y: center.y - targetPos.y,
+      };
+      
+      // Stop velocity for smooth snap
+      setVelocity({ x: 0, y: 0 });
+      
+      // Smooth animation to center
+      const startOffset = { ...panOffset };
+      const deltaX = targetOffset.x - startOffset.x;
+      const deltaY = targetOffset.y - startOffset.y;
+      const duration = 300; // 300ms animation
+      const startTime = Date.now();
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Easing function (ease-out cubic)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        
+        setPanOffset({
+          x: startOffset.x + deltaX * easeOut,
+          y: startOffset.y + deltaY * easeOut,
+        });
+        
+        if (progress < 1) {
+          animationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          // Ensure we end exactly at target
+          setPanOffset(targetOffset);
+          setVelocity({ x: 0, y: 0 });
+          onCenteredBubbleChange(closestBubble);
+          animationFrameRef.current = null;
+        }
+      };
+      
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
+  }, [panOffset, bubblePositions, bubbles, getCenterPoint, isDragging, onCenteredBubbleChange]);
+
+  // Generate edge bubbles when near the boundary
+  useEffect(() => {
+    if (panOffset === null || bubblePositions.length === 0 || !containerRef.current) return;
+
+    const center = getCenterPoint();
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportWidth = rect.width;
+    const viewportHeight = rect.height;
+
+    // Find the bounds of existing bubbles in field coordinate space
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    bubblePositions.forEach((pos) => {
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxY = Math.max(maxY, pos.y);
+    });
+
+    // Calculate center in field coordinates (origin is at 0,0 in field space, center needs to account for panOffset)
+    const fieldCenterX = center.x - panOffset.x;
+    const fieldCenterY = center.y - panOffset.y;
+
+    // Check if we're near the edge (within 200px of boundary in screen space)
+    const edgeThreshold = 200;
+    const screenMinX = minX + panOffset.x;
+    const screenMaxX = maxX + panOffset.x;
+    const screenMinY = minY + panOffset.y;
+    const screenMaxY = maxY + panOffset.y;
+    
+    const nearLeftEdge = center.x - screenMinX < edgeThreshold;
+    const nearRightEdge = screenMaxX - center.x < edgeThreshold;
+    const nearTopEdge = center.y - screenMinY < edgeThreshold;
+    const nearBottomEdge = screenMaxY - center.y < edgeThreshold;
+
+    const newEdgeBubbles: Position[] = [];
+
+    if (nearLeftEdge || nearRightEdge || nearTopEdge || nearBottomEdge) {
+      // Generate edge indicator bubbles in field coordinate space
+      const spacing = 150;
+      const edgeDistance = 250;
+
+      if (nearLeftEdge) {
+        // Generate bubbles to the left (in field coordinates)
+        for (let i = -2; i <= 2; i++) {
+          newEdgeBubbles.push({
+            x: minX - edgeDistance,
+            y: fieldCenterY + i * spacing,
+          });
+        }
+      }
+      if (nearRightEdge) {
+        // Generate bubbles to the right (in field coordinates)
+        for (let i = -2; i <= 2; i++) {
+          newEdgeBubbles.push({
+            x: maxX + edgeDistance,
+            y: fieldCenterY + i * spacing,
+          });
+        }
+      }
+      if (nearTopEdge) {
+        // Generate bubbles above (in field coordinates)
+        for (let i = -2; i <= 2; i++) {
+          newEdgeBubbles.push({
+            x: fieldCenterX + i * spacing,
+            y: minY - edgeDistance,
+          });
+        }
+      }
+      if (nearBottomEdge) {
+        // Generate bubbles below (in field coordinates)
+        for (let i = -2; i <= 2; i++) {
+          newEdgeBubbles.push({
+            x: fieldCenterX + i * spacing,
+            y: maxY + edgeDistance,
+          });
+        }
+      }
+    }
+
+    setEdgeBubbles(newEdgeBubbles);
+  }, [panOffset, bubblePositions, getCenterPoint]);
+
   // Handle target bubble (for smooth centering)
   useEffect(() => {
     if (targetBubble && bubblePositions.length > 0) {
@@ -338,6 +498,8 @@ export default function BubbleField({
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    // Smooth snap to center if bubble is close
+    smoothSnapToCenter();
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -378,6 +540,8 @@ export default function BubbleField({
 
   const handleTouchEnd = () => {
     setIsDragging(false);
+    // Smooth snap to center if bubble is close
+    smoothSnapToCenter();
   };
 
   const handleBubbleClick = (bubble: BubbleType, index: number) => {
@@ -451,6 +615,40 @@ export default function BubbleField({
             onClick={() => handleBubbleClick(bubble, index)}
             showClock={isOrigin && distance < 80}
             onThemeToggle={onThemeToggle}
+          />
+        );
+      })}
+      
+      {/* Edge-of-field indicator bubbles */}
+      {panOffset && edgeBubbles.map((edgePos, idx) => {
+        // Convert field coordinates to screen coordinates
+        const screenX = edgePos.x + panOffset.x;
+        const screenY = edgePos.y + panOffset.y;
+        const center = getCenterPoint();
+        const distance = Math.sqrt(
+          Math.pow(screenX - center.x, 2) + Math.pow(screenY - center.y, 2)
+        );
+        
+        // Edge bubbles are smaller and more transparent
+        const edgeScale = 0.25;
+        const edgeOpacity = 0.15;
+
+        return (
+          <div
+            key={`edge-${idx}`}
+            style={{
+              position: "absolute",
+              width: `${120 * edgeScale}px`,
+              height: `${120 * edgeScale}px`,
+              borderRadius: "50%",
+              transform: `translate(${screenX - 60 * edgeScale}px, ${screenY - 60 * edgeScale}px)`,
+              background: theme === "dark"
+                ? "radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 100%)"
+                : "radial-gradient(circle, rgba(0,0,0,0.04) 0%, transparent 100%)",
+              border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
+              opacity: edgeOpacity,
+              pointerEvents: "none",
+            }}
           />
         );
       })}

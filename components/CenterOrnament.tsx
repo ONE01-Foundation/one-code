@@ -7,46 +7,20 @@ interface CenterOrnamentProps {
 }
 
 export default function CenterOrnament({ theme }: CenterOrnamentProps) {
-  const [viewportCenter, setViewportCenter] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const updateCenter = () => {
-      // Use visualViewport when available (mobile), fallback to window
-      if (window.visualViewport) {
-        const vp = window.visualViewport;
-        setViewportCenter({ x: vp.width / 2, y: vp.height / 2 });
-      } else {
-        setViewportCenter({ 
-          x: window.innerWidth / 2, 
-          y: window.innerHeight / 2 
-        });
-      }
-    };
-
-    updateCenter();
-    
-    const handleResize = () => {
-      updateCenter();
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
     };
     
-    const handleOrientationChange = () => {
-      setTimeout(updateCenter, 100);
-    };
-
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("orientationchange", handleOrientationChange);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize);
-    }
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("orientationchange", handleOrientationChange);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleResize);
-      }
-    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // SVG color based on theme
+  const svgColor = theme === "dark" ? "#1a1a1a" : "#e5e5e5";
 
   return (
     <div
@@ -55,31 +29,43 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
         left: "50%",
         top: "50%",
         transform: "translate(-50%, -50%)",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        paddingLeft: "env(safe-area-inset-left, 0px)",
-        paddingRight: "env(safe-area-inset-right, 0px)",
       }}
     >
       <div
-        className={`relative transition-opacity duration-500 ${
-          theme === "dark" ? "opacity-60" : "opacity-40"
-        }`}
+        className="relative"
         style={{
-          width: "min(95vw, 700px)",
-          height: "min(95vw, 700px)",
-          maxWidth: "100%",
-          maxHeight: "100%",
+          width: isMobile ? "min(90vh, 400px)" : "min(80vw, 600px)",
+          height: isMobile ? "min(90vh, 400px)" : "min(80vw, 600px)",
         }}
       >
-        <img
-          src="/one-center-bg.svg"
-          alt="ONE Center Ornament"
-          className="w-full h-full object-contain"
+        {/* SVG with theme color */}
+        <div
           style={{
-            mixBlendMode: theme === "dark" ? "screen" : "multiply",
+            width: "100%",
+            height: "100%",
+            opacity: theme === "dark" ? 0.4 : 0.3,
           }}
-        />
+        >
+          <svg
+            viewBox="0 0 295 536"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ width: "100%", height: "100%" }}
+          >
+            <defs>
+              <linearGradient id="ornamentGradient" x1="147.5" y1="0" x2="147.5" y2="535.369" gradientUnits="userSpaceOnUse">
+                <stop offset="0.0432692" stopColor={svgColor} stopOpacity="0" />
+                <stop offset="0.283654" stopColor={svgColor} stopOpacity="0.9" />
+                <stop offset="0.682692" stopColor={svgColor} stopOpacity="0.9" />
+                <stop offset="0.966346" stopColor={svgColor} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M196.486 0C197.055 0 197.621 0.01449 198.183 0.0429688C198.744 0.0714553 199.302 0.113648 199.856 0.169922C201.795 0.366825 203.684 0.731814 205.509 1.25C205.77 1.32406 206.029 1.40117 206.287 1.48145C206.803 1.64195 207.314 1.81517 207.818 2C208.071 2.09243 208.322 2.18775 208.571 2.28613C210.567 3.07306 212.467 4.04928 214.25 5.19238C214.473 5.33528 214.694 5.48083 214.913 5.62891C216.885 6.96146 218.706 8.50183 220.343 10.2188C220.525 10.4094 220.705 10.6019 220.882 10.7969C222.3 12.3576 223.571 14.0552 224.672 15.8672C225.911 17.9058 226.935 20.0895 227.712 22.3867C228.23 23.9181 228.639 25.5 228.929 27.123C229.025 27.6638 229.109 28.2092 229.179 28.7588C229.284 29.5836 229.358 30.418 229.4 31.2607C229.429 31.8222 229.443 32.3875 229.443 32.9561V144.84C268.972 171.3 294.999 216.36 294.999 267.5C294.999 318.639 268.972 363.698 229.443 390.158V502.412C229.443 502.981 229.429 503.547 229.4 504.108C229.358 504.951 229.284 505.785 229.179 506.609C229.109 507.159 229.025 507.705 228.929 508.246C228.639 509.869 228.23 511.451 227.712 512.982C226.935 515.279 225.91 517.463 224.672 519.501C223.571 521.313 222.3 523.011 220.882 524.571C220.704 524.766 220.525 524.96 220.343 525.15C218.706 526.867 216.885 528.408 214.913 529.74C214.475 530.036 214.029 530.322 213.576 530.598C211.991 531.561 210.317 532.394 208.571 533.083C208.322 533.181 208.071 533.277 207.818 533.369C206.557 533.831 205.258 534.218 203.93 534.524C203.664 534.586 203.397 534.644 203.129 534.699C202.056 534.919 200.964 535.086 199.856 535.198C199.302 535.255 198.744 535.298 198.183 535.326C197.621 535.355 197.055 535.369 196.486 535.369H98.5107C80.3094 535.369 65.5537 520.613 65.5537 502.412V390.156C26.0263 363.696 0.000155347 318.638 0 267.5C0 216.361 26.0259 171.302 65.5537 144.842V32.9561C65.554 14.7549 80.3095 0 98.5107 0H196.486Z"
+              fill="url(#ornamentGradient)"
+            />
+          </svg>
+        </div>
       </div>
     </div>
   );
