@@ -50,25 +50,30 @@ export default function Home() {
   const originBubble = bubbles[0];
   const isOriginBubbleCentered = centeredBubble?.id === originBubble.id;
 
-  // Auto theme by time
+  // Auto theme by time - only update if theme actually changed
   useEffect(() => {
     if (!autoTheme) return;
 
     const updateTheme = () => {
       const newTheme = getAutoTheme();
-      setTheme(newTheme);
-      
-      // Update theme-color meta tag
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) {
-        meta.setAttribute("content", newTheme === "dark" ? "#000000" : "#FFFFFF");
-      }
+      // Only update if theme actually changed to avoid unnecessary re-renders
+      setTheme((currentTheme) => {
+        if (currentTheme !== newTheme) {
+          return newTheme;
+        }
+        return currentTheme;
+      });
     };
 
+    // Initial update
     updateTheme();
-    const interval = setInterval(updateTheme, 60000); // Check every minute
+    
+    // Check every minute to catch theme transitions (simpler and more reliable)
+    const intervalId = setInterval(updateTheme, 60000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [autoTheme]);
 
   // Detect browser language
@@ -88,11 +93,6 @@ export default function Home() {
     setTimeout(() => {
       setTheme((prev) => {
         const newTheme = prev === "light" ? "dark" : "light";
-        // Update theme-color meta tag
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) {
-          meta.setAttribute("content", newTheme === "dark" ? "#000000" : "#FFFFFF");
-        }
         return newTheme;
       });
       
