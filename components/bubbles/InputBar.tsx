@@ -7,166 +7,178 @@ interface InputBarProps {
   isRTL: boolean;
 }
 
-const PLACEHOLDER_WORDS = ["think", "do", "feel", "now"];
+const PLACEHOLDER_WORDS = ["Think", "Feel", "Do", "Now?"];
 
 export default function InputBar({ theme, isRTL }: InputBarProps) {
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(true);
+  const [showCaret, setShowCaret] = useState(false);
   const [mode, setMode] = useState<"private" | "global">("private");
-  const [showModeLabel, setShowModeLabel] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const labelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showModeText, setShowModeText] = useState(false);
+  const wordIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const caretIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const modeTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
 
   // Cycle through placeholder words
   useEffect(() => {
-    let wordInterval: NodeJS.Timeout | null = null;
-    let idleCheckInterval: NodeJS.Timeout | null = null;
+    let isCycling = true;
 
     const cycleWords = () => {
+      if (!isCycling) return;
+      
       setCurrentWordIndex((prev) => {
         const next = (prev + 1) % PLACEHOLDER_WORDS.length;
-        // Stop at "now?" (last word)
+        // Stop at "Now?" (last word)
         if (next === PLACEHOLDER_WORDS.length - 1) {
-          if (wordInterval) {
-            clearInterval(wordInterval);
-            wordInterval = null;
+          isCycling = false;
+          if (wordIntervalRef.current) {
+            clearInterval(wordIntervalRef.current);
+            wordIntervalRef.current = null;
           }
+          // Show caret briefly before "Now?"
+          setTimeout(() => {
+            setShowCaret(true);
+            setTimeout(() => setShowCaret(false), 1000);
+          }, 500);
           return next;
         }
         return next;
       });
     };
 
-    const checkIdle = () => {
-      const timeSinceInteraction = Date.now() - lastInteractionRef.current;
-      // Restart cycle if idle for 8 seconds
-      if (timeSinceInteraction > 8000) {
-        setCurrentWordIndex(0);
-        setIsVisible(true);
-        lastInteractionRef.current = Date.now();
-        // Restart word cycling
-        if (!wordInterval) {
-          wordInterval = setInterval(cycleWords, 2000);
-        }
-      }
-    };
-
     // Initial delay before starting cycle
     const initialTimer = setTimeout(() => {
-      wordInterval = setInterval(cycleWords, 2000); // Change word every 2 seconds
-      idleCheckInterval = setInterval(checkIdle, 1000);
+      wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
+    }, 1000);
+
+    // Check for idle and restart cycle
+    const idleCheck = setInterval(() => {
+      const timeSinceInteraction = Date.now() - lastInteractionRef.current;
+      if (timeSinceInteraction > 8000 && !isCycling) {
+        isCycling = true;
+        setCurrentWordIndex(0);
+        lastInteractionRef.current = Date.now();
+        if (wordIntervalRef.current) {
+          clearInterval(wordIntervalRef.current);
+        }
+        wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
+      }
     }, 1000);
 
     return () => {
       clearTimeout(initialTimer);
-      if (wordInterval) clearInterval(wordInterval);
-      if (idleCheckInterval) clearInterval(idleCheckInterval);
+      if (wordIntervalRef.current) clearInterval(wordIntervalRef.current);
+      clearInterval(idleCheck);
     };
   }, []);
 
   const handleModeToggle = () => {
-    setMode((prev) => (prev === "private" ? "global" : "private"));
-    setShowModeLabel(true);
-    
-    if (labelTimeoutRef.current) {
-      clearTimeout(labelTimeoutRef.current);
-    }
-    
-    labelTimeoutRef.current = setTimeout(() => {
-      setShowModeLabel(false);
-    }, 3000) as NodeJS.Timeout;
+    setMode((prev) => {
+      const newMode = prev === "private" ? "global" : "private";
+      
+      // Show mode text temporarily
+      setShowModeText(true);
+      if (modeTextTimeoutRef.current) {
+        clearTimeout(modeTextTimeoutRef.current);
+      }
+      modeTextTimeoutRef.current = setTimeout(() => {
+        setShowModeText(false);
+      }, 1000) as NodeJS.Timeout;
+      
+      return newMode;
+    });
+    lastInteractionRef.current = Date.now();
+  };
+
+  const handleMicClick = () => {
+    lastInteractionRef.current = Date.now();
   };
 
   const isLight = theme === "light";
+  const displayText = showModeText 
+    ? (mode === "private" ? "Private" : "Global")
+    : PLACEHOLDER_WORDS[currentWordIndex];
 
   return (
     <div
-      className={`fixed left-1/2 -translate-x-1/2 z-30 pointer-events-none
-        ${isRTL ? "bottom-24" : "bottom-24"}
-      `}
+      className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-none"
       style={{
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 6rem)",
+        bottom: "calc(50% - 100px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       <div
         className={`
-          flex items-center gap-2 px-4 py-2.5 rounded-2xl
+          flex items-center gap-3 px-5 py-3 rounded-2xl
           transition-all duration-300 pointer-events-auto
           ${isLight 
-            ? "bg-white/20 backdrop-blur-md border border-black/10" 
-            : "bg-black/20 backdrop-blur-md border border-white/10"
+            ? "bg-white/15 backdrop-blur-md border border-black/10" 
+            : "bg-black/15 backdrop-blur-md border border-white/10"
           }
         `}
+        style={{
+          minWidth: "280px",
+        }}
       >
-        {/* Placeholder text */}
-        <div className="flex-1 min-w-0 text-center">
-          <span
-            className={`
-              text-sm font-medium transition-all duration-500
-              ${isLight ? "text-black/60" : "text-white/60"}
-            `}
-            key={currentWordIndex}
-          >
-            {PLACEHOLDER_WORDS[currentWordIndex]}?
-          </span>
-        </div>
-
         {/* Mode toggle button */}
         <button
           onClick={handleModeToggle}
           className={`
-            w-8 h-8 rounded-full flex items-center justify-center
+            w-9 h-9 rounded-full flex items-center justify-center
             transition-all duration-200 flex-shrink-0
             ${isLight
-              ? "bg-black/10 hover:bg-black/20 text-black/70"
-              : "bg-white/10 hover:bg-white/20 text-white/70"
+              ? "bg-black/10 hover:bg-black/20"
+              : "bg-white/10 hover:bg-white/20"
             }
           `}
           aria-label={mode === "private" ? "Private" : "Global"}
         >
-          <span className="text-sm">
-            {mode === "private" ? "👤" : "🌍"}
-          </span>
+          <img
+            src={mode === "private" ? "/private-icon.svg" : "/global-icon.svg"}
+            alt={mode === "private" ? "Private" : "Global"}
+            width={18}
+            height={18}
+            className={isLight ? "opacity-70" : "opacity-70 brightness-0 invert"}
+          />
         </button>
+
+        {/* Input text */}
+        <div className="flex-1 min-w-0 text-center">
+          <span
+            className={`
+              text-base font-medium transition-all duration-500
+              ${isLight ? "text-black/70" : "text-white/70"}
+            `}
+          >
+            {displayText}
+            {showCaret && displayText === "Now?" && (
+              <span className="animate-pulse">|</span>
+            )}
+          </span>
+        </div>
 
         {/* Microphone button */}
         <button
-          onClick={() => {
-            lastInteractionRef.current = Date.now();
-          }}
+          onClick={handleMicClick}
           className={`
-            w-8 h-8 rounded-full flex items-center justify-center
+            w-9 h-9 rounded-full flex items-center justify-center
             transition-all duration-200 flex-shrink-0
             ${isLight
-              ? "bg-black/10 hover:bg-black/20 text-black/70"
-              : "bg-white/10 hover:bg-white/20 text-white/70"
+              ? "bg-black/10 hover:bg-black/20"
+              : "bg-white/10 hover:bg-white/20"
             }
           `}
           aria-label="Voice input"
         >
-          <span className="text-sm">🎤</span>
+          <img
+            src="/microphone-icon.svg"
+            alt="Microphone"
+            width={18}
+            height={18}
+            className={isLight ? "opacity-70" : "opacity-70 brightness-0 invert"}
+          />
         </button>
       </div>
-
-      {/* Mode label tooltip */}
-      {showModeLabel && (
-        <div
-          className={`
-            absolute left-1/2 -translate-x-1/2 top-full mt-2
-            px-3 py-1 rounded-full text-xs
-            transition-opacity duration-300
-            ${isLight
-              ? "bg-black/20 text-black/90"
-              : "bg-white/20 text-white/90"
-            }
-            backdrop-blur-sm
-          `}
-        >
-          {mode === "private" ? "פרטי" : "גלובלי"}
-        </div>
-      )}
     </div>
   );
 }
-

@@ -2,15 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Bubble from "./Bubble";
-import type { Bubble as BubbleType, BubbleShape, BubbleFill } from "@/app/page";
+import type { Bubble as BubbleType } from "@/app/page";
 
 interface BubbleFieldProps {
   bubbles: BubbleType[];
   theme: "light" | "dark";
-  bubbleShape: BubbleShape;
-  bubbleFill: BubbleFill;
   onCenteredBubbleChange: (bubble: BubbleType | null) => void;
-  homeBubble: BubbleType;
+  originBubble: BubbleType;
   targetBubble: BubbleType | null;
   onThemeToggle: () => void;
 }
@@ -23,10 +21,8 @@ interface Position {
 export default function BubbleField({
   bubbles,
   theme,
-  bubbleShape,
-  bubbleFill,
   onCenteredBubbleChange,
-  homeBubble,
+  originBubble,
   targetBubble,
   onThemeToggle,
 }: BubbleFieldProps) {
@@ -69,32 +65,30 @@ export default function BubbleField({
       );
       setBubblePositions(positions);
       
-      // Center the home bubble initially
-      // The first bubble (home) is generated at centerX, centerY
-      // Calculate actual viewport center accounting for safe areas
+      // Center the origin bubble initially
       if (positions.length > 0) {
-        const homeIndex = bubbles.findIndex((b) => b.id === homeBubble.id);
-        if (homeIndex === 0 && positions[0]) {
+        const originIndex = bubbles.findIndex((b) => b.id === originBubble.id);
+        if (originIndex === 0 && positions[0]) {
           const viewportCenterX = width / 2;
           const viewportCenterY = height / 2;
-          const homePos = positions[0];
+          const originPos = positions[0];
           
-          // Calculate offset to center the home bubble
+          // Calculate offset to center the origin bubble
           const offset = {
-            x: viewportCenterX - homePos.x,
-            y: viewportCenterY - homePos.y,
+            x: viewportCenterX - originPos.x,
+            y: viewportCenterY - originPos.y,
           };
           
           setPanOffset(offset);
           setVelocity({ x: 0, y: 0 });
-          // Immediately notify that home bubble is centered
+          // Immediately notify that origin bubble is centered
           setTimeout(() => {
-            onCenteredBubbleChange(homeBubble);
+            onCenteredBubbleChange(originBubble);
           }, 50);
         }
       }
     }
-  }, [bubbles.length, bubbles, homeBubble, onCenteredBubbleChange]);
+  }, [bubbles.length, bubbles, originBubble, onCenteredBubbleChange]);
 
   useEffect(() => {
     // Initial positioning
@@ -124,7 +118,7 @@ export default function BubbleField({
 
   // Find closest bubble to center
   const findClosestBubble = useCallback((): BubbleType | null => {
-    if (bubblePositions.length === 0) return null;
+    if (bubblePositions.length === 0 || panOffset === null) return null;
     
     const center = getCenterPoint();
     let closest: BubbleType | null = null;
@@ -132,7 +126,6 @@ export default function BubbleField({
 
     bubbles.forEach((bubble, index) => {
       if (!bubblePositions[index]) return;
-      if (panOffset === null) return;
       const pos = bubblePositions[index];
       const screenX = pos.x + panOffset.x;
       const screenY = pos.y + panOffset.y;
@@ -178,21 +171,6 @@ export default function BubbleField({
     onCenteredBubbleChange(closest);
   }, [panOffset, findClosestBubble, onCenteredBubbleChange]);
 
-  // Idle state detection
-  useEffect(() => {
-    const checkIdle = () => {
-      const timeSinceInteraction = Date.now() - lastInteractionTime;
-      if (timeSinceInteraction > 3000) {
-        setIsIdle(true);
-      } else {
-        setIsIdle(false);
-      }
-    };
-
-    const interval = setInterval(checkIdle, 500);
-    return () => clearInterval(interval);
-  }, [lastInteractionTime]);
-
   // Inertia animation
   useEffect(() => {
     if (isDragging || panOffset === null || (Math.abs(velocity.x) < 0.1 && Math.abs(velocity.y) < 0.1)) {
@@ -230,22 +208,23 @@ export default function BubbleField({
   const handleInteraction = () => {
     setLastInteractionTime(Date.now());
     setIsIdle(false);
+    if (idleTimeoutRef.current) {
+      clearTimeout(idleTimeoutRef.current);
+    }
+    idleTimeoutRef.current = setTimeout(() => {
+      setIsIdle(true);
+    }, 3000);
   };
 
-  const handleBubbleClick = (bubble: BubbleType, index: number) => {
-    if (bubblePositions[index]) {
-      const center = getCenterPoint();
-      const targetPos = bubblePositions[index];
-      const targetOffset = {
-        x: center.x - targetPos.x,
-        y: center.y - targetPos.y,
-      };
-      setPanOffset(targetOffset);
-      setVelocity({ x: 0, y: 0 });
-      onCenteredBubbleChange(bubble);
-      handleInteraction();
-    }
-  };
+  // Idle state detection
+  useEffect(() => {
+    handleInteraction();
+    return () => {
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (panOffset === null) return;
@@ -284,7 +263,6 @@ export default function BubbleField({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (panOffset === null) return;
-    // Prevent default to avoid scrolling issues on mobile
     e.preventDefault();
     const touch = e.touches[0];
     setIsDragging(true);
@@ -297,7 +275,7 @@ export default function BubbleField({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || panOffset === null) return;
-    e.preventDefault(); // Prevent scrolling on mobile
+    e.preventDefault();
     handleInteraction();
     
     const touch = e.touches[0];
@@ -323,10 +301,25 @@ export default function BubbleField({
     setIsDragging(false);
   };
 
+  const handleBubbleClick = (bubble: BubbleType, index: number) => {
+    if (bubblePositions[index]) {
+      const center = getCenterPoint();
+      const targetPos = bubblePositions[index];
+      const targetOffset = {
+        x: center.x - targetPos.x,
+        y: center.y - targetPos.y,
+      };
+      setPanOffset(targetOffset);
+      setVelocity({ x: 0, y: 0 });
+      onCenteredBubbleChange(bubble);
+      handleInteraction();
+    }
+  };
+
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing touch-none"
+      className="absolute inset-0 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing touch-none z-10"
       style={{ 
         touchAction: "none",
         width: "100vw",
@@ -356,9 +349,10 @@ export default function BubbleField({
           Math.pow(center.x, 2) + Math.pow(center.y, 2)
         );
         const normalizedDistance = Math.min(distance / maxDistance, 1);
-        const isHome = bubble.id === homeBubble.id;
-        const baseScale = isHome ? 0.5 : 0.4;
-        const maxScale = isHome ? 1.2 : 1.0; // Home bubble scales larger
+        const isOrigin = bubble.id === originBubble.id;
+        // Origin bubble is larger
+        const baseScale = isOrigin ? 0.6 : 0.4;
+        const maxScale = isOrigin ? 1.4 : 1.15;
         const scale = baseScale + (1 - normalizedDistance) * (maxScale - baseScale);
 
         return (
@@ -368,13 +362,11 @@ export default function BubbleField({
             position={{ x: screenX, y: screenY }}
             scale={scale}
             theme={theme}
-            shape={bubbleShape}
-            fill={bubbleFill}
             isCentered={distance < 80}
-            isHome={isHome}
+            isOrigin={isOrigin}
             isIdle={isIdle}
             onClick={() => handleBubbleClick(bubble, index)}
-            showClock={isHome && distance < 80}
+            showClock={isOrigin && distance < 80}
             onThemeToggle={onThemeToggle}
           />
         );
@@ -390,7 +382,6 @@ function generateHoneycombPositions(
   height: number = 1080
 ): Position[] {
   const positions: Position[] = [];
-  // Adjust spacing based on screen size (smaller on mobile)
   const isMobile = width < 768;
   const spacing = isMobile 
     ? Math.min(140, Math.min(width, height) * 0.2)
@@ -404,7 +395,7 @@ function generateHoneycombPositions(
 
   while (index < count) {
     if (ring === 0) {
-      // First bubble (home) is exactly at center
+      // First bubble (origin) is exactly at center
       positions.push({ x: centerX, y: centerY });
       index++;
     } else {
@@ -426,7 +417,7 @@ function generateHoneycombPositions(
   // Add minimal jitter for more natural look (less on mobile)
   const jitterAmount = isMobile ? 20 : 40;
   return positions.map((pos, idx) => {
-    // Don't jitter the first bubble (home)
+    // Don't jitter the first bubble (origin)
     if (idx === 0) return pos;
     return {
       x: pos.x + (Math.random() - 0.5) * jitterAmount,
@@ -434,4 +425,3 @@ function generateHoneycombPositions(
     };
   });
 }
-

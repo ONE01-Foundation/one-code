@@ -5,6 +5,7 @@ import TopBar from "@/components/bubbles/TopBar";
 import BottomBar from "@/components/bubbles/BottomBar";
 import BubbleField from "@/components/bubbles/BubbleField";
 import InputBar from "@/components/bubbles/InputBar";
+import CenterOrnament from "@/components/CenterOrnament";
 
 export type Bubble = {
   id: string;
@@ -15,32 +16,72 @@ export type Bubble = {
   aiText: string;
 };
 
-export type BubbleShape = "circle" | "rounded-square";
-export type BubbleFill = "gradient" | "solid";
-
 const MOCK_BUBBLES: Bubble[] = Array.from({ length: 30 }, (_, i) => ({
   id: `bubble-${i}`,
   title: `Item ${i + 1}`,
   icon: ["📱", "💡", "🎯", "🚀", "⭐", "🎨", "📝", "🔔", "💬", "🎵"][i % 10],
   value: Math.floor(Math.random() * 100),
   actionType: ["open", "view", "edit", "play", "share"][i % 5] as Bubble["actionType"],
-  aiText: `This is ${["a task", "an idea", "a goal", "a note", "a reminder"][i % 5]} about Item ${i + 1}`,
+  aiText: `Selected: Bubble ${i + 1}`,
 }));
 
+// Auto theme by time - interpolate between light and dark
+function getAutoTheme(): "light" | "dark" {
+  const hour = new Date().getHours();
+  // 6 AM - 6 PM: light, 6 PM - 6 AM: dark
+  // Smooth transition around 6 AM and 6 PM
+  if (hour >= 6 && hour < 18) {
+    return "light";
+  }
+  return "dark";
+}
+
+function lerpColor(
+  color1: string,
+  color2: string,
+  factor: number
+): string {
+  // Simple lerp for hex colors (black/white)
+  if (color1 === "#000000" && color2 === "#FFFFFF") {
+    const gray = Math.round(255 * factor);
+    return `rgb(${gray}, ${gray}, ${gray})`;
+  }
+  return factor > 0.5 ? color2 : color1;
+}
+
 export default function Home() {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">(getAutoTheme());
+  const [autoTheme, setAutoTheme] = useState(true);
   const [bubbles] = useState<Bubble[]>(MOCK_BUBBLES);
-  // Initialize with home bubble centered
   const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(bubbles[0]);
   const [targetBubble, setTargetBubble] = useState<Bubble | null>(null);
-  const [bubbleShape, setBubbleShape] = useState<BubbleShape>("circle");
-  const [bubbleFill, setBubbleFill] = useState<BubbleFill>("gradient");
   const [lang, setLang] = useState<"en" | "he">("en");
   const [isRTL, setIsRTL] = useState(false);
 
-  // First bubble is the home bubble
-  const homeBubble = bubbles[0];
-  const isHomeBubbleCentered = centeredBubble?.id === homeBubble.id;
+  // First bubble is the origin/home bubble
+  const originBubble = bubbles[0];
+  const isOriginBubbleCentered = centeredBubble?.id === originBubble.id;
+
+  // Auto theme by time
+  useEffect(() => {
+    if (!autoTheme) return;
+
+    const updateTheme = () => {
+      const newTheme = getAutoTheme();
+      setTheme(newTheme);
+      
+      // Update theme-color meta tag
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) {
+        meta.setAttribute("content", newTheme === "dark" ? "#000000" : "#FFFFFF");
+      }
+    };
+
+    updateTheme();
+    const interval = setInterval(updateTheme, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [autoTheme]);
 
   // Detect browser language
   useEffect(() => {
@@ -51,6 +92,7 @@ export default function Home() {
   }, []);
 
   const handleThemeToggle = useCallback(() => {
+    setAutoTheme(false); // Disable auto theme when manually toggled
     setTheme((prev) => {
       const newTheme = prev === "light" ? "dark" : "light";
       // Update theme-color meta tag
@@ -71,9 +113,9 @@ export default function Home() {
   }, [targetBubble]);
 
   const handleBackToHome = useCallback(() => {
-    // Trigger smooth centering of home bubble
-    setTargetBubble(homeBubble);
-  }, [homeBubble]);
+    // Trigger smooth centering of origin bubble
+    setTargetBubble(originBubble);
+  }, [originBubble]);
 
   // Update theme-color on mount and theme change
   useEffect(() => {
@@ -85,44 +127,49 @@ export default function Home() {
 
   return (
     <div
-      className={`fixed inset-0 overflow-hidden transition-colors duration-300 ${
-        theme === "dark" ? "bg-black" : "bg-white"
-      }`}
+      className="fixed inset-0 overflow-hidden"
       style={{
         width: "100vw",
         minHeight: "100vh",
         height: "100dvh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
+        backgroundColor: theme === "dark" ? "#000000" : "#FFFFFF",
+        transition: "background-color 0.3s ease",
       }}
       dir={isRTL ? "rtl" : "ltr"}
     >
+      {/* Layer 1: Fixed centered ornament background */}
+      <CenterOrnament theme={theme} />
+
+      {/* Layer 2: Bubble grid (draggable) */}
+      <BubbleField
+        bubbles={bubbles}
+        theme={theme}
+        onCenteredBubbleChange={handleCenteredBubbleChange}
+        originBubble={originBubble}
+        targetBubble={targetBubble}
+        onThemeToggle={handleThemeToggle}
+      />
+
+      {/* Layer 3: Top overlay bar */}
       <TopBar
         theme={theme}
         aiText={centeredBubble?.aiText || null}
         isRTL={isRTL}
       />
-      
-      <BubbleField
-        bubbles={bubbles}
-        theme={theme}
-        bubbleShape={bubbleShape}
-        bubbleFill={bubbleFill}
-        onCenteredBubbleChange={handleCenteredBubbleChange}
-        homeBubble={homeBubble}
-        targetBubble={targetBubble}
-        onThemeToggle={handleThemeToggle}
-      />
 
-
-      {centeredBubble && (
+      {/* Layer 4: Bottom overlay + InputBar + Action button */}
+      {!isOriginBubbleCentered && centeredBubble && (
         <BottomBar
           theme={theme}
           onBackToHome={handleBackToHome}
           isRTL={isRTL}
-          isHomeBubble={isHomeBubbleCentered}
         />
       )}
 

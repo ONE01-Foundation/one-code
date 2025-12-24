@@ -30,38 +30,36 @@ export default function TopBar({ theme, aiText, isRTL }: TopBarProps) {
 
   if (!displayText) return null;
 
-  const words = displayText.split(" ");
-  const firstWord = words[0];
-  const lastWord = words[words.length - 1];
-  const middleWords = words.slice(1, -1).join(" ");
-
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-40 pointer-events-none
-        h-24 bg-gradient-to-b ${
+      className={`fixed top-0 left-0 right-0 z-30 pointer-events-none
+        h-32 bg-gradient-to-b ${
           theme === "dark"
-            ? "from-black via-black/80 to-transparent"
-            : "from-white via-white/80 to-transparent"
+            ? "from-black/90 via-black/70 to-transparent"
+            : "from-white/90 via-white/70 to-transparent"
         }`}
+      style={{
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
     >
       <div
-        className={`absolute top-16 left-1/2 -translate-x-1/2 w-full max-w-2xl px-8
+        className={`absolute top-20 left-1/2 -translate-x-1/2 w-full max-w-2xl px-8
           transition-opacity duration-500 ${isVisible ? "opacity-100" : "opacity-0"}
           text-center
         `}
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         <p
-          className={`text-base md:text-lg ${
-            theme === "dark" ? "text-white/80" : "text-black/80"
+          className={`text-lg md:text-xl font-medium ${
+            theme === "dark" ? "text-white/90" : "text-black/90"
           }`}
+          style={{
+            lineHeight: "1.5",
+            textAlign: "center",
+          }}
         >
-          <span className="font-bold">{firstWord}</span>
-          {middleWords && ` ${middleWords} `}
-          <span className="font-bold">{lastWord}</span>
+          {displayText}
         </p>
       </div>
     </div>
   );
 }
-

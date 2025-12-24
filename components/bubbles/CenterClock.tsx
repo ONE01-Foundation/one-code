@@ -9,6 +9,7 @@ interface CenterClockProps {
 
 export default function CenterClock({ theme, onToggle }: CenterClockProps) {
   const [time, setTime] = useState<string>("");
+  const [date, setDate] = useState<string>("");
 
   useEffect(() => {
     const updateTime = () => {
@@ -16,6 +17,14 @@ export default function CenterClock({ theme, onToggle }: CenterClockProps) {
       const hours = now.getHours().toString().padStart(2, "0");
       const minutes = now.getMinutes().toString().padStart(2, "0");
       setTime(`${hours}:${minutes}`);
+      
+      // Format date (e.g., "Mon, Jan 15")
+      const options: Intl.DateTimeFormatOptions = { 
+        weekday: "short", 
+        month: "short", 
+        day: "numeric" 
+      };
+      setDate(now.toLocaleDateString("en-US", options));
     };
 
     updateTime();
@@ -27,18 +36,20 @@ export default function CenterClock({ theme, onToggle }: CenterClockProps) {
   return (
     <button
       onClick={onToggle}
-      className={`px-3 py-1.5 rounded-full transition-all duration-200
+      className={`px-4 py-2 rounded-full transition-all duration-200
         ${theme === "dark" 
-          ? "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white/80" 
-          : "bg-black/10 text-black/60 hover:bg-black/20 hover:text-black/80"
+          ? "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white/100" 
+          : "bg-black/10 text-black/80 hover:bg-black/20 hover:text-black/100"
         }
         backdrop-blur-sm border ${
           theme === "dark" ? "border-white/20" : "border-black/20"
         }`}
       aria-label="Toggle theme"
     >
-      <span className="text-xs font-mono tracking-wider">{time}</span>
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-base font-mono tracking-wider">{time}</span>
+        <span className="text-[10px] font-medium opacity-70">{date}</span>
+      </div>
     </button>
   );
 }
-
