@@ -31,7 +31,7 @@ export default function BubbleField({
   onThemeToggle,
 }: BubbleFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [panOffset, setPanOffset] = useState<Position>({ x: 0, y: 0 });
+  const [panOffset, setPanOffset] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
   const [velocity, setVelocity] = useState<Position>({ x: 0, y: 0 });
@@ -72,10 +72,11 @@ export default function BubbleField({
         const homeIndex = bubbles.findIndex((b) => b.id === homeBubble.id);
         if (homeIndex >= 0 && positions[homeIndex]) {
           const homePos = positions[homeIndex];
-          setPanOffset({
+          const offset = {
             x: center.x - homePos.x,
             y: center.y - homePos.y,
-          });
+          };
+          setPanOffset(offset);
           setVelocity({ x: 0, y: 0 });
           // Immediately notify that home bubble is centered
           setTimeout(() => {
@@ -107,6 +108,7 @@ export default function BubbleField({
 
     bubbles.forEach((bubble, index) => {
       if (!bubblePositions[index]) return;
+      if (panOffset === null) return;
       const pos = bubblePositions[index];
       const screenX = pos.x + panOffset.x;
       const screenY = pos.y + panOffset.y;
@@ -147,6 +149,7 @@ export default function BubbleField({
 
   // Update centered bubble when pan changes
   useEffect(() => {
+    if (panOffset === null) return;
     const closest = findClosestBubble();
     onCenteredBubbleChange(closest);
   }, [panOffset, findClosestBubble, onCenteredBubbleChange]);
@@ -168,15 +171,18 @@ export default function BubbleField({
 
   // Inertia animation
   useEffect(() => {
-    if (isDragging || (Math.abs(velocity.x) < 0.1 && Math.abs(velocity.y) < 0.1)) {
+    if (isDragging || panOffset === null || (Math.abs(velocity.x) < 0.1 && Math.abs(velocity.y) < 0.1)) {
       return;
     }
 
     const animate = () => {
-      setPanOffset((prev) => ({
-        x: prev.x + velocity.x,
-        y: prev.y + velocity.y,
-      }));
+      setPanOffset((prev) => {
+        if (prev === null) return null;
+        return {
+          x: prev.x + velocity.x,
+          y: prev.y + velocity.y,
+        };
+      });
 
       setVelocity((prev) => ({
         x: prev.x * 0.95,
@@ -195,7 +201,7 @@ export default function BubbleField({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isDragging, velocity]);
+  }, [isDragging, velocity, panOffset]);
 
   const handleInteraction = () => {
     setLastInteractionTime(Date.now());
@@ -218,6 +224,7 @@ export default function BubbleField({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (panOffset === null) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
     setVelocity({ x: 0, y: 0 });
@@ -225,7 +232,7 @@ export default function BubbleField({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || panOffset === null) return;
     handleInteraction();
 
     const now = Date.now();
@@ -252,6 +259,7 @@ export default function BubbleField({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (panOffset === null) return;
     // Prevent default to avoid scrolling issues on mobile
     e.preventDefault();
     const touch = e.touches[0];
@@ -264,7 +272,7 @@ export default function BubbleField({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || panOffset === null) return;
     e.preventDefault(); // Prevent scrolling on mobile
     handleInteraction();
     
@@ -305,7 +313,7 @@ export default function BubbleField({
       onTouchEnd={handleTouchEnd}
     >
       {bubbles.map((bubble, index) => {
-        if (!bubblePositions[index]) return null;
+        if (!bubblePositions[index] || panOffset === null) return null;
         const pos = bubblePositions[index];
         const center = getCenterPoint();
         const screenX = pos.x + panOffset.x;
