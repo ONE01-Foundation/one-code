@@ -11,6 +11,8 @@ interface BubbleProps {
   isCentered: boolean;
   isOrigin: boolean;
   isIdle: boolean;
+  isMoving: boolean;
+  isOriginCentered: boolean; // Whether the origin bubble is currently centered
   onClick: () => void;
   showClock?: boolean;
   onThemeToggle?: () => void;
@@ -24,6 +26,8 @@ export default function Bubble({
   isCentered,
   isOrigin,
   isIdle,
+  isMoving,
+  isOriginCentered,
   onClick,
   showClock = false,
   onThemeToggle,
@@ -31,10 +35,26 @@ export default function Bubble({
   const size = 120 * scale;
   const borderRadius = "50%"; // Always circle
 
-  // Opacity based on centered state and idle state
-  let opacity = isCentered ? 1 : 0.7;
-  if (isIdle && !isCentered) {
-    opacity = 0.4;
+  // Opacity based on visibility rules
+  let opacity = 1;
+  
+  if (isOriginCentered && isIdle && !isMoving) {
+    // State A: Idle + centered on ORIGIN - hide all non-centered bubbles
+    if (!isCentered) {
+      opacity = 0;
+    } else {
+      opacity = 1; // Origin bubble stays visible
+    }
+  } else if (isMoving || !isIdle) {
+    // State B: User is moving - show all bubbles with higher opacity
+    opacity = isCentered ? 1 : 0.7;
+  } else {
+    // State C: Idle + centered on NON-origin - fade non-centered bubbles to low opacity
+    if (isCentered) {
+      opacity = 1;
+    } else {
+      opacity = 0.3; // Low background opacity
+    }
   }
 
   // Border width - stronger for centered, especially origin
@@ -45,7 +65,7 @@ export default function Bubble({
     height: `${size}px`,
     borderRadius,
     transform: `translate(${position.x - size / 2}px, ${position.y - size / 2}px)`,
-    transition: "transform 0.3s ease-out, opacity 0.3s ease-out, border-width 0.3s ease-out",
+    transition: "transform 0.3s ease-out, opacity 0.4s ease-out, border-width 0.3s ease-out",
     position: "absolute" as const,
     display: "flex",
     flexDirection: "column" as const,
@@ -75,33 +95,36 @@ export default function Bubble({
         opacity,
       }}
     >
-      {/* Always show icon and label */}
-      <div className="flex flex-col items-center gap-0.5 relative">
-        <span className="text-xl">{bubble.icon}</span>
-        <span
-          className={`text-xs font-semibold ${
-            theme === "dark" ? "text-white/90" : "text-black/90"
-          }`}
-        >
-          {label}
-        </span>
-        {/* Show title only when centered */}
-        {isCentered && !isOrigin && (
+      {isOrigin && isCentered ? (
+        // Origin bubble: ONLY clock + date, positioned in upper area
+        <div className="flex flex-col items-center gap-0.5 relative" style={{ marginTop: "-20px" }}>
+          {showClock && onThemeToggle && (
+            <CenterClock theme={theme} onToggle={onThemeToggle} />
+          )}
+        </div>
+      ) : (
+        // Other bubbles: icon + label + title when centered
+        <div className="flex flex-col items-center gap-0.5 relative">
+          <span className="text-xl">{bubble.icon}</span>
           <span
-            className={`text-[10px] font-medium ${
-              theme === "dark" ? "text-white/70" : "text-black/70"
+            className={`text-xs font-semibold ${
+              theme === "dark" ? "text-white/90" : "text-black/90"
             }`}
           >
-            {bubble.title}
+            {label}
           </span>
-        )}
-        {/* Clock only in origin bubble when centered */}
-        {showClock && onThemeToggle && (
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
-            <CenterClock theme={theme} onToggle={onThemeToggle} />
-          </div>
-        )}
-      </div>
+          {/* Show title only when centered */}
+          {isCentered && (
+            <span
+              className={`text-[10px] font-medium ${
+                theme === "dark" ? "text-white/70" : "text-black/70"
+              }`}
+            >
+              {bubble.title}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -20,8 +20,8 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
           theme === "dark" ? "opacity-60" : "opacity-40"
         }`}
         style={{
-          width: "min(80vw, 600px)",
-          height: "min(80vw, 600px)",
+          width: "min(95vw, 700px)",
+          height: "min(95vw, 700px)",
           maxWidth: "100%",
           maxHeight: "100%",
         }}
@@ -38,4 +38,3 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
     </div>
   );
 }
-

@@ -14,17 +14,23 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
   const [showCaret, setShowCaret] = useState(false);
   const [mode, setMode] = useState<"private" | "global">("private");
   const [showModeText, setShowModeText] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const wordIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const caretIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const modeTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
 
   // Cycle through placeholder words
   useEffect(() => {
+    if (isFocused || inputValue) return; // Don't cycle when focused or has value
+    
     let isCycling = true;
 
     const cycleWords = () => {
-      if (!isCycling) return;
+      if (!isCycling || isFocused || inputValue) return;
       
       setCurrentWordIndex((prev) => {
         const next = (prev + 1) % PLACEHOLDER_WORDS.length;
@@ -37,8 +43,10 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
           }
           // Show caret briefly before "Now?"
           setTimeout(() => {
-            setShowCaret(true);
-            setTimeout(() => setShowCaret(false), 1000);
+            if (!isFocused && !inputValue) {
+              setShowCaret(true);
+              setTimeout(() => setShowCaret(false), 1000);
+            }
           }, 500);
           return next;
         }
@@ -48,13 +56,15 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
 
     // Initial delay before starting cycle
     const initialTimer = setTimeout(() => {
-      wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
+      if (!isFocused && !inputValue) {
+        wordIntervalRef.current = setInterval(cycleWords, 2000) as NodeJS.Timeout;
+      }
     }, 1000);
 
     // Check for idle and restart cycle
     const idleCheck = setInterval(() => {
       const timeSinceInteraction = Date.now() - lastInteractionRef.current;
-      if (timeSinceInteraction > 8000 && !isCycling) {
+      if (timeSinceInteraction > 8000 && !isCycling && !isFocused && !inputValue) {
         isCycling = true;
         setCurrentWordIndex(0);
         lastInteractionRef.current = Date.now();
@@ -70,7 +80,7 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
       if (wordIntervalRef.current) clearInterval(wordIntervalRef.current);
       clearInterval(idleCheck);
     };
-  }, []);
+  }, [isFocused, inputValue]);
 
   const handleModeToggle = () => {
     setMode((prev) => {
@@ -94,10 +104,45 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
     lastInteractionRef.current = Date.now();
   };
 
+  const handleInputFocus = () => {
+    setIsFocused(true);
+    // Stop hint animation immediately
+    if (wordIntervalRef.current) {
+      clearInterval(wordIntervalRef.current);
+      wordIntervalRef.current = null;
+    }
+    setShowCaret(false);
+    // Clear placeholder text
+    if (!inputValue) {
+      setInputValue("");
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsFocused(false);
+    // If input is empty, restart hint cycle after delay
+    if (!inputValue) {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+      }
+      restartTimeoutRef.current = setTimeout(() => {
+        if (!isFocused && !inputValue) {
+          setCurrentWordIndex(0);
+          lastInteractionRef.current = Date.now();
+        }
+      }, 3000) as NodeJS.Timeout;
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    lastInteractionRef.current = Date.now();
+  };
+
   const isLight = theme === "light";
   const displayText = showModeText 
     ? (mode === "private" ? "Private" : "Global")
-    : PLACEHOLDER_WORDS[currentWordIndex];
+    : (isFocused || inputValue ? "" : PLACEHOLDER_WORDS[currentWordIndex]);
 
   return (
     <div
@@ -142,31 +187,52 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
           />
         </button>
 
-        {/* Input text */}
-        <div className="flex-1 min-w-0 text-center">
-          <span
-            className={`
-              text-base font-medium transition-all duration-500
-              ${isLight ? "text-black/70" : "text-white/70"}
-            `}
-          >
-            {displayText}
-            {showCaret && displayText === "Now?" && (
-              <span className="animate-pulse">|</span>
-            )}
-          </span>
+        {/* Input field */}
+        <div className="flex-1 min-w-0 relative">
+          {!isFocused && !inputValue ? (
+            <div 
+              className="w-full text-center cursor-text"
+              onClick={() => inputRef.current?.focus()}
+            >
+              <span
+                className={`
+                  text-base font-medium
+                  ${isLight ? "text-black/70" : "text-white/70"}
+                `}
+              >
+                {displayText}
+                {showCaret && displayText === "Now?" && (
+                  <span className="animate-pulse ml-0.5">|</span>
+                )}
+              </span>
+            </div>
+          ) : (
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className={`
+                w-full bg-transparent border-none outline-none
+                text-base font-medium
+                ${isLight ? "text-black/70" : "text-white/70"}
+              `}
+              style={{
+                textAlign: "center",
+              }}
+            />
+          )}
         </div>
 
-        {/* Microphone button */}
+        {/* Microphone button - no border/outline */}
         <button
           onClick={handleMicClick}
           className={`
-            w-9 h-9 rounded-full flex items-center justify-center
+            w-9 h-9 flex items-center justify-center
             transition-all duration-200 flex-shrink-0
-            ${isLight
-              ? "bg-black/10 hover:bg-black/20"
-              : "bg-white/10 hover:bg-white/20"
-            }
+            bg-transparent border-none outline-none
           `}
           aria-label="Voice input"
         >
@@ -175,7 +241,7 @@ export default function InputBar({ theme, isRTL }: InputBarProps) {
             alt="Microphone"
             width={18}
             height={18}
-            className={isLight ? "opacity-70" : "opacity-70 brightness-0 invert"}
+            className={`${isLight ? "opacity-50" : "opacity-50 brightness-0 invert"}`}
           />
         </button>
       </div>

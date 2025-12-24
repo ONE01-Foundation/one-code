@@ -11,12 +11,15 @@ interface BubbleFieldProps {
   originBubble: BubbleType;
   targetBubble: BubbleType | null;
   onThemeToggle: () => void;
+  centeredBubble: BubbleType | null;
 }
 
 interface Position {
   x: number;
   y: number;
 }
+
+const MIN_BUBBLE_DISTANCE = 140; // Minimum distance between bubble centers
 
 export default function BubbleField({
   bubbles,
@@ -25,6 +28,7 @@ export default function BubbleField({
   originBubble,
   targetBubble,
   onThemeToggle,
+  centeredBubble,
 }: BubbleFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [panOffset, setPanOffset] = useState<Position | null>(null);
@@ -35,8 +39,10 @@ export default function BubbleField({
   const [lastMovePos, setLastMovePos] = useState<Position>({ x: 0, y: 0 });
   const animationFrameRef = useRef<number | null>(null);
   const [isIdle, setIsIdle] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
   const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const movingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
@@ -51,6 +57,48 @@ export default function BubbleField({
     };
   }, []);
 
+  // Collision avoidance: ensure minimum distance between bubbles
+  const enforceMinimumDistance = useCallback((positions: Position[]): Position[] => {
+    const adjusted = [...positions];
+    const maxIterations = 10;
+    
+    for (let iter = 0; iter < maxIterations; iter++) {
+      let hasCollision = false;
+      
+      for (let i = 0; i < adjusted.length; i++) {
+        for (let j = i + 1; j < adjusted.length; j++) {
+          const dx = adjusted[j].x - adjusted[i].x;
+          const dy = adjusted[j].y - adjusted[i].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < MIN_BUBBLE_DISTANCE && distance > 0) {
+            hasCollision = true;
+            const overlap = MIN_BUBBLE_DISTANCE - distance;
+            const angle = Math.atan2(dy, dx);
+            
+            // Push bubbles apart
+            const moveX = Math.cos(angle) * overlap * 0.5;
+            const moveY = Math.sin(angle) * overlap * 0.5;
+            
+            // Don't move origin bubble (index 0)
+            if (i !== 0) {
+              adjusted[i].x -= moveX;
+              adjusted[i].y -= moveY;
+            }
+            if (j !== 0) {
+              adjusted[j].x += moveX;
+              adjusted[j].y += moveY;
+            }
+          }
+        }
+      }
+      
+      if (!hasCollision) break;
+    }
+    
+    return adjusted;
+  }, []);
+
   const updatePositions = useCallback(() => {
     if (containerRef.current) {
       // Use actual viewport dimensions with safe area
@@ -58,11 +106,15 @@ export default function BubbleField({
       const width = rect.width;
       const height = rect.height;
       
-      const positions = generateHoneycombPositions(
+      let positions = generateHoneycombPositions(
         bubbles.length,
         width,
         height
       );
+      
+      // Enforce minimum distance
+      positions = enforceMinimumDistance(positions);
+      
       setBubblePositions(positions);
       
       // Center the origin bubble initially
@@ -88,7 +140,7 @@ export default function BubbleField({
         }
       }
     }
-  }, [bubbles.length, bubbles, originBubble, onCenteredBubbleChange]);
+  }, [bubbles.length, bubbles, originBubble, onCenteredBubbleChange, enforceMinimumDistance]);
 
   useEffect(() => {
     // Initial positioning
@@ -205,16 +257,30 @@ export default function BubbleField({
     };
   }, [isDragging, velocity, panOffset]);
 
-  const handleInteraction = () => {
-    setLastInteractionTime(Date.now());
+  const handleInteraction = useCallback(() => {
+    const now = Date.now();
+    setLastInteractionTime(now);
     setIsIdle(false);
+    setIsMoving(true);
+    
+    // Clear existing timeouts
     if (idleTimeoutRef.current) {
       clearTimeout(idleTimeoutRef.current);
     }
+    if (movingTimeoutRef.current) {
+      clearTimeout(movingTimeoutRef.current);
+    }
+    
+    // Set moving to false after movement stops
+    movingTimeoutRef.current = setTimeout(() => {
+      setIsMoving(false);
+    }, 200) as NodeJS.Timeout;
+    
+    // Set idle after 1000ms of no interaction
     idleTimeoutRef.current = setTimeout(() => {
       setIsIdle(true);
-    }, 3000);
-  };
+    }, 1000) as NodeJS.Timeout;
+  }, []);
 
   // Idle state detection
   useEffect(() => {
@@ -223,8 +289,11 @@ export default function BubbleField({
       if (idleTimeoutRef.current) {
         clearTimeout(idleTimeoutRef.current);
       }
+      if (movingTimeoutRef.current) {
+        clearTimeout(movingTimeoutRef.current);
+      }
     };
-  }, []);
+  }, [handleInteraction]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (panOffset === null) return;
@@ -350,10 +419,12 @@ export default function BubbleField({
         );
         const normalizedDistance = Math.min(distance / maxDistance, 1);
         const isOrigin = bubble.id === originBubble.id;
-        // Origin bubble is larger
+        // Increased max scale for centered bubbles
         const baseScale = isOrigin ? 0.6 : 0.4;
-        const maxScale = isOrigin ? 1.4 : 1.15;
+        const maxScale = isOrigin ? 1.6 : 1.4; // Increased for all centered bubbles
         const scale = baseScale + (1 - normalizedDistance) * (maxScale - baseScale);
+
+        const isOriginCentered = centeredBubble?.id === originBubble.id;
 
         return (
           <Bubble
@@ -365,6 +436,8 @@ export default function BubbleField({
             isCentered={distance < 80}
             isOrigin={isOrigin}
             isIdle={isIdle}
+            isMoving={isMoving}
+            isOriginCentered={isOriginCentered}
             onClick={() => handleBubbleClick(bubble, index)}
             showClock={isOrigin && distance < 80}
             onThemeToggle={onThemeToggle}
@@ -384,8 +457,8 @@ function generateHoneycombPositions(
   const positions: Position[] = [];
   const isMobile = width < 768;
   const spacing = isMobile 
-    ? Math.min(140, Math.min(width, height) * 0.2)
-    : Math.min(180, Math.min(width, height) * 0.25);
+    ? Math.max(140, Math.min(width, height) * 0.2) // Ensure minimum spacing
+    : Math.max(180, Math.min(width, height) * 0.25);
   const centerX = width / 2;
   const centerY = height / 2;
 
@@ -415,7 +488,7 @@ function generateHoneycombPositions(
   }
 
   // Add minimal jitter for more natural look (less on mobile)
-  const jitterAmount = isMobile ? 20 : 40;
+  const jitterAmount = isMobile ? 15 : 30;
   return positions.map((pos, idx) => {
     // Don't jitter the first bubble (origin)
     if (idx === 0) return pos;

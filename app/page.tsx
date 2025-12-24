@@ -155,6 +155,7 @@ export default function Home() {
         originBubble={originBubble}
         targetBubble={targetBubble}
         onThemeToggle={handleThemeToggle}
+        centeredBubble={centeredBubble}
       />
 
       {/* Layer 3: Top overlay bar */}

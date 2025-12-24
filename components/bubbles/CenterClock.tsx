@@ -18,13 +18,12 @@ export default function CenterClock({ theme, onToggle }: CenterClockProps) {
       const minutes = now.getMinutes().toString().padStart(2, "0");
       setTime(`${hours}:${minutes}`);
       
-      // Format date (e.g., "Mon, Jan 15")
-      const options: Intl.DateTimeFormatOptions = { 
-        weekday: "short", 
-        month: "short", 
-        day: "numeric" 
-      };
-      setDate(now.toLocaleDateString("en-US", options));
+      // Format date (e.g., Thu, 18.12.26)
+      const day = now.getDate().toString().padStart(2, "0");
+      const month = (now.getMonth() + 1).toString().padStart(2, "0");
+      const year = now.getFullYear().toString().slice(-2);
+      const weekday = now.toLocaleDateString("en-US", { weekday: "short" });
+      setDate(`${weekday}, ${day}.${month}.${year}`);
     };
 
     updateTime();
