@@ -15,7 +15,7 @@ export default function BottomBar({
 }: BottomBarProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Start expanded, then collapse after 3 seconds
@@ -32,6 +32,7 @@ export default function BottomBar({
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
   }, [isHovered]);
@@ -48,7 +49,7 @@ export default function BottomBar({
     setIsHovered(false);
     const timer = setTimeout(() => {
       setIsExpanded(false);
-    }, 3000);
+    }, 3000) as NodeJS.Timeout;
     timeoutRef.current = timer;
   };
 

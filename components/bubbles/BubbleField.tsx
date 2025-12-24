@@ -37,10 +37,10 @@ export default function BubbleField({
   const [velocity, setVelocity] = useState<Position>({ x: 0, y: 0 });
   const [lastMoveTime, setLastMoveTime] = useState<number>(Date.now());
   const [lastMovePos, setLastMovePos] = useState<Position>({ x: 0, y: 0 });
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
   const [isIdle, setIsIdle] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState<number>(Date.now());
-  const idleTimeoutRef = useRef<NodeJS.Timeout>();
+  const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
