@@ -29,7 +29,8 @@ const MOCK_BUBBLES: Bubble[] = Array.from({ length: 30 }, (_, i) => ({
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [bubbles] = useState<Bubble[]>(MOCK_BUBBLES);
-  const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(null);
+  // Initialize with home bubble centered
+  const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(bubbles[0]);
   const [targetBubble, setTargetBubble] = useState<Bubble | null>(null);
   const [bubbleShape, setBubbleShape] = useState<BubbleShape>("circle");
   const [bubbleFill, setBubbleFill] = useState<BubbleFill>("gradient");

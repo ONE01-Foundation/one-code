@@ -57,16 +57,18 @@ export default function BubbleField({
 
   const updatePositions = useCallback(() => {
     if (containerRef.current) {
+      const width = containerRef.current.clientWidth;
+      const height = containerRef.current.clientHeight;
       const positions = generateHoneycombPositions(
         bubbles.length,
-        containerRef.current.clientWidth,
-        containerRef.current.clientHeight
+        width,
+        height
       );
       setBubblePositions(positions);
       
       // Center the home bubble initially
       if (positions.length > 0) {
-        const center = getCenterPoint();
+        const center = { x: width / 2, y: height / 2 };
         const homeIndex = bubbles.findIndex((b) => b.id === homeBubble.id);
         if (homeIndex >= 0 && positions[homeIndex]) {
           const homePos = positions[homeIndex];
@@ -75,10 +77,14 @@ export default function BubbleField({
             y: center.y - homePos.y,
           });
           setVelocity({ x: 0, y: 0 });
+          // Immediately notify that home bubble is centered
+          setTimeout(() => {
+            onCenteredBubbleChange(homeBubble);
+          }, 50);
         }
       }
     }
-  }, [bubbles.length, bubbles, homeBubble, getCenterPoint]);
+  }, [bubbles.length, bubbles, homeBubble, onCenteredBubbleChange]);
 
   useEffect(() => {
     updatePositions();
@@ -348,7 +354,10 @@ function generateHoneycombPositions(
 ): Position[] {
   const positions: Position[] = [];
   // Adjust spacing based on screen size (smaller on mobile)
-  const spacing = Math.min(180, Math.min(width, height) * 0.25);
+  const isMobile = width < 768;
+  const spacing = isMobile 
+    ? Math.min(140, Math.min(width, height) * 0.2)
+    : Math.min(180, Math.min(width, height) * 0.25);
   const centerX = width / 2;
   const centerY = height / 2;
 
@@ -358,6 +367,7 @@ function generateHoneycombPositions(
 
   while (index < count) {
     if (ring === 0) {
+      // First bubble (home) is exactly at center
       positions.push({ x: centerX, y: centerY });
       index++;
     } else {
@@ -376,10 +386,15 @@ function generateHoneycombPositions(
     ring++;
   }
 
-  // Add some jitter for more natural look
-  return positions.map((pos) => ({
-    x: pos.x + (Math.random() - 0.5) * 40,
-    y: pos.y + (Math.random() - 0.5) * 40,
-  }));
+  // Add minimal jitter for more natural look (less on mobile)
+  const jitterAmount = isMobile ? 20 : 40;
+  return positions.map((pos, idx) => {
+    // Don't jitter the first bubble (home)
+    if (idx === 0) return pos;
+    return {
+      x: pos.x + (Math.random() - 0.5) * jitterAmount,
+      y: pos.y + (Math.random() - 0.5) * jitterAmount,
+    };
+  });
 }
 
