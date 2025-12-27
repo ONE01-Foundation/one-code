@@ -995,15 +995,14 @@ export default function BubbleField({
           const prevIndex = getPrevIndex(currentSubIndex);
           const nextIndex = getNextIndex(currentSubIndex);
           
-          // Render only 3: previous (left), current (center), next (right)
+          // Render only 2: previous (left), next (right) - center is the main bubble showing sub-bubble content
           const bubblesToRender = [
             { subBubble: subBubblesArray[prevIndex], position: -1, index: prevIndex, visualIndex: prevIndex + 1 }, // Left
-            { subBubble: subBubblesArray[currentSubIndex], position: 0, index: currentSubIndex, visualIndex: currentSubIndex + 1 }, // Center
             { subBubble: subBubblesArray[nextIndex], position: 1, index: nextIndex, visualIndex: nextIndex + 1 }, // Right
           ];
           
           return bubblesToRender.map(({ subBubble, position, index, visualIndex }) => {
-            // Position: -1 (left), 0 (center), 1 (right)
+            // Position: -1 (left), 1 (right) - center is the main bubble
             const baseX = position * subBubbleSpacing;
             // Apply horizontal pan offset for smooth scrolling
             const subX = center.x + baseX + subBubblePanOffset;
@@ -1018,9 +1017,9 @@ export default function BubbleField({
             const maxScale = 1.0;
             const subScale = baseScale + (1 - normalizedDistance) * (maxScale - baseScale);
             
-            // Center bubble is always the active one
-            const isActive = position === 0;
-            const isCentered = distanceFromCenter < 80;
+            // Left/right bubbles are never active (center main bubble shows the active content)
+            const isActive = false;
+            const isCentered = false;
             
             return (
               <div
