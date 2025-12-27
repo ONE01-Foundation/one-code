@@ -722,20 +722,21 @@ export default function BubbleField({
       return;
     }
     
-    const maxIndex = centeredBubble.subBubbles.length; // 0 (parent) to N (last sub-bubble)
+    const maxIndex = centeredBubble.subBubbles.length; // Max sub-bubble index (1-based, so maxIndex = total count)
     
     setActiveSubBubbleIndex((currentIndex) => {
       let targetIndex: number;
       
-      // Start from sub-bubble 1 if currently on parent (index 0)
-      const startIndex = currentIndex === 0 ? 1 : currentIndex;
-      
       if (direction === "right") {
         // Swipe right = move to next (index + 1, infinite scroll)
-        targetIndex = startIndex < maxIndex ? startIndex + 1 : 1; // Wrap to 1 (first sub-bubble)
+        // If at parent (0), go to first sub-bubble (1)
+        // If at last sub-bubble (maxIndex), wrap back to parent (0)
+        targetIndex = currentIndex < maxIndex ? currentIndex + 1 : 0;
       } else {
         // Swipe left = move to previous (index - 1, infinite scroll)
-        targetIndex = startIndex > 1 ? startIndex - 1 : maxIndex; // Wrap to last sub-bubble
+        // If at first sub-bubble (1), go to parent (0)
+        // If at parent (0), wrap to last sub-bubble (maxIndex)
+        targetIndex = currentIndex > 0 ? currentIndex - 1 : maxIndex;
       }
       
       // Always center the active sub-bubble (offset = 0 for centered position)
@@ -746,11 +747,11 @@ export default function BubbleField({
   }, [centeredBubble]);
 
   // Reset sub-bubble index and pan offset when centered bubble changes
-  // Also auto-select first sub-bubble when a bubble with sub-bubbles is centered
+  // Start at index 0 (parent bubble) when a bubble with sub-bubbles is centered
   useEffect(() => {
     if (centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0) {
-      // Auto-select first sub-bubble when centering a bubble with sub-bubbles
-      setActiveSubBubbleIndex(1);
+      // Start at parent bubble (index 0) when centering a bubble with sub-bubbles
+      setActiveSubBubbleIndex(0);
       setSubBubblePanOffset(0);
     } else {
       setActiveSubBubbleIndex(0);
@@ -912,8 +913,8 @@ export default function BubbleField({
         const isCenteredBubble = distance < 80 && centeredBubble?.id === bubble.id;
         const hasSubBubbles = isCenteredBubble && !!bubble.subBubbles && bubble.subBubbles.length > 0;
         
-        // Determine effective sub-bubble index (default to 1 if 0, to show first sub-bubble)
-        const effectiveSubBubbleIndex = hasSubBubbles && activeSubBubbleIndex === 0 ? 1 : activeSubBubbleIndex;
+        // Index 0 = parent bubble, index 1-N = sub-bubbles
+        const effectiveSubBubbleIndex = activeSubBubbleIndex;
         
         // Get active sub-bubble (index 0 = parent, index > 0 = sub-bubble)
         const activeSubBubble = hasSubBubbles && effectiveSubBubbleIndex > 0 ? (() => {
@@ -982,26 +983,50 @@ export default function BubbleField({
           const subBubblesArray = centeredBubble.subBubbles!; // Already checked above
           const totalSubBubbles = subBubblesArray.length;
           
-          // Only render 3 sub-bubbles: previous (left), current (center), next (right)
-          // activeSubBubbleIndex: 0 = parent, 1-N = sub-bubbles (1-based)
-          // If index is 0, default to showing first sub-bubble (index 1)
-          const effectiveIndex = activeSubBubbleIndex > 0 ? activeSubBubbleIndex : 1;
-          const currentSubIndex = effectiveIndex - 1; // Convert to 0-based
+          // activeSubBubbleIndex: 0 = parent, 1-N = sub-bubbles (1-based, but 0-based array access)
+          const currentIndex = activeSubBubbleIndex;
           
-          // Calculate indices for previous, current, next with infinite scroll
-          const getPrevIndex = (idx: number) => (idx - 1 + totalSubBubbles) % totalSubBubbles;
-          const getNextIndex = (idx: number) => (idx + 1) % totalSubBubbles;
+          // Calculate previous and next indices with infinite scroll (including parent at index 0)
+          // Previous: if at 0 (parent), show last sub-bubble; if at 1+, show index - 1
+          // Next: if at max (last sub-bubble), show 0 (parent); if at 0, show 1; otherwise index + 1
+          const getPrevIndex = () => {
+            if (currentIndex === 0) {
+              // At parent, show last sub-bubble
+              return { type: 'sub', index: totalSubBubbles - 1, visualIndex: totalSubBubbles };
+            } else {
+              // At sub-bubble, show previous (which could be parent at 0 or previous sub-bubble)
+              const prev = currentIndex - 1;
+              if (prev === 0) {
+                return { type: 'parent', index: 0, visualIndex: 0 };
+              } else {
+                return { type: 'sub', index: prev - 1, visualIndex: prev };
+              }
+            }
+          };
           
-          const prevIndex = getPrevIndex(currentSubIndex);
-          const nextIndex = getNextIndex(currentSubIndex);
+          const getNextIndex = () => {
+            if (currentIndex === 0) {
+              // At parent, show first sub-bubble
+              return { type: 'sub', index: 0, visualIndex: 1 };
+            } else if (currentIndex === totalSubBubbles) {
+              // At last sub-bubble, wrap to parent
+              return { type: 'parent', index: 0, visualIndex: 0 };
+            } else {
+              // Show next sub-bubble
+              return { type: 'sub', index: currentIndex, visualIndex: currentIndex + 1 };
+            }
+          };
           
-          // Render only 2: previous (left), next (right) - center is the main bubble showing sub-bubble content
+          const prevBubble = getPrevIndex();
+          const nextBubble = getNextIndex();
+          
+          // Render only 2: previous (left), next (right) - center is the main bubble showing current content
           const bubblesToRender = [
-            { subBubble: subBubblesArray[prevIndex], position: -1, index: prevIndex, visualIndex: prevIndex + 1 }, // Left
-            { subBubble: subBubblesArray[nextIndex], position: 1, index: nextIndex, visualIndex: nextIndex + 1 }, // Right
+            { bubble: prevBubble.type === 'parent' ? centeredBubble : subBubblesArray[prevBubble.index], position: -1, ...prevBubble }, // Left
+            { bubble: nextBubble.type === 'parent' ? centeredBubble : subBubblesArray[nextBubble.index], position: 1, ...nextBubble }, // Right
           ];
           
-          return bubblesToRender.map(({ subBubble, position, index, visualIndex }) => {
+          return bubblesToRender.map(({ bubble, position, index, visualIndex }) => {
             // Position: -1 (left), 1 (right) - center is the main bubble
             const baseX = position * subBubbleSpacing;
             // Apply horizontal pan offset for smooth scrolling
@@ -1023,7 +1048,7 @@ export default function BubbleField({
             
             return (
               <div
-                key={`sub-${centeredBubble.id}-${index}-${visualIndex}`}
+                key={`sub-${centeredBubble.id}-${position}-${visualIndex}`}
                 className="absolute pointer-events-auto cursor-pointer"
                 style={{
                   left: `${subX}px`,
@@ -1062,7 +1087,7 @@ export default function BubbleField({
                       : "none",
                   }}
                 >
-                  <span className="text-3xl">{subBubble.icon}</span>
+                  <span className="text-3xl">{bubble.icon}</span>
                 </div>
               </div>
             );
