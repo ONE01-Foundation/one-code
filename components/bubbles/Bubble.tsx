@@ -110,8 +110,12 @@ export default function Bubble({
   const displayTitle = isRTL && bubble.titleRTL ? bubble.titleRTL : bubble.title;
   const displayAiText = isRTL && bubble.aiTextRTL ? bubble.aiTextRTL : bubble.aiText;
   
-  // If showing sub-bubble content, use parent's icon when centered
-  const displayIcon = (hasSubBubbles && isCentered && parentBubble) ? parentBubble.icon : bubble.icon;
+  // If showing sub-bubble content and a sub-bubble is selected, show sub-bubble icon, otherwise parent icon
+  const displayIcon = (hasSubBubbles && isCentered && subBubbleIndex !== undefined && subBubbleIndex !== null && subBubbleIndex > 0) 
+    ? bubble.icon // Sub-bubble icon (bubble is already the active sub-bubble)
+    : (hasSubBubbles && isCentered && parentBubble) 
+      ? parentBubble.icon // Parent bubble icon when index 0
+      : bubble.icon; // Regular bubble icon
   const size = isCentered ? 280 : 120 * scale;
   const borderRadius = "50%"; // Always circle
 
@@ -269,7 +273,7 @@ export default function Bubble({
           {/* When centered: bigger icon, title, and aiText */}
           {isCentered ? (
             <div className="flex flex-col items-center gap-2" style={{ marginTop: "-60px" }}>
-              {/* Bigger icon at top - show parent bubble icon if has sub-bubbles and showing sub-bubble, otherwise show bubble icon */}
+              {/* Bigger icon at top - show sub-bubble icon when selected, parent icon when index 0 */}
               <span 
                 className="text-5xl"
                 style={{
@@ -278,7 +282,7 @@ export default function Bubble({
                   marginBottom: "4px",
                 }}
               >
-                {hasSubBubbles && parentBubble && subBubbleIndex !== undefined && subBubbleIndex !== null ? parentBubble.icon : displayIcon}
+                {displayIcon}
               </span>
               {/* Title */}
           <span

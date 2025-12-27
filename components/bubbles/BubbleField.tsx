@@ -716,45 +716,46 @@ export default function BubbleField({
   }, [centeredBubble, activeSubBubbleIndex]);
 
   // Navigate between sub-bubbles horizontally (similar to vertical navigation)
-  // Index 0 = parent, index 1-5 = sub-bubbles
+  // Index 0 = parent, index 1-N = sub-bubbles (infinite scroll)
   const navigateSubBubbles = useCallback((direction: "left" | "right") => {
     if (!centeredBubble || !centeredBubble.subBubbles || centeredBubble.subBubbles.length === 0) {
       return;
     }
     
-    const subBubbleSpacing = 120;
     const maxIndex = centeredBubble.subBubbles.length; // 0 (parent) to N (last sub-bubble)
     
     setActiveSubBubbleIndex((currentIndex) => {
       let targetIndex: number;
+      
+      // Start from sub-bubble 1 if currently on parent (index 0)
+      const startIndex = currentIndex === 0 ? 1 : currentIndex;
+      
       if (direction === "right") {
-        // Swipe right = move to next (index + 1, wrap around to 0 after max)
-        targetIndex = currentIndex < maxIndex ? currentIndex + 1 : 0;
+        // Swipe right = move to next (index + 1, infinite scroll)
+        targetIndex = startIndex < maxIndex ? startIndex + 1 : 1; // Wrap to 1 (first sub-bubble)
       } else {
-        // Swipe left = move to previous (index - 1, wrap around to max after 0)
-        targetIndex = currentIndex > 0 ? currentIndex - 1 : maxIndex;
+        // Swipe left = move to previous (index - 1, infinite scroll)
+        targetIndex = startIndex > 1 ? startIndex - 1 : maxIndex; // Wrap to last sub-bubble
       }
       
-      // Calculate target offset - if index 0 (parent), offset is 0
-      // For sub-bubbles (index 1+), center them at screen center
-      if (targetIndex === 0) {
-        setSubBubblePanOffset(0);
-      } else if (centeredBubble.subBubbles) {
-        // Convert to 0-based sub-bubble index
-        const subIndex = targetIndex - 1;
-        const baseX = (subIndex * subBubbleSpacing) - ((centeredBubble.subBubbles.length - 1) * subBubbleSpacing / 2);
-        const targetOffset = -baseX; // Negative to move the bubble to center
-        setSubBubblePanOffset(targetOffset);
-      }
+      // Always center the active sub-bubble (offset = 0 for centered position)
+      setSubBubblePanOffset(0);
       
       return targetIndex;
     });
   }, [centeredBubble]);
 
   // Reset sub-bubble index and pan offset when centered bubble changes
+  // Also auto-select first sub-bubble when a bubble with sub-bubbles is centered
   useEffect(() => {
-    setActiveSubBubbleIndex(0);
-    setSubBubblePanOffset(0);
+    if (centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0) {
+      // Auto-select first sub-bubble when centering a bubble with sub-bubbles
+      setActiveSubBubbleIndex(1);
+      setSubBubblePanOffset(0);
+    } else {
+      setActiveSubBubbleIndex(0);
+      setSubBubblePanOffset(0);
+    }
   }, [centeredBubble?.id]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
@@ -770,18 +771,18 @@ export default function BubbleField({
       // Check if centered bubble has sub-bubbles
       const hasSubBubbles = centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0;
       
-      if (swipeDirection.current === "vertical" && Math.abs(deltaY) > minSwipeDistance) {
-        // Only navigate vertical if not in sub-bubble mode (or if parent doesn't have sub-bubbles)
-        if (!hasSubBubbles) {
-          // Vertical swipe - swipe UP moves to next bubble (2, 3, 4...), swipe DOWN moves to previous bubble
-          navigateToBubble(deltaY > 0 ? "up" : "down");
-        }
-      } else if (swipeDirection.current === "horizontal" && Math.abs(deltaX) > minSwipeDistance && hasSubBubbles) {
+      // Prioritize vertical swipes over horizontal - only process horizontal if it's clearly horizontal
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      const isPrimarilyVertical = absDeltaY > absDeltaX * 1.5; // Vertical is at least 1.5x stronger than horizontal
+      const isPrimarilyHorizontal = absDeltaX > absDeltaY * 1.5; // Horizontal is at least 1.5x stronger than vertical
+      
+      if (isPrimarilyVertical && absDeltaY > minSwipeDistance) {
+        // Vertical swipe - always navigate parent bubbles
+        navigateToBubble(deltaY > 0 ? "up" : "down");
+      } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
         // Horizontal swipe - navigate between sub-bubbles (swipe right = next, swipe left = previous)
         navigateSubBubbles(deltaX > 0 ? "right" : "left");
-      } else if (swipeDirection.current === "vertical" && hasSubBubbles) {
-        // If parent has sub-bubbles, vertical swipe can still navigate to next parent bubble
-        navigateToBubble(deltaY > 0 ? "up" : "down");
       }
     }
     
@@ -910,8 +911,16 @@ export default function BubbleField({
         // Check if this is the centered bubble with sub-bubbles
         const isCenteredBubble = distance < 80 && centeredBubble?.id === bubble.id;
         const hasSubBubbles = isCenteredBubble && !!bubble.subBubbles && bubble.subBubbles.length > 0;
+        
+        // Determine effective sub-bubble index (default to 1 if 0, to show first sub-bubble)
+        const effectiveSubBubbleIndex = hasSubBubbles && activeSubBubbleIndex === 0 ? 1 : activeSubBubbleIndex;
+        
         // Get active sub-bubble (index 0 = parent, index > 0 = sub-bubble)
-        const activeSubBubble = hasSubBubbles && activeSubBubbleIndex > 0 ? getActiveSubBubble() : null;
+        const activeSubBubble = hasSubBubbles && effectiveSubBubbleIndex > 0 ? (() => {
+          const subIndex = effectiveSubBubbleIndex - 1;
+          return bubble.subBubbles![subIndex] || null;
+        })() : null;
+        
         // Use active sub-bubble content if selected (index > 0), otherwise use parent bubble
         const displayBubble = activeSubBubble || bubble;
 
@@ -941,7 +950,7 @@ export default function BubbleField({
             isRTL={isRTL}
             mode={mode}
             hasSubBubbles={hasSubBubbles}
-            subBubbleIndex={activeSubBubbleIndex}
+            subBubbleIndex={hasSubBubbles ? effectiveSubBubbleIndex : 0}
             subBubblesCount={bubble.subBubbles?.length || 0}
             parentBubble={isCenteredBubble ? bubble : undefined}
             subBubbles={isCenteredBubble ? bubble.subBubbles : undefined}
@@ -965,19 +974,38 @@ export default function BubbleField({
           );
           if (parentDistance > 80) return null;
           
-          // Calculate horizontal positions for sub-bubbles (similar to vertical layout)
-          const subBubbleSpacing = 120; // Space between sub-bubbles
-          const subBubbleY = center.y; // Same Y as center (horizontal line)
-          const subBubbleSize = 80; // Smaller size for sub-bubbles
+          // Calculate horizontal positions for sub-bubbles (position them left and right of center bubble)
+          const subBubbleSpacing = 150; // Space between sub-bubbles (left, center, right)
+          const subBubbleY = center.y; // Same Y level as center bubble (horizontal line)
+          const subBubbleSize = 70; // Smaller size for sub-bubbles
           
           const subBubblesArray = centeredBubble.subBubbles!; // Already checked above
-          // Render sub-bubbles (index 1-5 in activeSubBubbleIndex corresponds to sub-bubbles 0-4)
-          return subBubblesArray.map((subBubble, subIndex) => {
-            // Calculate base X position (like vertical Y positions)
-            // Position sub-bubbles starting from index 1 (subIndex 0 maps to activeSubBubbleIndex 1)
-            const visualIndex = subIndex + 1; // Visual index: 1, 2, 3, 4, 5
-            const baseX = (subIndex * subBubbleSpacing) - ((subBubblesArray.length - 1) * subBubbleSpacing / 2);
-            // Apply horizontal pan offset
+          const totalSubBubbles = subBubblesArray.length;
+          
+          // Only render 3 sub-bubbles: previous (left), current (center), next (right)
+          // activeSubBubbleIndex: 0 = parent, 1-N = sub-bubbles (1-based)
+          // If index is 0, default to showing first sub-bubble (index 1)
+          const effectiveIndex = activeSubBubbleIndex > 0 ? activeSubBubbleIndex : 1;
+          const currentSubIndex = effectiveIndex - 1; // Convert to 0-based
+          
+          // Calculate indices for previous, current, next with infinite scroll
+          const getPrevIndex = (idx: number) => (idx - 1 + totalSubBubbles) % totalSubBubbles;
+          const getNextIndex = (idx: number) => (idx + 1) % totalSubBubbles;
+          
+          const prevIndex = getPrevIndex(currentSubIndex);
+          const nextIndex = getNextIndex(currentSubIndex);
+          
+          // Render only 3: previous (left), current (center), next (right)
+          const bubblesToRender = [
+            { subBubble: subBubblesArray[prevIndex], position: -1, index: prevIndex, visualIndex: prevIndex + 1 }, // Left
+            { subBubble: subBubblesArray[currentSubIndex], position: 0, index: currentSubIndex, visualIndex: currentSubIndex + 1 }, // Center
+            { subBubble: subBubblesArray[nextIndex], position: 1, index: nextIndex, visualIndex: nextIndex + 1 }, // Right
+          ];
+          
+          return bubblesToRender.map(({ subBubble, position, index, visualIndex }) => {
+            // Position: -1 (left), 0 (center), 1 (right)
+            const baseX = position * subBubbleSpacing;
+            // Apply horizontal pan offset for smooth scrolling
             const subX = center.x + baseX + subBubblePanOffset;
             
             // Distance from screen center
@@ -985,18 +1013,18 @@ export default function BubbleField({
             const maxDistance = Math.sqrt(Math.pow(center.x, 2) + Math.pow(center.y, 2));
             const normalizedDistance = Math.min(distanceFromCenter / maxDistance, 1);
             
-            // Scale based on distance (closer = larger, like vertical bubbles)
+            // Scale based on distance (closer = larger)
             const baseScale = 0.5;
             const maxScale = 1.0;
             const subScale = baseScale + (1 - normalizedDistance) * (maxScale - baseScale);
             
-            // Determine if this sub-bubble is active (visualIndex matches activeSubBubbleIndex)
-            const isActive = visualIndex === activeSubBubbleIndex;
+            // Center bubble is always the active one
+            const isActive = position === 0;
             const isCentered = distanceFromCenter < 80;
             
             return (
               <div
-                key={`sub-${centeredBubble.id}-${subIndex}`}
+                key={`sub-${centeredBubble.id}-${index}-${visualIndex}`}
                 className="absolute pointer-events-auto cursor-pointer"
                 style={{
                   left: `${subX}px`,
@@ -1010,10 +1038,15 @@ export default function BubbleField({
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Set active index (visualIndex 1-5)
-                  const targetOffset = -baseX;
-                  setSubBubblePanOffset(targetOffset);
-                  setActiveSubBubbleIndex(visualIndex);
+                  // Navigate to clicked sub-bubble
+                  if (position === -1) {
+                    // Clicked left - go to previous
+                    navigateSubBubbles("left");
+                  } else if (position === 1) {
+                    // Clicked right - go to next
+                    navigateSubBubbles("right");
+                  }
+                  // Center is already active, no action needed
                 }}
               >
                 <div
