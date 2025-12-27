@@ -11,7 +11,7 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth <= 480);
     };
     
     checkMobile();
@@ -34,8 +34,8 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
       <div
         className="relative"
         style={{
-          width: isMobile ? "min(90vh, 400px)" : "min(80vw, 600px)",
-          height: isMobile ? "min(90vh, 400px)" : "min(80vw, 600px)",
+          width: isMobile ? "min(85vh, 600px)" : "min(80vw, 600px)",
+          height: isMobile ? "min(85vh, 600px)" : "min(80vw, 600px)",
         }}
       >
         {/* SVG with theme color */}

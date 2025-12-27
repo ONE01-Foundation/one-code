@@ -1,29 +1,161 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import TopBar from "@/components/bubbles/TopBar";
 import BottomBar from "@/components/bubbles/BottomBar";
 import BubbleField from "@/components/bubbles/BubbleField";
 import InputBar from "@/components/bubbles/InputBar";
 import CenterOrnament from "@/components/CenterOrnament";
+import FaviconUpdater from "@/components/FaviconUpdater";
+import PWAInstaller from "@/components/PWAInstaller";
+import ThemeColorMeta from "@/components/ThemeColorMeta";
 
 export type Bubble = {
   id: string;
   title: string;
+  titleRTL?: string; // Hebrew title for RTL support
   icon: string;
   value: number;
   actionType: "open" | "view" | "edit" | "play" | "share";
   aiText: string;
+  aiTextRTL?: string; // Hebrew AI text for RTL support
+  subBubbles?: Bubble[]; // Sub-bubbles that appear horizontally when parent is centered
 };
 
-const MOCK_BUBBLES: Bubble[] = Array.from({ length: 30 }, (_, i) => ({
-  id: `bubble-${i}`,
-  title: `Item ${i + 1}`,
-  icon: ["📱", "💡", "🎯", "🚀", "⭐", "🎨", "📝", "🔔", "💬", "🎵"][i % 10],
-  value: Math.floor(Math.random() * 100),
-  actionType: ["open", "view", "edit", "play", "share"][i % 5] as Bubble["actionType"],
-  aiText: `Selected: Bubble ${i + 1}`,
-}));
+const MOCK_BUBBLES_DATA = [
+  { 
+    icon: "🏠", 
+    title: "Home", 
+    titleRTL: "בית",
+    aiText: "Welcome home where everything begins",
+    aiTextRTL: "ברוכים הבאים הביתה שם הכל מתחיל"
+  },
+  { 
+    icon: "❤️", 
+    title: "Health", 
+    titleRTL: "בריאות",
+    aiText: "Track your wellness and maintain a healthy lifestyle",
+    aiTextRTL: "עקוב אחרי הרווחה שלך ושמור על אורח חיים בריא",
+    subBubbles: [
+      { icon: "🏋️", title: "Fitness", titleRTL: "כושר", aiText: "Track workouts and stay active", aiTextRTL: "עקוב אחרי אימונים והישאר פעיל", value: 0, actionType: "view" as const },
+      { icon: "🥗", title: "Nutrition", titleRTL: "תזונה", aiText: "Monitor your diet and meal planning", aiTextRTL: "עקוב אחרי התזונה ותכנון ארוחות", value: 1, actionType: "view" as const },
+      { icon: "🧘", title: "Mental Health", titleRTL: "בריאות נפשית", aiText: "Practice mindfulness and relaxation", aiTextRTL: "תרגל מיינדפולנס ורגיעה", value: 2, actionType: "view" as const },
+      { icon: "😴", title: "Sleep", titleRTL: "שינה", aiText: "Monitor sleep patterns and quality", aiTextRTL: "עקוב אחרי דפוסי השינה ואיכותה", value: 3, actionType: "view" as const },
+      { icon: "💊", title: "Medications", titleRTL: "תרופות", aiText: "Manage prescriptions and reminders", aiTextRTL: "נהל מרשמים ותזכורות", value: 4, actionType: "edit" as const },
+    ]
+  },
+  { 
+    icon: "💰", 
+    title: "Money", 
+    titleRTL: "כסף",
+    aiText: "Manage your finances and track expenses",
+    aiTextRTL: "נהל את הכספים שלך ועקוב אחרי הוצאות",
+    subBubbles: [
+      { icon: "📊", title: "Expenses", titleRTL: "הוצאות", aiText: "Track and categorize your spending", aiTextRTL: "עקוב וסווג את ההוצאות שלך", value: 0, actionType: "view" as const },
+      { icon: "💵", title: "Income", titleRTL: "הכנסות", aiText: "Monitor earnings and revenue streams", aiTextRTL: "עקוב אחרי רווחים ותזרימי הכנסה", value: 1, actionType: "view" as const },
+      { icon: "📈", title: "Investments", titleRTL: "השקעות", aiText: "Track portfolio and investment growth", aiTextRTL: "עקוב אחרי תיק ההשקעות והצמיחה", value: 2, actionType: "view" as const },
+      { icon: "💳", title: "Budget", titleRTL: "תקציב", aiText: "Plan and stick to your financial goals", aiTextRTL: "תכנן והתחייב ליעדים הכספיים שלך", value: 3, actionType: "edit" as const },
+      { icon: "🏦", title: "Accounts", titleRTL: "חשבונות", aiText: "Manage bank accounts and balances", aiTextRTL: "נהל חשבונות בנק ומאזנים", value: 4, actionType: "view" as const },
+    ]
+  },
+  { 
+    icon: "💼", 
+    title: "Work", 
+    titleRTL: "עבודה",
+    aiText: "Organize projects and boost productivity",
+    aiTextRTL: "ארגן פרויקטים והגבר פרודוקטיביות",
+    subBubbles: [
+      { icon: "📋", title: "Projects", titleRTL: "פרויקטים", aiText: "Manage and track your work projects", aiTextRTL: "נהל ועקוב אחרי פרויקטי העבודה שלך", value: 0, actionType: "view" as const },
+      { icon: "✅", title: "Tasks", titleRTL: "משימות", aiText: "Organize your to-do list and deadlines", aiTextRTL: "ארגן את רשימת המטלות והתאריכים", value: 1, actionType: "edit" as const },
+      { icon: "👥", title: "Team", titleRTL: "צוות", aiText: "Collaborate with colleagues and contacts", aiTextRTL: "שתף פעולה עם עמיתים ואנשי קשר", value: 2, actionType: "view" as const },
+      { icon: "📅", title: "Schedule", titleRTL: "לוח זמנים", aiText: "Manage meetings and appointments", aiTextRTL: "נהל פגישות ותורים", value: 3, actionType: "view" as const },
+      { icon: "📊", title: "Reports", titleRTL: "דוחות", aiText: "View work analytics and performance", aiTextRTL: "צפה באנליטיקה וביצועים בעבודה", value: 4, actionType: "view" as const },
+    ]
+  },
+  { 
+    icon: "🎓", 
+    title: "Learning", 
+    titleRTL: "למידה",
+    aiText: "Expand knowledge and acquire new skills",
+    aiTextRTL: "הרחב ידע ורכוש כישורים חדשים",
+    subBubbles: [
+      { icon: "📚", title: "Courses", titleRTL: "קורסים", aiText: "Enroll and track your learning progress", aiTextRTL: "הירשם ועקוב אחרי ההתקדמות בלימודים", value: 0, actionType: "view" as const },
+      { icon: "📖", title: "Books", titleRTL: "ספרים", aiText: "Read and organize your library", aiTextRTL: "קרא וארגן את הספרייה שלך", value: 1, actionType: "view" as const },
+      { icon: "✍️", title: "Notes", titleRTL: "הערות", aiText: "Capture insights and study materials", aiTextRTL: "תעד תובנות וחומרי לימוד", value: 2, actionType: "edit" as const },
+      { icon: "🎯", title: "Goals", titleRTL: "מטרות", aiText: "Set learning objectives and milestones", aiTextRTL: "הגדר יעדי למידה ואבני דרך", value: 3, actionType: "edit" as const },
+      { icon: "🏆", title: "Achievements", titleRTL: "הישגים", aiText: "Track your learning accomplishments", aiTextRTL: "עקוב אחרי ההישגים הלימודיים שלך", value: 4, actionType: "view" as const },
+    ]
+  },
+  { 
+    icon: "🎨", 
+    title: "Creative", 
+    titleRTL: "יצירתי",
+    aiText: "Express yourself through art and creativity",
+    aiTextRTL: "בטא את עצמך באמצעות אמנות ויצירתיות",
+    subBubbles: [
+      { icon: "🖼️", title: "Design", titleRTL: "עיצוב", aiText: "Create visual designs and graphics", aiTextRTL: "צור עיצובים חזותיים וגרפיקה", value: 0, actionType: "edit" as const },
+      { icon: "📸", title: "Photos", titleRTL: "תמונות", aiText: "Browse and edit your photo collection", aiTextRTL: "עיין בערוך את אוסף התמונות שלך", value: 1, actionType: "view" as const },
+      { icon: "🎬", title: "Videos", titleRTL: "וידאו", aiText: "Create and watch video content", aiTextRTL: "צור וצפה בתוכן וידאו", value: 2, actionType: "play" as const },
+      { icon: "✏️", title: "Writing", titleRTL: "כתיבה", aiText: "Write stories, articles, and ideas", aiTextRTL: "כתוב סיפורים, מאמרים ורעיונות", value: 3, actionType: "edit" as const },
+      { icon: "🎵", title: "Music", titleRTL: "מוזיקה", aiText: "Listen to songs and create playlists", aiTextRTL: "האזן לשירים וצור רשימות השמעה", value: 4, actionType: "play" as const },
+    ]
+  },
+  { 
+    icon: "🌍", 
+    title: "Life", 
+    titleRTL: "חיים",
+    aiText: "Manage daily life and personal matters",
+    aiTextRTL: "נהל את חיי היומיום ועניינים אישיים",
+    subBubbles: [
+      { icon: "📅", title: "Calendar", titleRTL: "יומן", aiText: "Plan your days and stay organized", aiTextRTL: "תכנן את הימים שלך והישאר מאורגן", value: 0, actionType: "view" as const },
+      { icon: "✈️", title: "Travel", titleRTL: "נסיעות", aiText: "Plan trips and explore destinations", aiTextRTL: "תכנן טיולים וחקור יעדים", value: 1, actionType: "view" as const },
+      { icon: "🍔", title: "Food", titleRTL: "אוכל", aiText: "Discover recipes and restaurants", aiTextRTL: "גלה מתכונים ומסעדות", value: 2, actionType: "view" as const },
+      { icon: "🛒", title: "Shopping", titleRTL: "קניות", aiText: "Track purchases and wishlists", aiTextRTL: "עקוב אחרי רכישות ורשימות משאלות", value: 3, actionType: "view" as const },
+      { icon: "🏠", title: "Home", titleRTL: "בית", aiText: "Manage household tasks and maintenance", aiTextRTL: "נהל משימות בית ואחזקה", value: 4, actionType: "view" as const },
+    ]
+  },
+  { 
+    icon: "⚙️", 
+    title: "Settings", 
+    titleRTL: "הגדרות",
+    aiText: "Configure and customize preferences",
+    aiTextRTL: "הגדר והתאם העדפות"
+  },
+];
+
+// Helper function to create bubble with sub-bubbles
+const createBubble = (item: any, i: number): Bubble => {
+  const bubble: Bubble = {
+    id: `bubble-${i}`,
+    title: item.title,
+    titleRTL: item.titleRTL,
+    icon: item.icon,
+    value: i,
+    actionType: item.actionType || (["open", "view", "edit", "play", "share"][i % 5] as Bubble["actionType"]),
+    aiText: item.aiText,
+    aiTextRTL: item.aiTextRTL,
+  };
+
+  // Add sub-bubbles if they exist
+  if (item.subBubbles && item.subBubbles.length > 0) {
+    bubble.subBubbles = item.subBubbles.map((sub: any, subIndex: number) => ({
+      id: `bubble-${i}-sub-${subIndex}`,
+      title: sub.title,
+      titleRTL: sub.titleRTL,
+      icon: sub.icon,
+      value: sub.value,
+      actionType: sub.actionType,
+      aiText: sub.aiText,
+      aiTextRTL: sub.aiTextRTL,
+    }));
+  }
+
+  return bubble;
+};
+
+const MOCK_BUBBLES: Bubble[] = MOCK_BUBBLES_DATA
+  .map((item, i) => createBubble(item, i))
+  .filter(bubble => bubble.title && bubble.icon && bubble.aiText); // Filter out empty bubbles
 
 export default function Home() {
   // Initialize with a safe default - will be updated on client-side mount
@@ -31,10 +163,29 @@ export default function Home() {
   const [autoTheme, setAutoTheme] = useState(true);
   const [bubbles] = useState<Bubble[]>(MOCK_BUBBLES);
   const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(bubbles[0]);
+  const [mode, setMode] = useState<"private" | "global">("private");
   const [targetBubble, setTargetBubble] = useState<Bubble | null>(null);
-  const [lang, setLang] = useState<"en" | "he">("en");
   const [isRTL, setIsRTL] = useState(false);
   const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
+  const [hoveredBubbleId, setHoveredBubbleId] = useState<string | null>(null);
+  const [isSettingsMode, setIsSettingsMode] = useState(false);
+  const [isDashboardMode, setIsDashboardMode] = useState(false);
+
+  // Settings bubbles - update icons dynamically based on current state
+  const settingsBubbles: Bubble[] = [
+    { id: "settings-theme", title: isRTL ? "ערכת נושא" : "Theme", icon: theme === "dark" ? "🌙" : "☀️", value: 0, actionType: "open", aiText: isRTL ? "החלף בין מצב כהה ובהיר" : "Toggle dark and light mode" },
+    { id: "settings-language", title: isRTL ? "שפה" : "Language", icon: isRTL ? "🇮🇱" : "🇺🇸", value: 1, actionType: "open", aiText: isRTL ? "שנה את שפת הממשק" : "Change interface language" },
+  ];
+
+  // Dashboard bubbles with live metrics
+  const dashboardBubbles: Bubble[] = [
+    { id: "dashboard-active-users", title: isRTL ? "משתמשים פעילים" : "Active Users", icon: "👥", value: 0, actionType: "view", aiText: isRTL ? "מספר המשתמשים הפעילים בזמן אמת" : "Real-time active user count" },
+    { id: "dashboard-revenue", title: isRTL ? "הכנסות" : "Revenue", icon: "💰", value: 1, actionType: "view", aiText: isRTL ? "הכנסות כוללות וצמיחה" : "Total revenue and growth" },
+    { id: "dashboard-engagement", title: isRTL ? "השתתפות" : "Engagement", icon: "📈", value: 2, actionType: "view", aiText: isRTL ? "מדדי השתתפות ופעילות" : "Engagement and activity metrics" },
+    { id: "dashboard-conversions", title: isRTL ? "המרות" : "Conversions", icon: "🎯", value: 3, actionType: "view", aiText: isRTL ? "שיעור המרות והצלחות" : "Conversion rates and successes" },
+    { id: "dashboard-performance", title: isRTL ? "ביצועים" : "Performance", icon: "⚡", value: 4, actionType: "view", aiText: isRTL ? "מדדי ביצועים וזמן תגובה" : "Performance metrics and response times" },
+    { id: "dashboard-traffic", title: isRTL ? "תנועה" : "Traffic", icon: "🌐", value: 5, actionType: "view", aiText: isRTL ? "נפח תנועה ומקורות" : "Traffic volume and sources" },
+  ];
 
   // First bubble is the origin/home bubble
   const originBubble = bubbles[0];
@@ -69,11 +220,10 @@ export default function Home() {
     };
   }, [autoTheme]);
 
-  // Detect browser language
+  // Detect browser language for RTL support
   useEffect(() => {
     const browserLang = navigator.language.toLowerCase();
     const isHebrew = browserLang.startsWith("he");
-    setLang(isHebrew ? "he" : "en");
     setIsRTL(isHebrew);
   }, []);
 
@@ -96,6 +246,19 @@ export default function Home() {
     }, 300);
   }, []);
 
+  const handleSettingsBubbleClick = useCallback((bubble: Bubble) => {
+    if (bubble.id === "settings-theme") {
+      // Toggle theme and disable auto theme (set to manual mode)
+      setAutoTheme(false); // Disable auto theme when manually toggled in settings
+      handleThemeToggle();
+      // Stay in settings mode - don't navigate away
+    } else if (bubble.id === "settings-language") {
+      // Toggle language/RTL
+      setIsRTL((prev) => !prev);
+      // Stay in settings mode - don't navigate away
+    }
+  }, [handleThemeToggle]);
+
   const handleCenteredBubbleChange = useCallback((bubble: Bubble | null) => {
     setCenteredBubble(bubble);
     // Clear target bubble after centering is complete
@@ -105,25 +268,43 @@ export default function Home() {
   }, [targetBubble]);
 
   const handleBackToHome = useCallback(() => {
+    if (isSettingsMode) {
+      // Exit settings mode
+      setIsSettingsMode(false);
+      setCenteredBubble(originBubble);
+    } else if (isDashboardMode) {
+      // Exit dashboard mode
+      setIsDashboardMode(false);
+      setCenteredBubble(originBubble);
+    } else {
     // Trigger smooth centering of origin bubble
     setTargetBubble(originBubble);
-  }, [originBubble]);
-
-  // Update theme-color on mount and theme change
-  useEffect(() => {
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) {
-      meta.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
     }
-  }, [theme]);
+  }, [originBubble, isSettingsMode, isDashboardMode]);
+
+  const handleOpenDashboard = useCallback(() => {
+    setIsDashboardMode(true);
+    // Center first dashboard bubble
+    if (dashboardBubbles.length > 0) {
+      setTargetBubble(dashboardBubbles[0]);
+    }
+  }, [dashboardBubbles]);
+
+  const handleOpenSettings = useCallback(() => {
+    setIsSettingsMode(true);
+    // Center first settings bubble
+    if (settingsBubbles.length > 0) {
+      setTargetBubble(settingsBubbles[0]);
+    }
+  }, [settingsBubbles]);
 
   return (
+      <>
+      <ThemeColorMeta theme={theme} />
+      <FaviconUpdater theme={theme} isRTL={isRTL} />
     <div
       className="fixed inset-0 overflow-hidden"
       style={{
-        width: "100vw",
-        minHeight: "100vh",
-        height: "100dvh",
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         paddingLeft: "env(safe-area-inset-left, 0px)",
@@ -138,19 +319,41 @@ export default function Home() {
 
       {/* Layer 2: Bubble grid (draggable) */}
       <BubbleField
-        bubbles={bubbles}
+        bubbles={
+          isSettingsMode ? settingsBubbles : 
+          isDashboardMode ? dashboardBubbles : 
+          bubbles
+        }
         theme={theme}
         onCenteredBubbleChange={handleCenteredBubbleChange}
         originBubble={originBubble}
         targetBubble={targetBubble}
         onThemeToggle={handleThemeToggle}
+        onOpenSettings={handleOpenSettings}
         centeredBubble={centeredBubble}
+        isRTL={isRTL}
+        mode={mode}
+        onHoveredBubbleChange={setHoveredBubbleId}
+        onBubbleClick={isSettingsMode ? handleSettingsBubbleClick : undefined}
       />
 
       {/* Layer 3: Top overlay bar - always present */}
       <TopBar
         theme={theme}
-        aiText={centeredBubble?.aiText || null}
+        aiText={
+          (() => {
+            const targetBubble = hoveredBubbleId ? (
+              isSettingsMode ? settingsBubbles : 
+              isDashboardMode ? dashboardBubbles : 
+              bubbles
+            ).find(b => b.id === hoveredBubbleId) : centeredBubble;
+            
+            if (!targetBubble) return null;
+            
+            // Use RTL text if available and RTL is enabled
+            return isRTL && targetBubble.aiTextRTL ? targetBubble.aiTextRTL : targetBubble.aiText;
+          })()
+        }
         isRTL={isRTL}
         isTransitioning={isThemeTransitioning}
       />
@@ -159,15 +362,62 @@ export default function Home() {
       <BottomBar
         theme={theme}
         onBackToHome={handleBackToHome}
+        onOpenDashboard={handleOpenDashboard}
         isRTL={isRTL}
-        showActionButton={!isOriginBubbleCentered && centeredBubble !== null}
+        showActionButton={isSettingsMode || isDashboardMode || (!isOriginBubbleCentered && centeredBubble !== null)}
         isTransitioning={isThemeTransitioning}
       />
 
       <InputBar
         theme={theme}
         isRTL={isRTL}
+        mode={mode}
+        onModeChange={setMode}
+        isOriginCentered={isOriginBubbleCentered}
+        centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
+        onOpenSettings={handleOpenSettings}
       />
+      {/* Button below input with bubble title (only when non-origin bubble is centered) */}
+      {!isOriginBubbleCentered && centeredBubble && (
+        <div 
+          className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+          style={{
+            top: "calc(50% + 100px)", // Position below input bar - moved up slightly
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 2rem)", // Increased bottom margin
+          }}
+        >
+          <button
+            className={`
+              px-8 py-3
+              transition-all duration-300 pointer-events-auto
+              text-white
+              hover:scale-105
+              active:scale-95
+            `}
+            onClick={() => {
+              // Regular click - navigate back to origin
+              if (!isSettingsMode) {
+                setCenteredBubble(originBubble);
+              }
+            }}
+            style={{
+              minWidth: "120px",
+              width: "180px",
+              height: "72px",
+              backgroundImage: "url(/preview-button-bg.svg)",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              border: "none",
+            }}
+          >
+            <span className="text-sm font-medium whitespace-nowrap">
+              {isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title}
+            </span>
+          </button>
+        </div>
+      )}
     </div>
+    </>
   );
 }

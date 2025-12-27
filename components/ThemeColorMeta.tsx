@@ -2,19 +2,32 @@
 
 import { useEffect } from "react";
 
-export default function ThemeColorMeta() {
+interface ThemeColorMetaProps {
+  theme: "light" | "dark";
+}
+
+export default function ThemeColorMeta({ theme }: ThemeColorMetaProps) {
   useEffect(() => {
-    // Create meta tag if it doesn't exist
-    // Initial theme will be set by page.tsx based on time of day
-    let meta = document.querySelector('meta[name="theme-color"]');
+    // Find or create theme-color meta tag
+    let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
     if (!meta) {
       meta = document.createElement("meta");
       meta.setAttribute("name", "theme-color");
-      // Default to dark, will be updated immediately by page.tsx
-      meta.setAttribute("content", "#000000");
       document.head.appendChild(meta);
     }
-  }, []);
+    
+    // Update theme color based on current theme
+    meta.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
+    
+    // Also update apple status bar style
+    let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]') as HTMLMetaElement;
+    if (!appleMeta) {
+      appleMeta = document.createElement("meta");
+      appleMeta.setAttribute("name", "apple-mobile-web-app-status-bar-style");
+      document.head.appendChild(appleMeta);
+    }
+    appleMeta.setAttribute("content", theme === "dark" ? "black-translucent" : "default");
+  }, [theme]);
 
   return null;
 }

@@ -1,5 +1,56 @@
 @import "tailwindcss";
 
+/* Hide mobile browser UI elements - prevent default browser bottom bar */
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+  height: 100dvh;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+body {
+  height: 100%;
+  height: -webkit-fill-available;
+  height: 100dvh;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Prevent mobile browser bottom bar on iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Additional mobile browser UI hiding */
+@media (display-mode: standalone) {
+  body {
+    /* PWA mode - ensure no browser UI */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@keyframes blink-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #000000;
@@ -37,26 +88,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html,
-body {
-  height: 100%;
-  height: 100dvh;
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
 /* Minimal, calm transitions only */
 button {
   transition: opacity 0.15s ease, background-color 0.15s ease;
@@ -72,4 +103,45 @@ button {
     opacity: 0.3;
     transform: translate(-50%, -50%) scale(1.05);
   }
+}
+
+/* Blinking question mark animation - matches "Now" text, just blinks */
+@keyframes blink-question {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Prevent SVG/images from being selectable, copyable, or showing context menu on mobile */
+img, svg {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Allow pointer events on parent buttons but prevent image/SVG interaction */
+button img,
+button svg {
+  pointer-events: none;
+}
+
+/* Prevent context menu and selection on buttons */
+button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
