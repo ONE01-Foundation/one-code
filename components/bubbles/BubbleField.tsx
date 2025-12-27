@@ -644,10 +644,11 @@ export default function BubbleField({
     if (!swipeDirection.current) {
       const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
       const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
-      const threshold = 10; // Minimum movement to detect direction
+      const threshold = 5; // Lower threshold for more responsive detection
       
       if (deltaX > threshold || deltaY > threshold) {
-        swipeDirection.current = deltaY > deltaX ? "vertical" : "horizontal";
+        // More sensitive direction detection - need clearer distinction
+        swipeDirection.current = deltaY > deltaX * 1.2 ? "vertical" : (deltaX > deltaY * 1.2 ? "horizontal" : null);
       }
     }
     
@@ -772,11 +773,11 @@ export default function BubbleField({
       // Check if centered bubble has sub-bubbles
       const hasSubBubbles = centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0;
       
-      // Prioritize vertical swipes over horizontal - only process horizontal if it's clearly horizontal
+      // More free scrolling - prioritize the stronger direction with lower threshold
       const absDeltaX = Math.abs(deltaX);
       const absDeltaY = Math.abs(deltaY);
-      const isPrimarilyVertical = absDeltaY > absDeltaX * 1.5; // Vertical is at least 1.5x stronger than horizontal
-      const isPrimarilyHorizontal = absDeltaX > absDeltaY * 1.5; // Horizontal is at least 1.5x stronger than vertical
+      const isPrimarilyVertical = absDeltaY > absDeltaX * 1.2; // Vertical is at least 1.2x stronger
+      const isPrimarilyHorizontal = absDeltaX > absDeltaY * 1.2; // Horizontal is at least 1.2x stronger
       
       if (isPrimarilyVertical && absDeltaY > minSwipeDistance) {
         // Vertical swipe - always navigate parent bubbles
@@ -1076,15 +1077,9 @@ export default function BubbleField({
                 <div
                   className="w-full h-full rounded-full flex items-center justify-center transition-all duration-300"
                   style={{
-                    background: theme === "dark" 
-                      ? (isActive ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.1)")
-                      : (isActive ? "rgba(0, 0, 0, 0.2)" : "rgba(0, 0, 0, 0.1)"),
-                    border: isActive 
-                      ? (theme === "dark" ? "2px solid rgba(255, 255, 255, 0.5)" : "2px solid rgba(0, 0, 0, 0.5)")
-                      : "1px solid transparent",
-                    boxShadow: isActive 
-                      ? (theme === "dark" ? "0 0 20px rgba(255, 255, 255, 0.3)" : "0 0 20px rgba(0, 0, 0, 0.3)")
-                      : "none",
+                    background: "transparent", // No background for side bubbles
+                    border: "none",
+                    boxShadow: "none",
                   }}
                 >
                   <span className="text-3xl">{bubble.icon}</span>

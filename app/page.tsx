@@ -119,7 +119,11 @@ const MOCK_BUBBLES_DATA = [
     title: "Settings", 
     titleRTL: "הגדרות",
     aiText: "Configure and customize preferences",
-    aiTextRTL: "הגדר והתאם העדפות"
+    aiTextRTL: "הגדר והתאם העדפות",
+    subBubbles: [
+      { icon: "🌙", title: "Theme", titleRTL: "ערכת נושא", aiText: "Toggle dark and light mode", aiTextRTL: "החלף בין מצב כהה ובהיר", value: 0, actionType: "open" as const },
+      { icon: "🇺🇸", title: "Language", titleRTL: "שפה", aiText: "Change interface language", aiTextRTL: "שנה את שפת הממשק", value: 1, actionType: "open" as const },
+    ]
   },
 ];
 
@@ -247,15 +251,14 @@ export default function Home() {
   }, []);
 
   const handleSettingsBubbleClick = useCallback((bubble: Bubble) => {
-    if (bubble.id === "settings-theme") {
+    // Handle Settings sub-bubble clicks (Theme/Language)
+    if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
       // Toggle theme and disable auto theme (set to manual mode)
-      setAutoTheme(false); // Disable auto theme when manually toggled in settings
+      setAutoTheme(false);
       handleThemeToggle();
-      // Stay in settings mode - don't navigate away
-    } else if (bubble.id === "settings-language") {
+    } else if (bubble.title === "Language" || bubble.title === "שפה") {
       // Toggle language/RTL
       setIsRTL((prev) => !prev);
-      // Stay in settings mode - don't navigate away
     }
   }, [handleThemeToggle]);
 
@@ -334,7 +337,19 @@ export default function Home() {
         isRTL={isRTL}
         mode={mode}
         onHoveredBubbleChange={setHoveredBubbleId}
-        onBubbleClick={isSettingsMode ? handleSettingsBubbleClick : undefined}
+        onBubbleClick={(bubble) => {
+          // Handle Settings sub-bubble clicks when Settings bubble is centered
+          if (centeredBubble && centeredBubble.title === "Settings" && bubble.title) {
+            if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
+              setAutoTheme(false);
+              handleThemeToggle();
+            } else if (bubble.title === "Language" || bubble.title === "שפה") {
+              setIsRTL((prev) => !prev);
+            }
+          } else if (isSettingsMode) {
+            handleSettingsBubbleClick(bubble);
+          }
+        }}
       />
 
       {/* Layer 3: Top overlay bar - always present */}
