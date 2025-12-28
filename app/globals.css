@@ -194,3 +194,16 @@ button {
   -ms-user-select: none;
   user-select: none;
 }
+
+/* Prevent selection and copying of emoji icons */
+span[style*="text-5xl"],
+span[style*="text-4xl"],
+span[style*="text-3xl"],
+span[style*="text-2xl"] {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  pointer-events: auto;
+}

@@ -280,6 +280,12 @@ export default function Bubble({
                   display: "block",
                   lineHeight: "1",
                   marginBottom: "4px",
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  MozUserSelect: "none",
+                  msUserSelect: "none",
+                  WebkitTouchCallout: "none",
+                  pointerEvents: "auto",
                 }}
               >
                 {displayIcon}
@@ -338,6 +344,12 @@ export default function Bubble({
                   display: "block",
                   lineHeight: "1",
                   marginBottom: isSpotlighted ? "6px" : "0",
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  MozUserSelect: "none",
+                  msUserSelect: "none",
+                  WebkitTouchCallout: "none",
+                  pointerEvents: "auto",
                 }}
               >
                 {bubble.icon}
