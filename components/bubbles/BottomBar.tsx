@@ -38,6 +38,7 @@ export default function BottomBar({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
+  const hasHandledActionRef = useRef(false); // Prevent double-firing
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [isMobile, setIsMobile] = useState(false);
   const isPWA = useIsPWA();
@@ -118,6 +119,7 @@ export default function BottomBar({
     setIsPressed(true);
     setIsExpanded(true);
     isLongPressRef.current = false;
+    hasHandledActionRef.current = false; // Reset action handler flag
     
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -125,30 +127,35 @@ export default function BottomBar({
     
     // Start long press timer
     longPressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true;
-      onBackToHome();
+      if (!hasHandledActionRef.current) {
+        isLongPressRef.current = true;
+        hasHandledActionRef.current = true;
+        onBackToHome();
+      }
     }, 500) as NodeJS.Timeout; // 500ms long press
   };
 
   const handleTouchEnd = () => {
-    setIsPressed(false);
+    // Clear long press timer FIRST, before checking anything
     const wasLongPress = isLongPressRef.current;
-    
-    // Clear long press timer
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
     
-    // If it wasn't a long press, go back one bubble
-    if (!wasLongPress && onBackOneBubble) {
+    setIsPressed(false);
+    
+    // Only go back if it wasn't a long press AND we haven't already handled an action
+    if (!wasLongPress && !hasHandledActionRef.current && onBackOneBubble) {
+      hasHandledActionRef.current = true; // Mark as handled to prevent double-firing
       onBackOneBubble();
     }
     
-    // Reset long press flag after a delay
+    // Reset flags after a delay
     setTimeout(() => {
       isLongPressRef.current = false;
-    }, 100);
+      hasHandledActionRef.current = false;
+    }, 300);
     
     const timer = setTimeout(() => {
       setIsExpanded(false);
@@ -160,6 +167,7 @@ export default function BottomBar({
     setIsPressed(true);
     setIsExpanded(true);
     isLongPressRef.current = false;
+    hasHandledActionRef.current = false; // Reset action handler flag
     
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -167,30 +175,35 @@ export default function BottomBar({
     
     // Start long press timer for mouse
     longPressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true;
-      onBackToHome();
+      if (!hasHandledActionRef.current) {
+        isLongPressRef.current = true;
+        hasHandledActionRef.current = true;
+        onBackToHome();
+      }
     }, 500) as NodeJS.Timeout; // 500ms long press
   };
 
   const handleMouseUp = () => {
-    setIsPressed(false);
+    // Clear long press timer FIRST, before checking anything
     const wasLongPress = isLongPressRef.current;
-    
-    // Clear long press timer
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
     
-    // If it wasn't a long press, go back one bubble
-    if (!wasLongPress && onBackOneBubble) {
+    setIsPressed(false);
+    
+    // Only go back if it wasn't a long press AND we haven't already handled an action
+    if (!wasLongPress && !hasHandledActionRef.current && onBackOneBubble) {
+      hasHandledActionRef.current = true; // Mark as handled to prevent double-firing
       onBackOneBubble();
     }
     
-    // Reset long press flag
+    // Reset flags after a delay
     setTimeout(() => {
       isLongPressRef.current = false;
-    }, 100);
+      hasHandledActionRef.current = false;
+    }, 300);
     
     const timer = setTimeout(() => {
       setIsExpanded(false);
@@ -243,7 +256,8 @@ export default function BottomBar({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              // Prevent default click - we handle it in mouseUp/touchEnd
+              // Don't do anything on click - handled by mouseUp/touchEnd
+              // This prevents double-firing of handlers
             }}
             className={`
               flex items-center justify-center gap-2
