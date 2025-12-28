@@ -377,9 +377,23 @@ export default function Home() {
 
   // Get current bubble ID for chat context
   const getCurrentBubbleId = useCallback(() => {
-    if (!centeredBubble) return "home";
+    if (!centeredBubble) return originBubble.id;
     return centeredBubble.id;
-  }, [centeredBubble]);
+  }, [centeredBubble, originBubble]);
+
+  // Show initial greeting when origin bubble is centered for the first time
+  useEffect(() => {
+    if (isOriginBubbleCentered && !isChatOpen) {
+      const bubbleId = getCurrentBubbleId();
+      // Only show greeting if no messages exist for this bubble
+      if (!chatMessages[bubbleId] || chatMessages[bubbleId].length === 0) {
+        const greeting = isRTL 
+          ? "שלום! אני כאן כדי לעזור לך. איך אני יכול לסייע לך היום?"
+          : "Hello! I'm here to help you. How can I assist you today?";
+        setCurrentAIText(greeting);
+      }
+    }
+  }, [isOriginBubbleCentered, isChatOpen, getCurrentBubbleId, chatMessages, isRTL]);
 
   // Get current bubble title
   const getCurrentBubbleTitle = useCallback(() => {
@@ -395,7 +409,31 @@ export default function Home() {
 
   const handleOpenChat = useCallback(() => {
     setIsChatOpen(true);
-  }, []);
+    
+    // If origin bubble and no messages yet, show initial greeting
+    const bubbleId = getCurrentBubbleId();
+    if (bubbleId === originBubble.id && (!chatMessages[bubbleId] || chatMessages[bubbleId].length === 0)) {
+      // Set initial greeting for origin bubble
+      const greeting = isRTL 
+        ? "שלום! אני כאן כדי לעזור לך. איך אני יכול לסייע לך היום?"
+        : "Hello! I'm here to help you. How can I assist you today?";
+      setCurrentAIText(greeting);
+    }
+  }, [getCurrentBubbleId, originBubble, chatMessages, isRTL]);
+  
+  // Show initial greeting when origin bubble is centered for the first time
+  useEffect(() => {
+    if (isOriginBubbleCentered && !isChatOpen) {
+      const bubbleId = getCurrentBubbleId();
+      // Only show greeting if no messages exist for this bubble
+      if (!chatMessages[bubbleId] || chatMessages[bubbleId].length === 0) {
+        const greeting = isRTL 
+          ? "שלום! אני כאן כדי לעזור לך. איך אני יכול לסייע לך היום?"
+          : "Hello! I'm here to help you. How can I assist you today?";
+        setCurrentAIText(greeting);
+      }
+    }
+  }, [isOriginBubbleCentered, isChatOpen, getCurrentBubbleId, chatMessages, isRTL]);
 
   const handleCloseChat = useCallback(() => {
     setIsChatOpen(false);

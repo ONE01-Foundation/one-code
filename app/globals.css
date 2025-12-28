@@ -254,7 +254,11 @@ input::-webkit-credentials-auto-fill-button {
   display: none !important;
 }
 
-/* Prevent iOS from showing keyboard toolbar */
+/* Hide iOS keyboard accessory bar (with checkmark and arrows) */
+input::-webkit-input-placeholder {
+  -webkit-appearance: none;
+}
+
 @supports (-webkit-touch-callout: none) {
   input[type="text"],
   input[type="search"],
@@ -262,5 +266,30 @@ input::-webkit-credentials-auto-fill-button {
   input[type="tel"] {
     -webkit-appearance: none;
     -webkit-user-select: text;
+  }
+  
+  /* Hide iOS keyboard accessory toolbar (checkmark, arrows, etc.) */
+  input::-webkit-input-placeholder {
+    opacity: 0;
+  }
+}
+
+/* Hide iOS Safari input accessory bar completely */
+input[type="text"]::-webkit-input-placeholder,
+input[type="search"]::-webkit-input-placeholder {
+  -webkit-user-select: none;
+}
+
+/* Additional iOS keyboard accessory bar hiding */
+@supports (-webkit-touch-callout: none) {
+  /* Hide the input accessory bar (toolbar above keyboard) */
+  input {
+    -webkit-appearance: none;
+  }
+  
+  /* Hide the keyboard accessory view */
+  input[type="text"],
+  input[type="search"] {
+    -webkit-overflow-scrolling: touch;
   }
 }

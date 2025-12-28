@@ -474,6 +474,7 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             data-1p-ignore="true"
             data-lpignore="true"
             data-form-type="other"
+            enterKeyHint="send"
           />
           
           {/* Placeholder overlay - only visible when not focused and no value */}
