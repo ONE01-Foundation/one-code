@@ -960,13 +960,22 @@ export default function BubbleField({
         // Vertical swipe - always navigate parent bubbles
         navigateToBubble(deltaY > 0 ? "up" : "down");
       } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
-        // Horizontal swipe - navigate between sub-bubbles (swipe left = left sub-bubble, swipe right = right sub-bubble)
-        // deltaX > 0 means swipe right (finger moves right), deltaX < 0 means swipe left (finger moves left)
-        // Swipe left (deltaX < 0) should go to left sub-bubble (previous), swipe right (deltaX > 0) should go to right sub-bubble (next)
-        const direction = deltaX < 0 ? "left" : "right"; // Swipe left = left, swipe right = right
-        // Highlight the arrow being swiped
-        setHighlightedArrow(direction);
-        navigateSubBubbles(direction);
+        // Horizontal swipe - navigate between sub-bubbles
+        // In LTR: swipe left (deltaX < 0) = go to left/previous, swipe right (deltaX > 0) = go to right/next
+        // In RTL: swipe left (deltaX < 0) = go to right/next, swipe right (deltaX > 0) = go to left/previous
+        // So we need to reverse the direction in RTL mode
+        const swipeDirection = deltaX < 0 ? "left" : "right";
+        const navigationDirection = isRTL ? (swipeDirection === "left" ? "right" : "left") : swipeDirection;
+        
+        // Highlight the arrow that corresponds to the direction we're navigating TO
+        // The highlight should match the visual direction, not the navigation direction
+        // In LTR: navigating right (next) highlights right arrow, navigating left (previous) highlights left arrow
+        // In RTL: navigating right (next) is visually going left, so highlight left arrow
+        //         navigating left (previous) is visually going right, so highlight right arrow
+        const highlightDirection = isRTL ? (navigationDirection === "right" ? "left" : "right") : navigationDirection;
+        setHighlightedArrow(highlightDirection);
+        
+        navigateSubBubbles(navigationDirection);
         // Clear highlight after animation
         setTimeout(() => setHighlightedArrow(null), 300);
       }
@@ -1017,7 +1026,10 @@ export default function BubbleField({
       }
       
       scrollTimeoutRef.current = setTimeout(() => {
-        navigateSubBubbles(e.deltaX < 0 ? "left" : "right"); // Scroll left = left sub-bubble, scroll right = right sub-bubble
+        // Horizontal scroll - account for RTL
+        const scrollDirection = e.deltaX < 0 ? "left" : "right";
+        const navigationDirection = isRTL ? (scrollDirection === "left" ? "right" : "left") : scrollDirection;
+        navigateSubBubbles(navigationDirection);
       }, 50);
     } else {
       // Vertical scroll - navigate parent bubbles
