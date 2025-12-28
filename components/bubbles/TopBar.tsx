@@ -58,7 +58,7 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false }
       >
         {displayText && (
           <p
-            className={`text-sm md:text-base lg:text-lg font-normal ${
+            className={`text-base md:text-lg lg:text-xl font-normal ${
               theme === "dark" ? "text-white/60" : "text-black/60"
             }`}
             style={{

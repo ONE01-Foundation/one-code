@@ -5,7 +5,6 @@ import { useState, useEffect, useRef } from "react";
 interface BottomBarProps {
   theme: "light" | "dark";
   onBackToHome: () => void;
-  onBackOneBubble?: () => void; // Go back one bubble (previous bubble)
   onOpenDashboard?: () => void;
   isRTL: boolean;
   showActionButton?: boolean;
@@ -26,7 +25,6 @@ const useIsPWA = () => {
 export default function BottomBar({
   theme,
   onBackToHome,
-  onBackOneBubble,
   onOpenDashboard,
   isRTL,
   showActionButton = false,
@@ -36,9 +34,6 @@ export default function BottomBar({
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isLongPressRef = useRef(false);
-  const hasHandledActionRef = useRef(false); // Prevent double-firing
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [isMobile, setIsMobile] = useState(false);
   const isPWA = useIsPWA();
@@ -90,10 +85,6 @@ export default function BottomBar({
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
     };
   }, [isHovered, isPressed, showActionButton]);
 
@@ -118,93 +109,13 @@ export default function BottomBar({
   const handleTouchStart = () => {
     setIsPressed(true);
     setIsExpanded(true);
-    isLongPressRef.current = false;
-    hasHandledActionRef.current = false; // Reset action handler flag
-    
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    
-    // Start long press timer
-    longPressTimerRef.current = setTimeout(() => {
-      if (!hasHandledActionRef.current) {
-        isLongPressRef.current = true;
-        hasHandledActionRef.current = true;
-        onBackToHome();
-      }
-    }, 500) as NodeJS.Timeout; // 500ms long press
   };
 
   const handleTouchEnd = () => {
-    // Clear long press timer FIRST, before checking anything
-    const wasLongPress = isLongPressRef.current;
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    
     setIsPressed(false);
-    
-    // Only go back if it wasn't a long press AND we haven't already handled an action
-    if (!wasLongPress && !hasHandledActionRef.current && onBackOneBubble) {
-      hasHandledActionRef.current = true; // Mark as handled to prevent double-firing
-      onBackOneBubble();
-    }
-    
-    // Reset flags after a delay
-    setTimeout(() => {
-      isLongPressRef.current = false;
-      hasHandledActionRef.current = false;
-    }, 300);
-    
-    const timer = setTimeout(() => {
-      setIsExpanded(false);
-    }, 2000) as NodeJS.Timeout;
-    timeoutRef.current = timer;
-  };
-
-  const handleMouseDown = () => {
-    setIsPressed(true);
-    setIsExpanded(true);
-    isLongPressRef.current = false;
-    hasHandledActionRef.current = false; // Reset action handler flag
-    
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    // Start long press timer for mouse
-    longPressTimerRef.current = setTimeout(() => {
-      if (!hasHandledActionRef.current) {
-        isLongPressRef.current = true;
-        hasHandledActionRef.current = true;
-        onBackToHome();
-      }
-    }, 500) as NodeJS.Timeout; // 500ms long press
-  };
-
-  const handleMouseUp = () => {
-    // Clear long press timer FIRST, before checking anything
-    const wasLongPress = isLongPressRef.current;
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    
-    setIsPressed(false);
-    
-    // Only go back if it wasn't a long press AND we haven't already handled an action
-    if (!wasLongPress && !hasHandledActionRef.current && onBackOneBubble) {
-      hasHandledActionRef.current = true; // Mark as handled to prevent double-firing
-      onBackOneBubble();
-    }
-    
-    // Reset flags after a delay
-    setTimeout(() => {
-      isLongPressRef.current = false;
-      hasHandledActionRef.current = false;
-    }, 300);
-    
     const timer = setTimeout(() => {
       setIsExpanded(false);
     }, 2000) as NodeJS.Timeout;
@@ -247,18 +158,11 @@ export default function BottomBar({
           }}
         >
           <button
+            onClick={onBackToHome}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // Don't do anything on click - handled by mouseUp/touchEnd
-              // This prevents double-firing of handlers
-            }}
             className={`
               flex items-center justify-center gap-2
               transition-all duration-300 pointer-events-auto
@@ -273,24 +177,29 @@ export default function BottomBar({
                 : "w-10 h-10 rounded-full"
               }
             `}
-            aria-label="Back"
-            title="Long press to go home"
+            aria-label="Back to Home"
+            title="Back to Home"
           >
             {isExpanded && (
               <span className="text-sm font-medium transition-all duration-300">
-                {isRTL ? "חזור" : "Back"}
+                Home
               </span>
             )}
-            <img 
-              src="/Back-icon.svg"
-              alt="Back"
-              width="20"
-              height="20"
+            <svg 
+              width="20" 
+              height="20" 
+              viewBox="0 0 46 46" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
               className="flex-shrink-0"
-              style={{
-                filter: theme === "dark" ? "invert(1)" : "invert(0)",
-              }}
-            />
+            >
+              <path 
+                fillRule="evenodd" 
+                clipRule="evenodd" 
+                d="M36.5664 15.9252L27.9488 8.80004C25.0459 6.39999 20.9541 6.39999 18.0512 8.80004L9.43355 15.9252C7.88094 17.2089 7 19.1553 7 21.1861V32.2974C7 35.9056 9.77464 39 13.4 39H16.6C18.3673 39 19.8 37.5674 19.8 35.8V30.5965C19.8 28.5685 21.3234 27.0939 23 27.0939C24.6766 27.0939 26.2 28.5685 26.2 30.5965V35.8C26.2 37.5674 27.6326 39 29.4 39H32.6C36.2254 39 39 35.9056 39 32.2974V21.1861C39 19.1553 38.119 17.2089 36.5664 15.9252Z" 
+                fill={theme === "dark" ? "white" : "black"}
+              />
+            </svg>
           </button>
         </div>
       )}
