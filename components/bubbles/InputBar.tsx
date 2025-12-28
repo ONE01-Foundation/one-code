@@ -348,21 +348,23 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
         className={`
           flex items-center rounded-3xl
           transition-all duration-300 pointer-events-auto
-          ${isLight 
-            ? "bg-white/20 backdrop-blur-sm border border-black/10" 
-            : "bg-black/20 backdrop-blur-sm border border-white/10"
+          ${isFocused
+            ? "bg-white border border-white/20" // Full white when focused (keyboard open)
+            : isLight 
+              ? "bg-white/20 backdrop-blur-sm border border-black/10" 
+              : "bg-black/20 backdrop-blur-sm border border-white/10"
           }
         `}
         style={{
           gap: "0px",
-          width: "fit-content",
-          minWidth: "152px",
+          width: isFocused ? "calc(100vw - 40px)" : "fit-content",
+          minWidth: isFocused ? "calc(100vw - 40px)" : "152px",
           maxWidth: "calc(100vw - 40px)",
           height: "45px",
           paddingTop: "0px",
           paddingBottom: "0px",
-          paddingLeft: "5px",
-          paddingRight: "5px",
+          paddingLeft: isFocused ? "12px" : "5px",
+          paddingRight: isFocused ? "12px" : "5px",
         }}
       >
         {/* Mode toggle button (when origin centered) or Create button (when other bubble centered) */}
@@ -455,7 +457,10 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             className={`
               bg-transparent border-none outline-none w-full
               text-base font-extralight
-              ${isLight ? "text-black/70" : "text-white/70"}
+              ${isFocused 
+                ? "text-black" // Black text when focused (on white background)
+                : isLight ? "text-black/70" : "text-white/70"
+              }
             `}
             style={{
               fontWeight: 200,
@@ -516,26 +521,80 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
           )}
         </div>
 
-        {/* Microphone button - no border/outline */}
-        <button
-          onClick={handleMicClick}
-          onContextMenu={(e) => e.preventDefault()}
-          className={`
-            w-8 h-8 flex items-center justify-center
-            transition-all duration-200 flex-shrink-0
-            bg-transparent border-none outline-none
-          `}
-          aria-label="Voice input"
-        >
-          <img
-            src="/microphone-icon.svg"
-            alt="Microphone"
-            width={22}
-            height={22}
-            draggable="false"
-            className={`${isLight ? "opacity-50" : "opacity-50 brightness-0 invert"}`}
-          />
-        </button>
+          {/* Send button (when text entered) or Microphone button */}
+          {inputValue.trim() && onSendMessage ? (
+            <button
+              onClick={() => {
+                if (inputValue.trim() && onSendMessage) {
+                  onSendMessage(inputValue.trim());
+                  setInputValue("");
+                  inputRef.current?.blur();
+                }
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`
+                w-8 h-8 rounded-full flex items-center justify-center
+                transition-all duration-200 flex-shrink-0
+                ${isFocused
+                  ? "bg-black/10 hover:bg-black/20"
+                  : isLight
+                    ? "bg-black/10 hover:bg-black/20"
+                    : "bg-white/10 hover:bg-white/20"
+                }
+              `}
+              aria-label="Send"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{
+                  transform: isRTL ? "scaleX(-1)" : "none",
+                }}
+              >
+                <path
+                  d="M22 2L11 13"
+                  stroke={isFocused ? "#000" : (isLight ? "#000" : "#fff")}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M22 2L15 22L11 13L2 9L22 2Z"
+                  stroke={isFocused ? "#000" : (isLight ? "#000" : "#fff")}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={handleMicClick}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`
+                w-8 h-8 flex items-center justify-center
+                transition-all duration-200 flex-shrink-0
+                bg-transparent border-none outline-none
+              `}
+              aria-label="Voice input"
+            >
+              <img
+                src="/microphone-icon.svg"
+                alt="Microphone"
+                width={22}
+                height={22}
+                draggable="false"
+                className={`${isFocused 
+                  ? "opacity-70" 
+                  : isLight ? "opacity-50" : "opacity-50 brightness-0 invert"
+                }`}
+                style={isFocused ? { filter: "none", opacity: 0.7 } : {}}
+              />
+            </button>
+          )}
       </div>
     </div>
   );

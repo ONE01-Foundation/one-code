@@ -43,9 +43,16 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false, 
           setCurrentWordIndex(currentIndex);
           wordTimeoutRef.current = setTimeout(animateWords, 150) as NodeJS.Timeout;
         } else {
-          // All words shown, fade to low opacity after a delay and stop (no loop)
+          // All words shown, fade to low opacity after a delay, then hide completely
           fadeTimeoutRef.current = setTimeout(() => {
             setOpacity(0.3);
+            // Hide completely after fade
+            setTimeout(() => {
+              setIsVisible(false);
+              setDisplayWords([]);
+              setCurrentWordIndex(0);
+              setOpacity(1);
+            }, 1000); // Hide after 1 second of being faded
             isAnimating = false;
           }, 3000) as NodeJS.Timeout; // Wait 3 seconds before fading
         }

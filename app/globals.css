@@ -39,6 +39,30 @@ body {
   will-change: background-color;
 }
 
+/* Prevent viewport resize when keyboard opens on mobile */
+@supports (-webkit-touch-callout: none) {
+  html,
+  body {
+    position: fixed;
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: 100dvh;
+    overflow: hidden;
+    /* Prevent viewport resize */
+    overscroll-behavior: none;
+    touch-action: pan-x pan-y;
+  }
+  
+  /* Ensure keyboard overlays content instead of pushing it */
+  @media (max-width: 768px) {
+    html,
+    body {
+      height: 100vh !important;
+      max-height: 100vh !important;
+    }
+  }
+}
+
 /* iOS safe area backgrounds - theme-aware (dark = black, light = white) */
 /* These cover the safe area insets that iOS adds outside the viewport */
 /* Using CSS custom property that gets updated via JavaScript */

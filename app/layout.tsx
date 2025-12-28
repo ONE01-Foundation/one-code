@@ -41,7 +41,7 @@ export const viewport = {
   maximumScale: 1,
   viewportFit: "cover" as const,
   userScalable: false,
-  interactiveWidget: "resizes-content" as const,
+  interactiveWidget: "overlays-content" as const, // Changed from "resizes-content" to prevent viewport resize
 };
 
 export default function RootLayout({
