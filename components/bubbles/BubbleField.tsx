@@ -89,6 +89,7 @@ export default function BubbleField({
   const [activeSubBubbleIndex, setActiveSubBubbleIndex] = useState<number>(0);
   const [subBubblePanOffset, setSubBubblePanOffset] = useState<number>(0); // Horizontal offset for sub-bubbles
   const [isMobile, setIsMobile] = useState(false);
+  const [highlightedArrow, setHighlightedArrow] = useState<"left" | "right" | null>(null);
 
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
@@ -795,7 +796,12 @@ export default function BubbleField({
         navigateToBubble(deltaY > 0 ? "up" : "down");
       } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
         // Horizontal swipe - navigate between sub-bubbles (swipe right = next, swipe left = previous)
-        navigateSubBubbles(deltaX > 0 ? "right" : "left");
+        const direction = deltaX > 0 ? "right" : "left";
+        // Highlight the arrow being swiped
+        setHighlightedArrow(direction === "right" ? "right" : "left");
+        navigateSubBubbles(direction);
+        // Clear highlight after animation
+        setTimeout(() => setHighlightedArrow(null), 300);
       }
     }
     
@@ -989,7 +995,7 @@ export default function BubbleField({
           
           // Calculate horizontal positions for sub-bubbles (position them left and right of center bubble)
           // Use smaller spacing on mobile so arrows are more visible and closer to center
-          const subBubbleSpacing = isMobile ? 120 : 220; // Closer on mobile, further on desktop
+          const subBubbleSpacing = isMobile ? 130 : 220; // 10px further from center on mobile (was 120), further on desktop
           const subBubbleY = center.y; // Same Y level as center bubble (horizontal line)
           const subBubbleSize = 70; // Smaller size for sub-bubbles
           
@@ -1103,7 +1109,14 @@ export default function BubbleField({
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
                       style={{
-                        color: theme === "dark" ? "rgba(255, 255, 255, 0.9)" : "rgba(0, 0, 0, 0.9)",
+                        color: theme === "dark" 
+                          ? (highlightedArrow === (position === -1 ? "left" : "right") 
+                              ? "rgba(255, 255, 255, 0.9)" 
+                              : "rgba(255, 255, 255, 0.4)")
+                          : (highlightedArrow === (position === -1 ? "left" : "right")
+                              ? "rgba(0, 0, 0, 0.9)"
+                              : "rgba(0, 0, 0, 0.4)"),
+                        transition: "color 0.3s ease-out",
                       }}
                     >
                       {position === -1 ? (

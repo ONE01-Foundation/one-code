@@ -174,7 +174,6 @@ export default function Home() {
   const [hoveredBubbleId, setHoveredBubbleId] = useState<string | null>(null);
   const [isSettingsMode, setIsSettingsMode] = useState(false);
   const [isDashboardMode, setIsDashboardMode] = useState(false);
-  const [showHomeButton, setShowHomeButton] = useState(false);
 
   // Settings bubbles - update icons dynamically based on current state
   const settingsBubbles: Bubble[] = [
@@ -380,7 +379,7 @@ export default function Home() {
         onBackToHome={handleBackToHome}
         onOpenDashboard={handleOpenDashboard}
         isRTL={isRTL}
-        showActionButton={showHomeButton || isSettingsMode || isDashboardMode || (!isOriginBubbleCentered && centeredBubble !== null)}
+        showActionButton={isDashboardMode}
         isTransitioning={isThemeTransitioning}
       />
 
@@ -392,7 +391,6 @@ export default function Home() {
         isOriginCentered={isOriginBubbleCentered}
         centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
         onOpenSettings={handleOpenSettings}
-        onInputChange={(value) => setShowHomeButton(value === "1")}
       />
       {/* Button below input with bubble title (only when non-origin bubble is centered) */}
       {!isOriginBubbleCentered && centeredBubble && (

@@ -10,14 +10,13 @@ interface InputBarProps {
   isOriginCentered: boolean;
   centeredBubbleTitle?: string | null;
   onOpenSettings?: () => void;
-  onInputChange?: (value: string) => void;
 }
 
 const PLACEHOLDER_WORDS_EN = ["Think", "Feel", "Do", "Now?"];
 const PLACEHOLDER_WORDS_HE = ["חשוב", "הרגש", "עשה", "עכשיו?"];
 const LONG_IDLE_TIME = 30000; // 30 seconds of idle before hint cycle restarts
 
-export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCentered, centeredBubbleTitle, onOpenSettings, onInputChange }: InputBarProps) {
+export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCentered, centeredBubbleTitle, onOpenSettings }: InputBarProps) {
   const PLACEHOLDER_WORDS = isRTL ? PLACEHOLDER_WORDS_HE : PLACEHOLDER_WORDS_EN;
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [showModeText, setShowModeText] = useState(false);
@@ -277,14 +276,9 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setInputValue(newValue);
-    // Notify parent of input change
-    if (onInputChange) {
-      onInputChange(newValue);
-    }
+    setInputValue(e.target.value);
     // Only mark as interacted if user actually types something
-    if (newValue.length > 0) {
+    if (e.target.value.length > 0) {
       setHasInteracted(true);
       lastInteractionRef.current = Date.now();
       // Stop hint cycle permanently once user types
