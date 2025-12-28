@@ -128,7 +128,7 @@ export default function BottomBar({
     <>
       {/* Background layer for safe area - transparent to show through */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none"
+        className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none"
         style={{
           height: safeAreaBottom,
           backgroundColor: "transparent",
@@ -136,7 +136,7 @@ export default function BottomBar({
       />
       {/* Main bottom bar with gradient */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-30 pointer-events-none
+        className={`fixed bottom-0 left-0 right-0 z-40 pointer-events-none
           transition-all duration-300 ${
             isTransitioning ? "opacity-0 translate-y-full" : "opacity-100 translate-y-0"
           }`}

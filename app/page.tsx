@@ -227,13 +227,19 @@ export default function Home() {
 
   // Set data-theme attribute on html element for CSS variable updates
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    // Also directly set background color for safe areas
-    const bgColor = theme === "dark" ? "#000000" : "#FFFFFF";
-    document.documentElement.style.setProperty("background-color", bgColor);
-    
-    // Update safe area pseudo-elements via CSS custom property
-    document.documentElement.style.setProperty("--safe-area-bg", bgColor);
+    // Use requestAnimationFrame to ensure smooth transition
+    requestAnimationFrame(() => {
+      document.documentElement.setAttribute("data-theme", theme);
+      // Also directly set background color for safe areas
+      const bgColor = theme === "dark" ? "#000000" : "#FFFFFF";
+      document.documentElement.style.setProperty("background-color", bgColor);
+      
+      // Update safe area pseudo-elements via CSS custom property
+      document.documentElement.style.setProperty("--safe-area-bg", bgColor);
+      
+      // Also update body background for smooth transition
+      document.body.style.setProperty("background-color", bgColor);
+    });
   }, [theme]);
 
   // Auto theme by time - always calculated on client-side (after mount) to use correct timezone

@@ -15,6 +15,9 @@ html {
   min-height: 100vh;
   min-height: -webkit-fill-available;
   min-height: 100dvh;
+  /* Smooth theme transition */
+  transition: background-color 0.3s ease;
+  will-change: background-color;
 }
 
 body {
@@ -32,11 +35,14 @@ body {
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
+  /* Ensure smooth theme transition */
+  will-change: background-color;
 }
 
 /* iOS safe area backgrounds - theme-aware (dark = black, light = white) */
 /* These cover the safe area insets that iOS adds outside the viewport */
 /* Using CSS custom property that gets updated via JavaScript */
+/* Lower z-index so they don't cover UI elements like bottom bar */
 html::before {
   content: '';
   position: fixed;
@@ -45,7 +51,7 @@ html::before {
   right: 0;
   height: env(safe-area-inset-top, 0px);
   background-color: var(--safe-area-bg, var(--background)) !important;
-  z-index: 10000;
+  z-index: 1;
   pointer-events: none;
   transition: background-color 0.3s ease;
 }
@@ -58,7 +64,7 @@ html::after {
   right: 0;
   height: env(safe-area-inset-bottom, 0px);
   background-color: var(--safe-area-bg, var(--background)) !important;
-  z-index: 10000;
+  z-index: 1;
   pointer-events: none;
   transition: background-color 0.3s ease;
 }
