@@ -90,6 +90,14 @@ export default function BubbleField({
   const [subBubblePanOffset, setSubBubblePanOffset] = useState<number>(0); // Horizontal offset for sub-bubbles
   const [isMobile, setIsMobile] = useState(false);
   const [highlightedArrow, setHighlightedArrow] = useState<"left" | "right" | null>(null);
+  
+  // Double tap/click detection
+  const lastTapTime = useRef<number>(0);
+  const lastTapPos = useRef<Position | null>(null);
+  const doubleTapTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastClickTime = useRef<number>(0);
+  const lastClickPos = useRef<Position | null>(null);
+  const doubleClickTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
@@ -539,8 +547,11 @@ export default function BubbleField({
     };
   }, [handleInteraction]);
 
+  const mouseDownPos = useRef<Position | null>(null);
+  
   const handleMouseDown = (e: React.MouseEvent) => {
     if (panOffset === null) return;
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
     setIsDragging(true);
     const localDragStart = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
     setDragStart(localDragStart);
@@ -617,8 +628,80 @@ export default function BubbleField({
     smoothSnapToCenter();
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
     setIsDragging(false);
+    
+    // Check for double click (desktop) - only if it wasn't a drag
+    if (isPointerDevice && mouseDownPos.current) {
+      const currentTime = Date.now();
+      const currentPos: Position = { x: e.clientX, y: e.clientY };
+      const dragDistance = Math.sqrt(
+        Math.pow(currentPos.x - mouseDownPos.current.x, 2) + 
+        Math.pow(currentPos.y - mouseDownPos.current.y, 2)
+      );
+      const maxClickDistance = 30; // Maximum distance for a click (not a drag)
+      
+      // Only treat as click if movement was small (not a drag)
+      if (dragDistance < maxClickDistance) {
+        const timeSinceLastClick = currentTime - lastClickTime.current;
+        const doubleClickTimeWindow = 300; // 300ms window for double click
+        
+        // Check if this is a double click
+        if (lastClickPos.current && 
+            timeSinceLastClick < doubleClickTimeWindow &&
+            Math.abs(currentPos.x - lastClickPos.current.x) < maxClickDistance &&
+            Math.abs(currentPos.y - lastClickPos.current.y) < maxClickDistance) {
+          // Double click detected - go to origin bubble
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Clear any pending single click timeout
+          if (doubleClickTimeout.current) {
+            clearTimeout(doubleClickTimeout.current);
+            doubleClickTimeout.current = null;
+          }
+          
+          // Navigate to origin bubble
+          const center = getCenterPoint();
+          const originIndex = bubbles.findIndex(b => b.id === originBubble.id);
+          if (originIndex >= 0 && bubblePositions[originIndex]) {
+            const originPos = bubblePositions[originIndex];
+            const targetOffset = {
+              x: center.x - originPos.x,
+              y: center.y - originPos.y,
+            };
+            const clampedTarget = clampPanOffset(targetOffset);
+            setPanOffset(clampedTarget);
+            setVelocity({ x: 0, y: 0 });
+            onCenteredBubbleChange(originBubble);
+          }
+          
+          // Reset click tracking
+          lastClickTime.current = 0;
+          lastClickPos.current = null;
+          mouseDownPos.current = null;
+          return;
+        } else {
+          // Single click - wait to see if it becomes a double click
+          lastClickTime.current = currentTime;
+          lastClickPos.current = currentPos;
+          
+          // Clear any existing timeout
+          if (doubleClickTimeout.current) {
+            clearTimeout(doubleClickTimeout.current);
+          }
+          
+          // Set timeout to clear if no second click comes
+          doubleClickTimeout.current = setTimeout(() => {
+            lastClickTime.current = 0;
+            lastClickPos.current = null;
+          }, doubleClickTimeWindow);
+        }
+      }
+    }
+    
+    mouseDownPos.current = null;
+    
     // Clear velocity immediately on mouse up to stop inertia
     setVelocity({ x: 0, y: 0 });
     // Small delay to ensure dragging state is cleared before snap
@@ -772,12 +855,94 @@ export default function BubbleField({
     }
   }, [centeredBubble?.id]);
 
+  // Cleanup double tap/click timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (doubleTapTimeout.current) {
+        clearTimeout(doubleTapTimeout.current);
+      }
+      if (doubleClickTimeout.current) {
+        clearTimeout(doubleClickTimeout.current);
+      }
+    };
+  }, []);
+
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     setIsDragging(false);
     
+    const touch = e.changedTouches[0];
+    const currentTime = Date.now();
+    const currentPos: Position = { x: touch.clientX, y: touch.clientY };
+    
+    // Check for double tap
+    if (touchStartPos.current) {
+      const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
+      const maxTapDistance = 30; // Maximum distance for a tap (not a swipe)
+      
+      // If movement is small, it's a tap
+      if (deltaX < maxTapDistance && deltaY < maxTapDistance) {
+        const timeSinceLastTap = currentTime - lastTapTime.current;
+        const doubleTapTimeWindow = 300; // 300ms window for double tap
+        
+        // Check if this is a double tap
+        if (lastTapPos.current && 
+            timeSinceLastTap < doubleTapTimeWindow &&
+            Math.abs(currentPos.x - lastTapPos.current.x) < maxTapDistance &&
+            Math.abs(currentPos.y - lastTapPos.current.y) < maxTapDistance) {
+          // Double tap detected - go to origin bubble
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Clear any pending single tap timeout
+          if (doubleTapTimeout.current) {
+            clearTimeout(doubleTapTimeout.current);
+            doubleTapTimeout.current = null;
+          }
+          
+          // Navigate to origin bubble
+          const center = getCenterPoint();
+          const originIndex = bubbles.findIndex(b => b.id === originBubble.id);
+          if (originIndex >= 0 && bubblePositions[originIndex]) {
+            const originPos = bubblePositions[originIndex];
+            const targetOffset = {
+              x: center.x - originPos.x,
+              y: center.y - originPos.y,
+            };
+            const clampedTarget = clampPanOffset(targetOffset);
+            setPanOffset(clampedTarget);
+            setVelocity({ x: 0, y: 0 });
+            onCenteredBubbleChange(originBubble);
+          }
+          
+          // Reset tap tracking
+          lastTapTime.current = 0;
+          lastTapPos.current = null;
+          
+          touchStartPos.current = null;
+          swipeDirection.current = null;
+          return;
+        } else {
+          // Single tap - wait to see if it becomes a double tap
+          lastTapTime.current = currentTime;
+          lastTapPos.current = currentPos;
+          
+          // Clear any existing timeout
+          if (doubleTapTimeout.current) {
+            clearTimeout(doubleTapTimeout.current);
+          }
+          
+          // Set timeout to clear if no second tap comes
+          doubleTapTimeout.current = setTimeout(() => {
+            lastTapTime.current = 0;
+            lastTapPos.current = null;
+          }, doubleTapTimeWindow);
+        }
+      }
+    }
+    
     // Handle swipe completion
     if (touchStartPos.current && swipeDirection.current) {
-      const touch = e.changedTouches[0];
       const deltaX = touch.clientX - touchStartPos.current.x;
       const deltaY = touch.clientY - touchStartPos.current.y;
       const minSwipeDistance = 50; // Minimum distance for a swipe
@@ -795,10 +960,12 @@ export default function BubbleField({
         // Vertical swipe - always navigate parent bubbles
         navigateToBubble(deltaY > 0 ? "up" : "down");
       } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
-        // Horizontal swipe - navigate between sub-bubbles (swipe right = next, swipe left = previous)
-        const direction = deltaX > 0 ? "right" : "left";
+        // Horizontal swipe - navigate between sub-bubbles (swipe left = left sub-bubble, swipe right = right sub-bubble)
+        // deltaX > 0 means swipe right (finger moves right), deltaX < 0 means swipe left (finger moves left)
+        // Swipe left (deltaX < 0) should go to left sub-bubble (previous), swipe right (deltaX > 0) should go to right sub-bubble (next)
+        const direction = deltaX < 0 ? "left" : "right"; // Swipe left = left, swipe right = right
         // Highlight the arrow being swiped
-        setHighlightedArrow(direction === "right" ? "right" : "left");
+        setHighlightedArrow(direction);
         navigateSubBubbles(direction);
         // Clear highlight after animation
         setTimeout(() => setHighlightedArrow(null), 300);
@@ -811,7 +978,7 @@ export default function BubbleField({
     swipeDirection.current = null;
     
     // No need to snap - bubbles change directly
-  }, [navigateToBubble, navigateSubBubbles, centeredBubble]);
+  }, [navigateToBubble, navigateSubBubbles, centeredBubble, bubbles, bubblePositions, originBubble, getCenterPoint, clampPanOffset, onCenteredBubbleChange]);
 
   const handleBubbleClick = (bubble: BubbleType, index: number) => {
     if (bubblePositions[index]) {
@@ -850,7 +1017,7 @@ export default function BubbleField({
       }
       
       scrollTimeoutRef.current = setTimeout(() => {
-        navigateSubBubbles(e.deltaX > 0 ? "right" : "left");
+        navigateSubBubbles(e.deltaX < 0 ? "left" : "right"); // Scroll left = left sub-bubble, scroll right = right sub-bubble
       }, 50);
     } else {
       // Vertical scroll - navigate parent bubbles
