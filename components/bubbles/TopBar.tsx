@@ -47,7 +47,7 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false, 
           fadeTimeoutRef.current = setTimeout(() => {
             setOpacity(0.3);
             isAnimating = false;
-          }, 2000) as NodeJS.Timeout;
+          }, 3000) as NodeJS.Timeout; // Wait 3 seconds before fading
         }
       };
       

@@ -206,7 +206,8 @@ export default function Home() {
   const [isSettingsMode, setIsSettingsMode] = useState(false);
   const [isDashboardMode, setIsDashboardMode] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({}); // Chat history per bubble ID
+  const [currentAIText, setCurrentAIText] = useState<string | null>(null); // Current AI response for TopBar
 
   // Settings bubbles - update icons dynamically based on current state
   const settingsBubbles: Bubble[] = [
@@ -373,6 +374,24 @@ export default function Home() {
     }
   }, [settingsBubbles]);
 
+  // Get current bubble ID for chat context
+  const getCurrentBubbleId = useCallback(() => {
+    if (!centeredBubble) return "home";
+    return centeredBubble.id;
+  }, [centeredBubble]);
+
+  // Get current bubble title
+  const getCurrentBubbleTitle = useCallback(() => {
+    if (!centeredBubble) return "Home";
+    return isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title;
+  }, [centeredBubble, isRTL]);
+
+  // Get chat messages for current bubble
+  const getCurrentChatMessages = useCallback((): ChatMessage[] => {
+    const bubbleId = getCurrentBubbleId();
+    return chatMessages[bubbleId] || [];
+  }, [chatMessages, getCurrentBubbleId]);
+
   const handleOpenChat = useCallback(() => {
     setIsChatOpen(true);
   }, []);
@@ -382,6 +401,10 @@ export default function Home() {
   }, []);
 
   const handleSendMessage = useCallback(async (message: string) => {
+    const bubbleId = getCurrentBubbleId();
+    const bubbleTitle = getCurrentBubbleTitle();
+    const currentMessages = chatMessages[bubbleId] || [];
+    
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -389,7 +412,11 @@ export default function Home() {
       content: message,
     };
     
-    setChatMessages((prev) => [...prev, userMessage]);
+    // Update chat messages for this bubble
+    setChatMessages((prev) => ({
+      ...prev,
+      [bubbleId]: [...currentMessages, userMessage],
+    }));
     
     // Add AI message placeholder with typing indicator
     const aiMessageId = `ai-${Date.now()}`;
@@ -400,20 +427,49 @@ export default function Home() {
       isTyping: true,
     };
     
-    setChatMessages((prev) => [...prev, aiMessage]);
+    setChatMessages((prev) => ({
+      ...prev,
+      [bubbleId]: [...(prev[bubbleId] || []), userMessage, aiMessage],
+    }));
     
-    // TODO: Connect to OpenAI API
-    // For now, simulate AI response with word-by-word typing
-    setTimeout(() => {
-      // Simulated AI response - replace with actual API call
-      const simulatedResponse = "This is a simulated AI response. OpenAI integration will be added next.";
-      const words = simulatedResponse.split(" ");
+    try {
+      // Call OpenAI API
+      const response = await fetch("/api/brain", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: message,
+          bubbleId: bubbleId,
+          bubbleTitle: bubbleTitle,
+          chatHistory: currentMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiResponse = data.reply || "I apologize, but I couldn't generate a response.";
+
+      // Update AI message with response (word-by-word animation)
+      const words = aiResponse.split(" ");
+      
+      // Set current AI text for TopBar (first 50 words or so)
+      const previewText = words.slice(0, 50).join(" ");
+      setCurrentAIText(previewText);
       
       // Word-by-word animation
-      words.forEach((word, index) => {
+      words.forEach((word: string, index: number) => {
         setTimeout(() => {
           setChatMessages((prev) => {
-            const updated = [...prev];
+            const bubbleMessages = prev[bubbleId] || [];
+            const updated = [...bubbleMessages];
             const aiMsgIndex = updated.findIndex((msg) => msg.id === aiMessageId);
             if (aiMsgIndex >= 0) {
               const currentWords = updated[aiMsgIndex].content ? updated[aiMsgIndex].content.split(" ") : [];
@@ -423,12 +479,40 @@ export default function Home() {
                 isTyping: index < words.length - 1,
               };
             }
-            return updated;
+            return {
+              ...prev,
+              [bubbleId]: updated,
+            };
           });
-        }, index * 150);
+        }, index * 50); // Faster typing for better UX
       });
-    }, 500);
-  }, []);
+
+      // Fade TopBar AI text after 5 seconds if no new response
+      setTimeout(() => {
+        setCurrentAIText(null);
+      }, 5000);
+    } catch (error) {
+      console.error("Error calling AI API:", error);
+      
+      // Update AI message with error
+      setChatMessages((prev) => {
+        const bubbleMessages = prev[bubbleId] || [];
+        const updated = [...bubbleMessages];
+        const aiMsgIndex = updated.findIndex((msg) => msg.id === aiMessageId);
+        if (aiMsgIndex >= 0) {
+          updated[aiMsgIndex] = {
+            ...updated[aiMsgIndex],
+            content: "I apologize, but I encountered an error. Please try again.",
+            isTyping: false,
+          };
+        }
+        return {
+          ...prev,
+          [bubbleId]: updated,
+        };
+      });
+    }
+  }, [chatMessages, getCurrentBubbleId, getCurrentBubbleTitle]);
 
   return (
       <>
@@ -491,7 +575,7 @@ export default function Home() {
       <TopBar
         theme={theme}
         aiText={
-          isChatOpen ? null : (() => {
+          isChatOpen ? null : (currentAIText || (() => {
             const targetBubble = hoveredBubbleId ? (
               isSettingsMode ? settingsBubbles : 
               isDashboardMode ? dashboardBubbles : 
@@ -502,7 +586,7 @@ export default function Home() {
             
             // Use RTL text if available and RTL is enabled
             return isRTL && targetBubble.aiTextRTL ? targetBubble.aiTextRTL : targetBubble.aiText;
-          })()
+          })())
         }
         isRTL={isRTL}
         isTransitioning={isThemeTransitioning}
@@ -535,7 +619,7 @@ export default function Home() {
         theme={theme}
         isRTL={isRTL}
         isOpen={isChatOpen}
-        messages={chatMessages}
+        messages={getCurrentChatMessages()}
         onClose={handleCloseChat}
       />
       {/* Button below input with bubble title (only when non-origin bubble is centered) */}
