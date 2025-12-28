@@ -967,12 +967,10 @@ export default function BubbleField({
         const swipeDirection = deltaX < 0 ? "left" : "right";
         const navigationDirection = isRTL ? (swipeDirection === "left" ? "right" : "left") : swipeDirection;
         
-        // Highlight the arrow that corresponds to the direction we're navigating TO
-        // The highlight should match the visual direction, not the navigation direction
-        // In LTR: navigating right (next) highlights right arrow, navigating left (previous) highlights left arrow
-        // In RTL: navigating right (next) is visually going left, so highlight left arrow
-        //         navigating left (previous) is visually going right, so highlight right arrow
-        const highlightDirection = isRTL ? (navigationDirection === "right" ? "left" : "right") : navigationDirection;
+        // Highlight the OPPOSITE arrow - when swiping left, highlight right arrow (where you're going)
+        // When swiping right, highlight left arrow (where you're going)
+        // This gives visual feedback that you're moving towards that direction
+        const highlightDirection = swipeDirection === "left" ? "right" : "left";
         setHighlightedArrow(highlightDirection);
         
         navigateSubBubbles(navigationDirection);
