@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import TopBar from "@/components/bubbles/TopBar";
 import BottomBar from "@/components/bubbles/BottomBar";
 import BubbleField from "@/components/bubbles/BubbleField";
@@ -208,6 +208,7 @@ export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({}); // Chat history per bubble ID
   const [currentAIText, setCurrentAIText] = useState<string | null>(null); // Current AI response for TopBar
+  const messageIdCounterRef = useRef(0); // Counter to ensure unique message IDs
 
   // Settings bubbles - update icons dynamically based on current state
   const settingsBubbles: Bubble[] = [
@@ -405,21 +406,19 @@ export default function Home() {
     const bubbleTitle = getCurrentBubbleTitle();
     const currentMessages = chatMessages[bubbleId] || [];
     
+    // Generate unique message IDs using counter + timestamp + random
+    messageIdCounterRef.current += 1;
+    const userMessageId = `user-${Date.now()}-${messageIdCounterRef.current}-${Math.random().toString(36).substr(2, 9)}`;
+    const aiMessageId = `ai-${Date.now()}-${messageIdCounterRef.current}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Add user message
     const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: userMessageId,
       role: "user",
       content: message,
     };
     
-    // Update chat messages for this bubble
-    setChatMessages((prev) => ({
-      ...prev,
-      [bubbleId]: [...currentMessages, userMessage],
-    }));
-    
     // Add AI message placeholder with typing indicator
-    const aiMessageId = `ai-${Date.now()}`;
     const aiMessage: ChatMessage = {
       id: aiMessageId,
       role: "assistant",
@@ -427,9 +426,10 @@ export default function Home() {
       isTyping: true,
     };
     
+    // Update chat messages for this bubble (add both user and AI placeholder)
     setChatMessages((prev) => ({
       ...prev,
-      [bubbleId]: [...(prev[bubbleId] || []), userMessage, aiMessage],
+      [bubbleId]: [...currentMessages, userMessage, aiMessage],
     }));
     
     try {
@@ -460,11 +460,7 @@ export default function Home() {
       // Update AI message with response (word-by-word animation)
       const words = aiResponse.split(" ");
       
-      // Set current AI text for TopBar (first 50 words or so)
-      const previewText = words.slice(0, 50).join(" ");
-      setCurrentAIText(previewText);
-      
-      // Word-by-word animation
+      // Word-by-word animation - update both chat and TopBar in real-time
       words.forEach((word: string, index: number) => {
         setTimeout(() => {
           setChatMessages((prev) => {
@@ -473,11 +469,22 @@ export default function Home() {
             const aiMsgIndex = updated.findIndex((msg) => msg.id === aiMessageId);
             if (aiMsgIndex >= 0) {
               const currentWords = updated[aiMsgIndex].content ? updated[aiMsgIndex].content.split(" ") : [];
+              const newContent = [...currentWords, word].join(" ");
+              
               updated[aiMsgIndex] = {
                 ...updated[aiMsgIndex],
-                content: [...currentWords, word].join(" "),
+                content: newContent,
                 isTyping: index < words.length - 1,
               };
+              
+              // Update TopBar with current AI response (first 50 words max, or first 200 characters)
+              const previewWords = newContent.split(" ").slice(0, 50);
+              const previewText = previewWords.join(" ");
+              if (previewText.length <= 200) {
+                setCurrentAIText(previewText);
+              } else {
+                setCurrentAIText(previewText.substring(0, 200) + "...");
+              }
             }
             return {
               ...prev,
@@ -487,10 +494,11 @@ export default function Home() {
         }, index * 50); // Faster typing for better UX
       });
 
-      // Fade TopBar AI text after 5 seconds if no new response
+      // Fade TopBar AI text after 5 seconds when typing is complete
+      const totalTypingTime = words.length * 50;
       setTimeout(() => {
         setCurrentAIText(null);
-      }, 5000);
+      }, totalTypingTime + 5000); // 5 seconds after typing completes
     } catch (error) {
       console.error("Error calling AI API:", error);
       
