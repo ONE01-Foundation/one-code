@@ -961,13 +961,13 @@ export default function BubbleField({
         navigateToBubble(deltaY > 0 ? "up" : "down");
       } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
         // Horizontal swipe - navigate between sub-bubbles
-        // Swipe right (deltaX > 0) should go to next sub-bubble (1/5, 2/5, etc.) in LTR
-        // Swipe right (deltaX > 0) should go to previous sub-bubble in RTL (opposite)
-        // Swipe left (deltaX < 0) should go to previous in LTR, next in RTL
+        // Swipe right (deltaX > 0) should go to previous sub-bubble in LTR (opposite of before)
+        // Swipe right (deltaX > 0) should go to next sub-bubble in RTL (opposite)
+        // Swipe left (deltaX < 0) should go to next in LTR, previous in RTL
         const swipeDirection = deltaX < 0 ? "left" : "right";
-        // In LTR: swipe right = next (right), swipe left = previous (left)
-        // In RTL: swipe right = previous (left), swipe left = next (right) - opposite
-        const navigationDirection = isRTL ? (swipeDirection === "right" ? "left" : "right") : swipeDirection;
+        // In LTR: swipe right = previous (left), swipe left = next (right) - OPPOSITE
+        // In RTL: swipe right = next (right), swipe left = previous (left) - OPPOSITE
+        const navigationDirection = isRTL ? (swipeDirection === "right" ? "right" : "left") : (swipeDirection === "right" ? "left" : "right");
         
         // Highlight the OPPOSITE arrow - when swiping left, highlight right arrow (where you're going)
         // When swiping right, highlight left arrow (where you're going)
@@ -1026,11 +1026,11 @@ export default function BubbleField({
       }
       
       scrollTimeoutRef.current = setTimeout(() => {
-        // Horizontal scroll - account for RTL
-        // Scroll right (deltaX > 0) should go to next sub-bubble (1/5, 2/5, etc.) in LTR
-        // Scroll right (deltaX > 0) should go to previous in RTL (opposite)
+        // Horizontal scroll - account for RTL (OPPOSITE behavior)
+        // Scroll right (deltaX > 0) should go to previous sub-bubble in LTR (opposite)
+        // Scroll right (deltaX > 0) should go to next sub-bubble in RTL (opposite)
         const scrollDirection = e.deltaX < 0 ? "left" : "right";
-        const navigationDirection = isRTL ? (scrollDirection === "right" ? "left" : "right") : scrollDirection;
+        const navigationDirection = isRTL ? (scrollDirection === "right" ? "right" : "left") : (scrollDirection === "right" ? "left" : "right");
         navigateSubBubbles(navigationDirection);
       }, 50);
     } else {
