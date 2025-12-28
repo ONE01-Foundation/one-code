@@ -266,11 +266,19 @@ export default function Home() {
     const newBubbles = createBubblesWithDynamicSettings(theme, isRTL);
     setBubbles(newBubbles);
     
-    // Update centered bubble if it exists to reflect the new bubble data
-    if (centeredBubble) {
-      const updatedCenteredBubble = newBubbles.find(b => b.id === centeredBubble.id);
-      if (updatedCenteredBubble) {
-        setCenteredBubble(updatedCenteredBubble);
+    // Update centered bubble's sub-bubbles if it's the Settings bubble
+    // This ensures emojis update without resetting the centered state
+    if (centeredBubble && (centeredBubble.title === "Settings" || centeredBubble.title === "הגדרות")) {
+      const updatedSettingsBubble = newBubbles.find(b => b.title === "Settings" || b.title === "הגדרות");
+      if (updatedSettingsBubble) {
+        // Update the centered bubble with new sub-bubbles but keep the same reference structure
+        setCenteredBubble(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            subBubbles: updatedSettingsBubble.subBubbles
+          };
+        });
       }
     }
   }, [theme, isRTL]);

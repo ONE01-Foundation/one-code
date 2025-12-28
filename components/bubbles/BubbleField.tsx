@@ -844,14 +844,21 @@ export default function BubbleField({
 
   // Reset sub-bubble index and pan offset when centered bubble changes
   // Start at index 0 (parent bubble) when a bubble with sub-bubbles is centered
+  // Only reset if the bubble ID actually changed (not just sub-bubbles updated)
+  const previousCenteredBubbleId = useRef<string | null>(null);
   useEffect(() => {
-    if (centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0) {
-      // Start at parent bubble (index 0) when centering a bubble with sub-bubbles
-      setActiveSubBubbleIndex(0);
-      setSubBubblePanOffset(0);
-    } else {
-      setActiveSubBubbleIndex(0);
-      setSubBubblePanOffset(0);
+    const currentId = centeredBubble?.id || null;
+    // Only reset if the bubble ID changed (not if it's the same bubble with updated sub-bubbles)
+    if (currentId !== previousCenteredBubbleId.current) {
+      previousCenteredBubbleId.current = currentId;
+      if (centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0) {
+        // Start at parent bubble (index 0) when centering a bubble with sub-bubbles
+        setActiveSubBubbleIndex(0);
+        setSubBubblePanOffset(0);
+      } else {
+        setActiveSubBubbleIndex(0);
+        setSubBubblePanOffset(0);
+      }
     }
   }, [centeredBubble?.id]);
 
