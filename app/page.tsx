@@ -270,6 +270,21 @@ export default function Home() {
     }
   }, [targetBubble]);
 
+  const handleBackOneBubble = useCallback(() => {
+    // Find current bubble index and go to previous one
+    const currentBubbles = isSettingsMode ? settingsBubbles : 
+                          isDashboardMode ? dashboardBubbles : 
+                          bubbles;
+    const currentIndex = currentBubbles.findIndex(b => b.id === centeredBubble?.id);
+    if (currentIndex > 0) {
+      // Go to previous bubble
+      setTargetBubble(currentBubbles[currentIndex - 1]);
+    } else if (currentIndex === 0 && currentBubbles.length > 1) {
+      // Wrap to last bubble
+      setTargetBubble(currentBubbles[currentBubbles.length - 1]);
+    }
+  }, [centeredBubble, bubbles, settingsBubbles, dashboardBubbles, isSettingsMode, isDashboardMode]);
+
   const handleBackToHome = useCallback(() => {
     if (isSettingsMode) {
       // Exit settings mode
@@ -377,6 +392,7 @@ export default function Home() {
       <BottomBar
         theme={theme}
         onBackToHome={handleBackToHome}
+        onBackOneBubble={handleBackOneBubble}
         onOpenDashboard={handleOpenDashboard}
         isRTL={isRTL}
         showActionButton={isSettingsMode || isDashboardMode || (!isOriginBubbleCentered && centeredBubble !== null)}

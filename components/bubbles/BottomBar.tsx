@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 interface BottomBarProps {
   theme: "light" | "dark";
   onBackToHome: () => void;
+  onBackOneBubble?: () => void; // Go back one bubble (previous bubble)
   onOpenDashboard?: () => void;
   isRTL: boolean;
   showActionButton?: boolean;
@@ -25,6 +26,7 @@ const useIsPWA = () => {
 export default function BottomBar({
   theme,
   onBackToHome,
+  onBackOneBubble,
   onOpenDashboard,
   isRTL,
   showActionButton = false,
@@ -130,11 +132,17 @@ export default function BottomBar({
 
   const handleTouchEnd = () => {
     setIsPressed(false);
+    const wasLongPress = isLongPressRef.current;
     
     // Clear long press timer
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
+    }
+    
+    // If it wasn't a long press, go back one bubble
+    if (!wasLongPress && onBackOneBubble) {
+      onBackOneBubble();
     }
     
     // Reset long press flag after a delay
@@ -166,11 +174,17 @@ export default function BottomBar({
 
   const handleMouseUp = () => {
     setIsPressed(false);
+    const wasLongPress = isLongPressRef.current;
     
     // Clear long press timer
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
+    }
+    
+    // If it wasn't a long press, go back one bubble
+    if (!wasLongPress && onBackOneBubble) {
+      onBackOneBubble();
     }
     
     // Reset long press flag
@@ -221,7 +235,11 @@ export default function BottomBar({
         >
           <button
             onClick={(e) => {
-              e.preventDefault(); // Prevent default click action
+              e.preventDefault();
+              // Single click goes back one bubble
+              if (onBackOneBubble) {
+                onBackOneBubble();
+              }
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
