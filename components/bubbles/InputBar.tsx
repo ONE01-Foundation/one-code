@@ -338,9 +338,10 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
 
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+      className="fixed left-1/2 -translate-x-1/2 pointer-events-none"
       style={{
         top: "calc(50% + 50px)", // Position below center with consistent spacing
+        zIndex: 45, // Above backdrop (40) but below chat overlay (50)
       }}
     >
       <div

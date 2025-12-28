@@ -527,17 +527,16 @@ export default function Home() {
         isOriginCentered={isOriginBubbleCentered}
         centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
         onOpenSettings={handleOpenSettings}
-        onSendMessage={handleSendMessage}
+        onSendMessage={isChatOpen ? handleSendMessage : undefined}
       />
 
-      {/* AI Chat Interface */}
+      {/* AI Chat Interface - Overlay from topbar */}
       <AIChat
         theme={theme}
         isRTL={isRTL}
         isOpen={isChatOpen}
         messages={chatMessages}
         onClose={handleCloseChat}
-        onSendMessage={handleSendMessage}
       />
       {/* Button below input with bubble title (only when non-origin bubble is centered) */}
       {!isOriginBubbleCentered && centeredBubble && (

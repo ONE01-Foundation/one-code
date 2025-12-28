@@ -33,7 +33,7 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false, 
       let currentIndex = 0;
       let isAnimating = true;
       
-      // Start word-by-word animation
+      // Start word-by-word animation - animate once, then fade to low opacity and stop
       const animateWords = () => {
         if (!isAnimating) return;
         
@@ -43,18 +43,10 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false, 
           setCurrentWordIndex(currentIndex);
           wordTimeoutRef.current = setTimeout(animateWords, 150) as NodeJS.Timeout;
         } else {
-          // All words shown, fade out after a delay
+          // All words shown, fade to low opacity after a delay and stop (no loop)
           fadeTimeoutRef.current = setTimeout(() => {
             setOpacity(0.3);
-            // After fade, restart from beginning
-            setTimeout(() => {
-              if (isAnimating && aiText) { // Only restart if still valid
-                currentIndex = 0;
-                setCurrentWordIndex(0);
-                setOpacity(1);
-                animateWords();
-              }
-            }, 500);
+            isAnimating = false;
           }, 2000) as NodeJS.Timeout;
         }
       };
