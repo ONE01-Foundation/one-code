@@ -50,10 +50,11 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false }
       }}
     >
       <div
-        className="absolute inset-0 flex items-center justify-center w-full px-8"
+        className="absolute inset-0 flex items-start justify-center w-full px-8"
         style={{
           transition: "opacity 0.6s ease-out",
           opacity: isVisible ? 1 : 0,
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 4rem)",
         }}
       >
         {displayText && (

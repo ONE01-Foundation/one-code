@@ -88,6 +88,7 @@ export default function BubbleField({
   const swipeDirection = useRef<"vertical" | "horizontal" | null>(null);
   const [activeSubBubbleIndex, setActiveSubBubbleIndex] = useState<number>(0);
   const [subBubblePanOffset, setSubBubblePanOffset] = useState<number>(0); // Horizontal offset for sub-bubbles
+  const [isMobile, setIsMobile] = useState(false);
 
   // Generate honeycomb positions
   const [bubblePositions, setBubblePositions] = useState<Position[]>([]);
@@ -107,6 +108,16 @@ export default function BubbleField({
     return () => {
       window.matchMedia('(pointer: fine)').removeEventListener('change', checkPointerDevice);
     };
+  }, []);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Calculate center point (viewport center) - SINGLE SOURCE OF TRUTH (FIX #7)
@@ -1082,7 +1093,41 @@ export default function BubbleField({
                     boxShadow: "none",
                   }}
                 >
-                  <span className="text-3xl">{bubble.icon}</span>
+                  {isMobile ? (
+                    // Show left/right arrows on mobile instead of emojis
+                    <svg
+                      width="32"
+                      height="32"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{
+                        color: theme === "dark" ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.6)",
+                      }}
+                    >
+                      {position === -1 ? (
+                        // Left arrow
+                        <path
+                          d="M15 18L9 12L15 6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ) : (
+                        // Right arrow
+                        <path
+                          d="M9 18L15 12L9 6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
+                    </svg>
+                  ) : (
+                    <span className="text-3xl">{bubble.icon}</span>
+                  )}
                 </div>
               </div>
             );
