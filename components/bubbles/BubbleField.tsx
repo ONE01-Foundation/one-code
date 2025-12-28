@@ -961,11 +961,13 @@ export default function BubbleField({
         navigateToBubble(deltaY > 0 ? "up" : "down");
       } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
         // Horizontal swipe - navigate between sub-bubbles
-        // In LTR: swipe left (deltaX < 0) = go to left/previous, swipe right (deltaX > 0) = go to right/next
-        // In RTL: swipe left (deltaX < 0) = go to right/next, swipe right (deltaX > 0) = go to left/previous
-        // So we need to reverse the direction in RTL mode
+        // Swipe right (deltaX > 0) should go to next sub-bubble (1/5, 2/5, etc.) in LTR
+        // Swipe right (deltaX > 0) should go to previous sub-bubble in RTL (opposite)
+        // Swipe left (deltaX < 0) should go to previous in LTR, next in RTL
         const swipeDirection = deltaX < 0 ? "left" : "right";
-        const navigationDirection = isRTL ? (swipeDirection === "left" ? "right" : "left") : swipeDirection;
+        // In LTR: swipe right = next (right), swipe left = previous (left)
+        // In RTL: swipe right = previous (left), swipe left = next (right) - opposite
+        const navigationDirection = isRTL ? (swipeDirection === "right" ? "left" : "right") : swipeDirection;
         
         // Highlight the OPPOSITE arrow - when swiping left, highlight right arrow (where you're going)
         // When swiping right, highlight left arrow (where you're going)
@@ -1025,8 +1027,10 @@ export default function BubbleField({
       
       scrollTimeoutRef.current = setTimeout(() => {
         // Horizontal scroll - account for RTL
+        // Scroll right (deltaX > 0) should go to next sub-bubble (1/5, 2/5, etc.) in LTR
+        // Scroll right (deltaX > 0) should go to previous in RTL (opposite)
         const scrollDirection = e.deltaX < 0 ? "left" : "right";
-        const navigationDirection = isRTL ? (scrollDirection === "left" ? "right" : "left") : scrollDirection;
+        const navigationDirection = isRTL ? (scrollDirection === "right" ? "left" : "right") : scrollDirection;
         navigateSubBubbles(navigationDirection);
       }, 50);
     } else {
@@ -1277,48 +1281,44 @@ export default function BubbleField({
                     boxShadow: "none",
                   }}
                 >
-                  {isMobile ? (
-                    // Show left/right arrows on mobile instead of emojis
-                    <svg
-                      width="40"
-                      height="40"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{
-                        color: theme === "dark" 
-                          ? (highlightedArrow === (position === -1 ? "left" : "right") 
-                              ? "rgba(255, 255, 255, 0.9)" 
-                              : "rgba(255, 255, 255, 0.4)")
-                          : (highlightedArrow === (position === -1 ? "left" : "right")
-                              ? "rgba(0, 0, 0, 0.9)"
-                              : "rgba(0, 0, 0, 0.4)"),
-                        transition: "color 0.3s ease-out",
-                      }}
-                    >
-                      {position === -1 ? (
-                        // Left arrow
-                        <path
-                          d="M15 18L9 12L15 6"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      ) : (
-                        // Right arrow
-                        <path
-                          d="M9 18L15 12L9 6"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      )}
-                    </svg>
-                  ) : (
-                    <span className="text-3xl">{bubble.icon}</span>
-                  )}
+                  {/* Show left/right arrows on both mobile and desktop instead of emojis */}
+                  <svg
+                    width={isMobile ? "40" : "32"}
+                    height={isMobile ? "40" : "32"}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    style={{
+                      color: theme === "dark" 
+                        ? (highlightedArrow === (position === -1 ? "left" : "right") 
+                            ? "rgba(255, 255, 255, 0.9)" 
+                            : "rgba(255, 255, 255, 0.4)")
+                        : (highlightedArrow === (position === -1 ? "left" : "right")
+                            ? "rgba(0, 0, 0, 0.9)"
+                            : "rgba(0, 0, 0, 0.4)"),
+                      transition: "color 0.3s ease-out",
+                    }}
+                  >
+                    {position === -1 ? (
+                      // Left arrow
+                      <path
+                        d="M15 18L9 12L15 6"
+                        stroke="currentColor"
+                        strokeWidth={isMobile ? "2.5" : "2"}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    ) : (
+                      // Right arrow
+                      <path
+                        d="M9 18L15 12L9 6"
+                        stroke="currentColor"
+                        strokeWidth={isMobile ? "2.5" : "2"}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                  </svg>
                 </div>
               </div>
             );

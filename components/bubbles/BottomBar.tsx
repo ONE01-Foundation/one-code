@@ -204,12 +204,12 @@ export default function BottomBar({
         </div>
       )}
       
-      {/* Footer with copyright - positioned 10px above the end of footer container (12px on mobile) */}
+      {/* Footer with copyright - positioned lower on mobile, higher on desktop */}
       <div
         className="absolute left-0 right-0 flex items-center justify-center pointer-events-auto"
         style={{
-          bottom: isMobile ? "12px" : "10px", // 2px higher on mobile, 10px on desktop
-          paddingBottom: "0.5rem",
+          bottom: isMobile ? "4px" : "10px", // Much lower on mobile (4px from bottom), 10px on desktop
+          paddingBottom: isMobile ? "0" : "0.5rem",
         }}
       >
         <button
@@ -219,9 +219,14 @@ export default function BottomBar({
               onOpenDashboard();
             }
           }}
-          className={`text-xs font-normal transition-opacity duration-200 hover:opacity-100 cursor-pointer bg-transparent border-none p-0 ${
+          className={`text-xs font-normal transition-opacity duration-200 hover:opacity-100 cursor-pointer bg-transparent border-none ${
             theme === "dark" ? "text-white/40 hover:text-white/60" : "text-black/40 hover:text-black/60"
           }`}
+          style={{
+            // Larger clickable area but not visible - padding increases touch target
+            padding: isMobile ? "20px" : "8px", // Bigger padding on mobile for easier tapping
+            margin: "-20px", // Negative margin to keep visual size the same
+          }}
         >
           {isRTL ? "1" : "1"}
         </button>
