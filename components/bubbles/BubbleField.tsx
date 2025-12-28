@@ -229,6 +229,8 @@ export default function BubbleField({
 
   const updatePositions = useCallback(() => {
     if (containerRef.current && originIndex >= 0) {
+      isUpdatingPositions.current = true;
+      
       // Use clientWidth/clientHeight for actual content area dimensions (excludes padding/scrollbars)
       let width = containerRef.current.clientWidth || containerRef.current.offsetWidth;
       let height = containerRef.current.clientHeight || containerRef.current.offsetHeight;
@@ -267,32 +269,59 @@ export default function BubbleField({
       
       setBubblePositions(positions);
       
-      // Center the origin bubble via panOffset (SINGLE source of truth for centering)
-      // Use double requestAnimationFrame to ensure layout is complete (Safari/Edge fix)
-      requestAnimationFrame(() => {
+      // Only center the origin bubble on initial load or if no bubble is currently centered
+      // Don't reset if we're already centered on a bubble (prevents reset when bubbles update)
+      if (panOffset === null || !centeredBubble) {
+        // Center the origin bubble via panOffset (SINGLE source of truth for centering)
+        // Use double requestAnimationFrame to ensure layout is complete (Safari/Edge fix)
         requestAnimationFrame(() => {
-          if (!containerRef.current) return;
-          const center = getCenterPoint();
-          if (positions[originIndex]) {
-            const originPos = positions[originIndex];
-          
-          // Calculate offset to center the origin bubble
-          const offset = {
-              x: center.x - originPos.x,
-              y: center.y - originPos.y,
-          };
-          
-          setPanOffset(offset);
-          setVelocity({ x: 0, y: 0 });
-          // Immediately notify that origin bubble is centered
-          setTimeout(() => {
-            onCenteredBubbleChange(originBubble);
-          }, 50);
-        }
+          requestAnimationFrame(() => {
+            if (!containerRef.current) {
+              isUpdatingPositions.current = false;
+              return;
+            }
+            const center = getCenterPoint();
+            if (positions[originIndex]) {
+              const originPos = positions[originIndex];
+            
+            // Calculate offset to center the origin bubble
+            const offset = {
+                x: center.x - originPos.x,
+                y: center.y - originPos.y,
+            };
+            
+            setPanOffset(offset);
+            setVelocity({ x: 0, y: 0 });
+            // Immediately notify that origin bubble is centered
+            setTimeout(() => {
+              onCenteredBubbleChange(originBubble);
+              isUpdatingPositions.current = false;
+            }, 50);
+          }
+          });
         });
-      });
+      } else if (centeredBubble && panOffset !== null) {
+        // If we have a centered bubble, maintain its position when bubbles update
+        // Find the index of the currently centered bubble in the new bubbles array
+        const currentCenteredIndex = bubbles.findIndex(b => b.id === centeredBubble.id);
+        if (currentCenteredIndex >= 0 && positions[currentCenteredIndex]) {
+          const center = getCenterPoint();
+          const centeredPos = positions[currentCenteredIndex];
+          const offset = {
+            x: center.x - centeredPos.x,
+            y: center.y - centeredPos.y,
+          };
+          setPanOffset(clampPanOffset(offset));
+        }
+        // Reset flag after a short delay to allow position update to complete
+        setTimeout(() => {
+          isUpdatingPositions.current = false;
+        }, 100);
+      } else {
+        isUpdatingPositions.current = false;
       }
-  }, [bubbles, originIndex, originBubble, onCenteredBubbleChange, enforceMinimumDistance, getCenterPoint]);
+      }
+  }, [bubbles, originIndex, originBubble, onCenteredBubbleChange, enforceMinimumDistance, getCenterPoint, panOffset, centeredBubble, clampPanOffset]);
 
   useEffect(() => {
     // Initial positioning - use longer delay for Safari/Edge to ensure layout is complete
@@ -460,10 +489,14 @@ export default function BubbleField({
   }, [targetBubble, bubblePositions, bubbles, getCenterPoint, onCenteredBubbleChange, clampPanOffset]);
 
   // Update centered bubble when pan changes
+  // Don't update if we're in the middle of updating positions (to prevent reset during bubble updates)
+  const isUpdatingPositions = useRef(false);
   useEffect(() => {
-    if (panOffset === null) return;
+    if (panOffset === null || isUpdatingPositions.current) return;
     const closest = findClosestBubble();
-    onCenteredBubbleChange(closest);
+    if (closest) {
+      onCenteredBubbleChange(closest);
+    }
   }, [panOffset, findClosestBubble, onCenteredBubbleChange]);
 
   // Inertia animation (with bounds clamping) - only for desktop mouse drags
