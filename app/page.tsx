@@ -157,15 +157,45 @@ const createBubble = (item: any, i: number): Bubble => {
   return bubble;
 };
 
-const MOCK_BUBBLES: Bubble[] = MOCK_BUBBLES_DATA
-  .map((item, i) => createBubble(item, i))
-  .filter(bubble => bubble.title && bubble.icon && bubble.aiText); // Filter out empty bubbles
+// Create bubbles with dynamic Settings sub-bubbles
+const createBubblesWithDynamicSettings = (theme: "light" | "dark", isRTL: boolean): Bubble[] => {
+  const bubblesData = [...MOCK_BUBBLES_DATA];
+  
+  // Find Settings bubble and update its sub-bubbles dynamically
+  const settingsIndex = bubblesData.findIndex(item => item.title === "Settings");
+  if (settingsIndex >= 0 && bubblesData[settingsIndex].subBubbles) {
+    bubblesData[settingsIndex].subBubbles = [
+      { 
+        icon: theme === "dark" ? "🌙" : "☀️", 
+        title: "Theme", 
+        titleRTL: "ערכת נושא", 
+        aiText: "Toggle dark and light mode", 
+        aiTextRTL: "החלף בין מצב כהה ובהיר", 
+        value: 0, 
+        actionType: "open" as const 
+      },
+      { 
+        icon: isRTL ? "🇮🇱" : "🇺🇸", 
+        title: "Language", 
+        titleRTL: "שפה", 
+        aiText: "Change interface language", 
+        aiTextRTL: "שנה את שפת הממשק", 
+        value: 1, 
+        actionType: "open" as const 
+      },
+    ];
+  }
+  
+  return bubblesData
+    .map((item, i) => createBubble(item, i))
+    .filter(bubble => bubble.title && bubble.icon && bubble.aiText);
+};
 
 export default function Home() {
   // Initialize with a safe default - will be updated on client-side mount
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [autoTheme, setAutoTheme] = useState(true);
-  const [bubbles] = useState<Bubble[]>(MOCK_BUBBLES);
+  const [bubbles, setBubbles] = useState<Bubble[]>(() => createBubblesWithDynamicSettings("dark", false));
   const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(bubbles[0]);
   const [mode, setMode] = useState<"private" | "global">("private");
   const [targetBubble, setTargetBubble] = useState<Bubble | null>(null);
@@ -230,6 +260,20 @@ export default function Home() {
     const isHebrew = browserLang.startsWith("he");
     setIsRTL(isHebrew);
   }, []);
+
+  // Update bubbles when theme or RTL changes to update Settings sub-bubble emojis
+  useEffect(() => {
+    const newBubbles = createBubblesWithDynamicSettings(theme, isRTL);
+    setBubbles(newBubbles);
+    
+    // Update centered bubble if it exists to reflect the new bubble data
+    if (centeredBubble) {
+      const updatedCenteredBubble = newBubbles.find(b => b.id === centeredBubble.id);
+      if (updatedCenteredBubble) {
+        setCenteredBubble(updatedCenteredBubble);
+      }
+    }
+  }, [theme, isRTL]);
 
   const handleThemeToggle = useCallback(() => {
     setAutoTheme(false); // Disable auto theme when manually toggled
