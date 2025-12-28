@@ -988,7 +988,8 @@ export default function BubbleField({
           if (parentDistance > 80) return null;
           
           // Calculate horizontal positions for sub-bubbles (position them left and right of center bubble)
-          const subBubbleSpacing = 220; // Space between sub-bubbles (left, center, right) - increased for more distance
+          // Use smaller spacing on mobile so arrows are more visible and closer to center
+          const subBubbleSpacing = isMobile ? 120 : 220; // Closer on mobile, further on desktop
           const subBubbleY = center.y; // Same Y level as center bubble (horizontal line)
           const subBubbleSize = 70; // Smaller size for sub-bubbles
           
@@ -1096,13 +1097,13 @@ export default function BubbleField({
                   {isMobile ? (
                     // Show left/right arrows on mobile instead of emojis
                     <svg
-                      width="32"
-                      height="32"
+                      width="40"
+                      height="40"
                       viewBox="0 0 24 24"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
                       style={{
-                        color: theme === "dark" ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.6)",
+                        color: theme === "dark" ? "rgba(255, 255, 255, 0.9)" : "rgba(0, 0, 0, 0.9)",
                       }}
                     >
                       {position === -1 ? (
@@ -1110,7 +1111,7 @@ export default function BubbleField({
                         <path
                           d="M15 18L9 12L15 6"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="2.5"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
@@ -1119,7 +1120,7 @@ export default function BubbleField({
                         <path
                           d="M9 18L15 12L9 6"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="2.5"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
