@@ -208,10 +208,9 @@ export default function BottomBar({
       <div
         className="absolute left-0 right-0 flex items-center justify-center pointer-events-auto"
         style={{
-          // Position above safe area - account for parent paddingBottom
-          bottom: isMobile 
-            ? `calc(${safeAreaBottom} + 4px)`
-            : `calc(${safeAreaBottom} + 10px)`,
+          // Position relative to parent bottom (parent already has paddingBottom for safe area)
+          // So we just need to add the desired offset (4px on mobile, 10px on desktop)
+          bottom: isMobile ? "4px" : "10px",
           paddingBottom: isMobile ? "0" : "0.5rem",
         }}
       >
