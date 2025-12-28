@@ -31,7 +31,15 @@ export default function ThemeColorMeta({ theme }: ThemeColorMetaProps) {
       appleMeta.setAttribute("name", "apple-mobile-web-app-status-bar-style");
       document.head.appendChild(appleMeta);
     }
+    // In light mode, use "default" (white) or "black-translucent" with white background
+    // In dark mode, use "black-translucent" (black)
     appleMeta.setAttribute("content", theme === "dark" ? "black-translucent" : "default");
+    
+    // For Android Chrome browser UI, ensure theme-color is correct
+    // Chrome uses theme-color for the browser UI (address bar, etc.)
+    // White in light mode, black in dark mode
+    const chromeThemeColor = theme === "dark" ? "#000000" : "#FFFFFF";
+    meta.setAttribute("content", chromeThemeColor);
   }, [theme]);
 
   return null;

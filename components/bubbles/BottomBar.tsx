@@ -208,7 +208,10 @@ export default function BottomBar({
       <div
         className="absolute left-0 right-0 flex items-center justify-center pointer-events-auto"
         style={{
-          bottom: isMobile ? "4px" : "10px", // Much lower on mobile (4px from bottom), 10px on desktop
+          // Position above safe area - use calc to ensure visibility in both PWA and browser
+          bottom: isMobile 
+            ? `calc(${isPWA ? "env(safe-area-inset-bottom, 0px)" : "env(safe-area-inset-bottom, 0px) + 40px"} + 4px)`
+            : `calc(${isPWA ? "env(safe-area-inset-bottom, 0px)" : "env(safe-area-inset-bottom, 0px) + 40px"} + 10px)`,
           paddingBottom: isMobile ? "0" : "0.5rem",
         }}
       >
