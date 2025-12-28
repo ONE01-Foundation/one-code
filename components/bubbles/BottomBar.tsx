@@ -234,19 +234,17 @@ export default function BottomBar({
           }}
         >
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              // Single click goes back one bubble
-              if (onBackOneBubble) {
-                onBackOneBubble();
-              }
-            }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Prevent default click - we handle it in mouseUp/touchEnd
+            }}
             className={`
               flex items-center justify-center gap-2
               transition-all duration-300 pointer-events-auto
