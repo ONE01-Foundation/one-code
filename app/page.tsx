@@ -582,20 +582,7 @@ export default function Home() {
       {/* Layer 3: Top overlay bar - always present */}
       <TopBar
         theme={theme}
-        aiText={
-          isChatOpen ? null : (currentAIText || (() => {
-            const targetBubble = hoveredBubbleId ? (
-              isSettingsMode ? settingsBubbles : 
-              isDashboardMode ? dashboardBubbles : 
-              bubbles
-            ).find(b => b.id === hoveredBubbleId) : centeredBubble;
-            
-            if (!targetBubble) return null;
-            
-            // Use RTL text if available and RTL is enabled
-            return isRTL && targetBubble.aiTextRTL ? targetBubble.aiTextRTL : targetBubble.aiText;
-          })())
-        }
+        aiText={isChatOpen ? null : currentAIText} // Only show real AI responses, not predefined bubble text
         isRTL={isRTL}
         isTransitioning={isThemeTransitioning}
         onTap={handleOpenChat}
