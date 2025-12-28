@@ -1139,7 +1139,12 @@ export default function BubbleField({
               onClick={() => {
                 // If bubble is already centered and has custom click handler, call it
                 if (centeredBubble?.id === bubble.id && onBubbleClick) {
-                  onBubbleClick(bubble);
+                  // If a sub-bubble is active (index > 0), pass the sub-bubble instead of parent
+                  if (hasSubBubbles && effectiveSubBubbleIndex > 0 && activeSubBubble) {
+                    onBubbleClick(activeSubBubble);
+                  } else {
+                    onBubbleClick(bubble);
+                  }
                 } else {
                   handleBubbleClick(bubble, index);
                 }

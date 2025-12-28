@@ -338,8 +338,14 @@ export default function Home() {
         mode={mode}
         onHoveredBubbleChange={setHoveredBubbleId}
         onBubbleClick={(bubble) => {
-          // Handle Settings sub-bubble clicks when Settings bubble is centered
-          if (centeredBubble && centeredBubble.title === "Settings" && bubble.title) {
+          // Handle Settings sub-bubble clicks when they are centered (Theme/Language)
+          if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
+            setAutoTheme(false);
+            handleThemeToggle();
+          } else if (bubble.title === "Language" || bubble.title === "שפה") {
+            setIsRTL((prev) => !prev);
+          } else if (centeredBubble && centeredBubble.title === "Settings" && bubble.title) {
+            // Fallback for when Settings bubble is centered but sub-bubble not yet active
             if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
               setAutoTheme(false);
               handleThemeToggle();
