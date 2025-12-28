@@ -187,7 +187,7 @@ const createBubblesWithDynamicSettings = (theme: "light" | "dark", isRTL: boolea
   }
   
   return bubblesData
-    .map((item, i) => createBubble(item, i))
+  .map((item, i) => createBubble(item, i))
     .filter(bubble => bubble.title && bubble.icon && bubble.aiText);
 };
 
@@ -224,6 +224,17 @@ export default function Home() {
   // First bubble is the origin/home bubble
   const originBubble = bubbles[0];
   const isOriginBubbleCentered = centeredBubble?.id === originBubble.id;
+
+  // Set data-theme attribute on html element for CSS variable updates
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    // Also directly set background color for safe areas
+    const bgColor = theme === "dark" ? "#000000" : "#FFFFFF";
+    document.documentElement.style.setProperty("background-color", bgColor);
+    
+    // Update safe area pseudo-elements via CSS custom property
+    document.documentElement.style.setProperty("--safe-area-bg", bgColor);
+  }, [theme]);
 
   // Auto theme by time - always calculated on client-side (after mount) to use correct timezone
   useEffect(() => {

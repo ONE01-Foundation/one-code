@@ -17,7 +17,12 @@ export default function ThemeColorMeta({ theme }: ThemeColorMetaProps) {
     }
     
     // Update theme color based on current theme
-    meta.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
+    // This affects iOS safe area background
+    const themeColor = theme === "dark" ? "#000000" : "#FFFFFF";
+    meta.setAttribute("content", themeColor);
+    
+    // Also update the html element's background to match (for safe areas)
+    document.documentElement.style.setProperty("background-color", themeColor);
     
     // Also update apple status bar style
     let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]') as HTMLMetaElement;
