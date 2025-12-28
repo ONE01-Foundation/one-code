@@ -977,7 +977,7 @@ export default function BubbleField({
           if (parentDistance > 80) return null;
           
           // Calculate horizontal positions for sub-bubbles (position them left and right of center bubble)
-          const subBubbleSpacing = 150; // Space between sub-bubbles (left, center, right)
+          const subBubbleSpacing = 220; // Space between sub-bubbles (left, center, right) - increased for more distance
           const subBubbleY = center.y; // Same Y level as center bubble (horizontal line)
           const subBubbleSize = 70; // Smaller size for sub-bubbles
           
