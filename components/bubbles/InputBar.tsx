@@ -10,13 +10,14 @@ interface InputBarProps {
   isOriginCentered: boolean;
   centeredBubbleTitle?: string | null;
   onOpenSettings?: () => void;
+  onSendMessage?: (message: string) => void; // Handler for sending messages to AI
 }
 
 const PLACEHOLDER_WORDS_EN = ["Think", "Feel", "Do", "Now?"];
 const PLACEHOLDER_WORDS_HE = ["חשוב", "הרגש", "עשה", "עכשיו?"];
 const LONG_IDLE_TIME = 30000; // 30 seconds of idle before hint cycle restarts
 
-export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCentered, centeredBubbleTitle, onOpenSettings }: InputBarProps) {
+export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCentered, centeredBubbleTitle, onOpenSettings, onSendMessage }: InputBarProps) {
   const PLACEHOLDER_WORDS = isRTL ? PLACEHOLDER_WORDS_HE : PLACEHOLDER_WORDS_EN;
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [showModeText, setShowModeText] = useState(false);
@@ -442,6 +443,14 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             onChange={handleInputChange}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
+            onKeyPress={(e) => {
+              if (e.key === "Enter" && inputValue.trim() && onSendMessage) {
+                e.preventDefault();
+                onSendMessage(inputValue.trim());
+                setInputValue("");
+                inputRef.current?.blur();
+              }
+            }}
             className={`
               bg-transparent border-none outline-none w-full
               text-base font-extralight

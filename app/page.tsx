@@ -5,6 +5,7 @@ import TopBar from "@/components/bubbles/TopBar";
 import BottomBar from "@/components/bubbles/BottomBar";
 import BubbleField from "@/components/bubbles/BubbleField";
 import InputBar from "@/components/bubbles/InputBar";
+import AIChat, { ChatMessage } from "@/components/bubbles/AIChat";
 import CenterOrnament from "@/components/CenterOrnament";
 import FaviconUpdater from "@/components/FaviconUpdater";
 import PWAInstaller from "@/components/PWAInstaller";
@@ -204,6 +205,8 @@ export default function Home() {
   const [hoveredBubbleId, setHoveredBubbleId] = useState<string | null>(null);
   const [isSettingsMode, setIsSettingsMode] = useState(false);
   const [isDashboardMode, setIsDashboardMode] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   // Settings bubbles - update icons dynamically based on current state
   const settingsBubbles: Bubble[] = [
@@ -370,6 +373,63 @@ export default function Home() {
     }
   }, [settingsBubbles]);
 
+  const handleOpenChat = useCallback(() => {
+    setIsChatOpen(true);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setIsChatOpen(false);
+  }, []);
+
+  const handleSendMessage = useCallback(async (message: string) => {
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: message,
+    };
+    
+    setChatMessages((prev) => [...prev, userMessage]);
+    
+    // Add AI message placeholder with typing indicator
+    const aiMessageId = `ai-${Date.now()}`;
+    const aiMessage: ChatMessage = {
+      id: aiMessageId,
+      role: "assistant",
+      content: "",
+      isTyping: true,
+    };
+    
+    setChatMessages((prev) => [...prev, aiMessage]);
+    
+    // TODO: Connect to OpenAI API
+    // For now, simulate AI response with word-by-word typing
+    setTimeout(() => {
+      // Simulated AI response - replace with actual API call
+      const simulatedResponse = "This is a simulated AI response. OpenAI integration will be added next.";
+      const words = simulatedResponse.split(" ");
+      
+      // Word-by-word animation
+      words.forEach((word, index) => {
+        setTimeout(() => {
+          setChatMessages((prev) => {
+            const updated = [...prev];
+            const aiMsgIndex = updated.findIndex((msg) => msg.id === aiMessageId);
+            if (aiMsgIndex >= 0) {
+              const currentWords = updated[aiMsgIndex].content ? updated[aiMsgIndex].content.split(" ") : [];
+              updated[aiMsgIndex] = {
+                ...updated[aiMsgIndex],
+                content: [...currentWords, word].join(" "),
+                isTyping: index < words.length - 1,
+              };
+            }
+            return updated;
+          });
+        }, index * 150);
+      });
+    }, 500);
+  }, []);
+
   return (
       <>
       <ThemeColorMeta theme={theme} />
@@ -431,7 +491,7 @@ export default function Home() {
       <TopBar
         theme={theme}
         aiText={
-          (() => {
+          isChatOpen ? null : (() => {
             const targetBubble = hoveredBubbleId ? (
               isSettingsMode ? settingsBubbles : 
               isDashboardMode ? dashboardBubbles : 
@@ -446,6 +506,7 @@ export default function Home() {
         }
         isRTL={isRTL}
         isTransitioning={isThemeTransitioning}
+        onTap={handleOpenChat}
       />
 
       {/* Layer 4: Bottom overlay - always present, action button only when needed */}
@@ -466,6 +527,17 @@ export default function Home() {
         isOriginCentered={isOriginBubbleCentered}
         centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
         onOpenSettings={handleOpenSettings}
+        onSendMessage={handleSendMessage}
+      />
+
+      {/* AI Chat Interface */}
+      <AIChat
+        theme={theme}
+        isRTL={isRTL}
+        isOpen={isChatOpen}
+        messages={chatMessages}
+        onClose={handleCloseChat}
+        onSendMessage={handleSendMessage}
       />
       {/* Button below input with bubble title (only when non-origin bubble is centered) */}
       {!isOriginBubbleCentered && centeredBubble && (
