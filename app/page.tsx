@@ -619,7 +619,7 @@ export default function Home() {
         isOriginCentered={isOriginBubbleCentered}
         centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
         onOpenSettings={handleOpenSettings}
-        onSendMessage={isChatOpen ? handleSendMessage : undefined}
+        onSendMessage={handleSendMessage}
       />
 
       {/* AI Chat Interface - Overlay from topbar */}

@@ -348,23 +348,21 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
         className={`
           flex items-center rounded-3xl
           transition-all duration-300 pointer-events-auto
-          ${isFocused
-            ? "bg-white border border-white/20" // Full white when focused (keyboard open)
-            : isLight 
-              ? "bg-white/20 backdrop-blur-sm border border-black/10" 
-              : "bg-black/20 backdrop-blur-sm border border-white/10"
+          ${isLight 
+            ? "bg-white/20 backdrop-blur-sm border border-black/10" 
+            : "bg-black/20 backdrop-blur-sm border border-white/10"
           }
         `}
         style={{
           gap: "0px",
-          width: isFocused ? "calc(100vw - 40px)" : "fit-content",
-          minWidth: isFocused ? "calc(100vw - 40px)" : "152px",
+          width: "fit-content", // No expansion - keep original width
+          minWidth: "152px",
           maxWidth: "calc(100vw - 40px)",
           height: "45px",
           paddingTop: "0px",
           paddingBottom: "0px",
-          paddingLeft: isFocused ? "12px" : "5px",
-          paddingRight: isFocused ? "12px" : "5px",
+          paddingLeft: "5px",
+          paddingRight: "5px",
         }}
       >
         {/* Mode toggle button (when origin centered) or Create button (when other bubble centered) */}
@@ -457,10 +455,7 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             className={`
               bg-transparent border-none outline-none w-full
               text-base font-extralight
-              ${isFocused 
-                ? "text-black" // Black text when focused (on white background)
-                : isLight ? "text-black/70" : "text-white/70"
-              }
+              ${isLight ? "text-black/70" : "text-white/70"}
             `}
             style={{
               fontWeight: 200,
@@ -475,6 +470,10 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             autoComplete="off"
             autoCapitalize="off"
             autoCorrect="off"
+            spellCheck={false}
+            data-1p-ignore="true"
+            data-lpignore="true"
+            data-form-type="other"
           />
           
           {/* Placeholder overlay - only visible when not focused and no value */}
@@ -535,11 +534,9 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
               className={`
                 w-8 h-8 rounded-full flex items-center justify-center
                 transition-all duration-200 flex-shrink-0
-                ${isFocused
+                ${isLight
                   ? "bg-black/10 hover:bg-black/20"
-                  : isLight
-                    ? "bg-black/10 hover:bg-black/20"
-                    : "bg-white/10 hover:bg-white/20"
+                  : "bg-white/10 hover:bg-white/20"
                 }
               `}
               aria-label="Send"
@@ -556,14 +553,14 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
               >
                 <path
                   d="M22 2L11 13"
-                  stroke={isFocused ? "#000" : (isLight ? "#000" : "#fff")}
+                  stroke={isLight ? "#000" : "#fff"}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
                 <path
                   d="M22 2L15 22L11 13L2 9L22 2Z"
-                  stroke={isFocused ? "#000" : (isLight ? "#000" : "#fff")}
+                  stroke={isLight ? "#000" : "#fff"}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
