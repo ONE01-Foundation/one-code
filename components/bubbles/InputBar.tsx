@@ -29,12 +29,15 @@ export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onMode
   const inputRef = useRef<HTMLInputElement>(null);
   const inputGhostRef = useRef<HTMLSpanElement>(null);
   const [inputWidth, setInputWidth] = useState(80);
+  const [isRecording, setIsRecording] = useState(false);
   const wordIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const modeTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastInteractionRef = useRef<number>(Date.now());
   const hasRunInitialCycleRef = useRef<boolean>(false);
   const cycleWasRunningRef = useRef(false);
+  const recognitionRef = useRef<any>(null);
+  const baseTextRef = useRef<string>("");
 
   // Cycle through placeholder words - only on first open or after very long idle
   useEffect(() => {
@@ -133,13 +136,130 @@ export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onMode
     // TODO: Add create functionality
   };
 
-  const handleMicClick = () => {
-    setHasInteracted(true);
-    lastInteractionRef.current = Date.now();
-    // Stop hint cycle permanently
-    if (wordIntervalRef.current) {
-      clearInterval(wordIntervalRef.current);
-      wordIntervalRef.current = null;
+  // Initialize Speech Recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = isRTL ? "he-IL" : "en-US";
+
+        recognition.onresult = (event: any) => {
+          let interimTranscript = "";
+          let finalTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + " ";
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Update base text with final transcript
+          if (finalTranscript) {
+            baseTextRef.current = baseTextRef.current + (baseTextRef.current ? " " : "") + finalTranscript.trim() + " ";
+            setInputValue(baseTextRef.current);
+          }
+          // Update display with base text + interim transcript
+          else if (interimTranscript) {
+            setInputValue(baseTextRef.current + (baseTextRef.current ? " " : "") + interimTranscript);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          setIsRecording(false);
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+            } catch (e) {
+              // Ignore errors when stopping
+            }
+          }
+        };
+
+        recognition.onend = () => {
+          setIsRecording(false);
+          // Finalize any remaining interim text (already in baseTextRef from final results)
+          setInputValue(baseTextRef.current.trim());
+        };
+
+        recognitionRef.current = recognition;
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+    };
+  }, [isRTL]);
+
+  // Update recognition language when RTL changes
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = isRTL ? "he-IL" : "en-US";
+    }
+  }, [isRTL]);
+
+  // Sync baseTextRef with inputValue when not recording (handles manual typing and clearing)
+  useEffect(() => {
+    if (!isRecording) {
+      baseTextRef.current = inputValue;
+    }
+  }, [inputValue, isRecording]);
+
+  const handleMicMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    startRecording();
+  };
+
+  const handleMicMouseUp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    stopRecording();
+  };
+
+  const handleMicTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    startRecording();
+  };
+
+  const handleMicTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    stopRecording();
+  };
+
+  const startRecording = () => {
+    if (recognitionRef.current && !isRecording) {
+      try {
+        setHasInteracted(true);
+        lastInteractionRef.current = Date.now();
+        setIsRecording(true);
+        baseTextRef.current = inputValue; // Save current input value as base
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+        setIsRecording(false);
+      }
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current && isRecording) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error("Error stopping speech recognition:", error);
+        setIsRecording(false);
+      }
     }
   };
 
@@ -488,7 +608,11 @@ export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onMode
             </button>
           ) : (
             <button
-              onClick={handleMicClick}
+              onMouseDown={handleMicMouseDown}
+              onMouseUp={handleMicMouseUp}
+              onMouseLeave={handleMicMouseUp}
+              onTouchStart={handleMicTouchStart}
+              onTouchEnd={handleMicTouchEnd}
               onContextMenu={(e) => e.preventDefault()}
               className={`
                 flex items-center justify-center
@@ -507,11 +631,17 @@ export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onMode
                 width={22 * sizeMultiplier}
                 height={22 * sizeMultiplier}
                 draggable="false"
-                className={`${isFocused 
-                  ? "opacity-70" 
-                  : isLight ? "opacity-50" : "opacity-50 brightness-0 invert"
+                className={`${isRecording 
+                  ? (isLight ? "opacity-100" : "opacity-100 brightness-0 invert")
+                  : (isFocused 
+                    ? "opacity-70" 
+                    : isLight ? "opacity-50" : "opacity-50 brightness-0 invert")
                 }`}
-                style={isFocused ? { filter: "none", opacity: 0.7 } : {}}
+                style={isRecording ? { 
+                  filter: isLight ? "none" : "brightness(0) invert(1)",
+                  opacity: 1,
+                  animation: "pulse 1.5s ease-in-out infinite",
+                } : (isFocused ? { filter: "none", opacity: 0.7 } : {})}
               />
             </button>
           )}

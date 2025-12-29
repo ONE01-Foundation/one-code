@@ -215,6 +215,18 @@ button {
   }
 }
 
+/* Pulse animation for recording microphone */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
 /* Prevent SVG/images from being selectable, copyable, or showing context menu on mobile */
 img, svg {
   -webkit-user-select: none;
