@@ -122,6 +122,8 @@ export default function Bubble({
   subBubbles,
   activeProfile = null,
   profiles = [],
+  onProfileChange,
+  activeProfileIndex = 0,
 }: BubbleProps) {
   // Use RTL title and aiText if available and RTL is enabled
   const displayTitle = isRTL && bubble.titleRTL ? bubble.titleRTL : bubble.title;
