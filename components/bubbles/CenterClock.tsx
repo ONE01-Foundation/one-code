@@ -133,7 +133,8 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                 longPressTimerRef.current = null;
               }
             }}
-            onMouseLeave={() => {
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = "1";
               if (longPressTimerRef.current) {
                 clearTimeout(longPressTimerRef.current);
                 longPressTimerRef.current = null;
@@ -162,9 +163,6 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = "0.8";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = "1";
             }}
           >
             {/* Inner circle with icon or image */}
