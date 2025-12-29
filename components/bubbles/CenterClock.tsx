@@ -6,6 +6,7 @@ interface CenterClockProps {
   theme: "light" | "dark";
   onToggle?: () => void; // Made optional since we're removing the click handler
   isRTL?: boolean;
+  uiSize?: "normal" | "large";
 }
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -28,11 +29,12 @@ const AI_TEXT_PLACEHOLDERS_HE = [
   "לאן אתה רוצה ללכת",
 ];
 
-export default function CenterClock({ theme, onToggle, isRTL = false }: CenterClockProps) {
+export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "normal" }: CenterClockProps) {
   const AI_TEXT_PLACEHOLDERS = isRTL ? AI_TEXT_PLACEHOLDERS_HE : AI_TEXT_PLACEHOLDERS_EN;
   const [time, setTime] = useState<string>("");
   const [date, setDate] = useState<string>("");
   const [aiTextIndex, setAiTextIndex] = useState(0);
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
 
   useEffect(() => {
     const updateTime = () => {
@@ -81,7 +83,11 @@ export default function CenterClock({ theme, onToggle, isRTL = false }: CenterCl
           className={`text-base font-light transition-opacity duration-500 mb-3 ${
             theme === "dark" ? "text-white/30" : "text-black/30"
           }`}
-          style={{ userSelect: "none", WebkitUserSelect: "none" }}
+          style={{ 
+            userSelect: "none", 
+            WebkitUserSelect: "none",
+            fontSize: `${1 * sizeMultiplier}rem`, // text-base = 1rem
+          }}
         >
           {AI_TEXT_PLACEHOLDERS[aiTextIndex]}
         </span>
@@ -91,7 +97,11 @@ export default function CenterClock({ theme, onToggle, isRTL = false }: CenterCl
           className={`text-3xl font-mono font-semibold tracking-wider ${
             theme === "dark" ? "text-white/90" : "text-black/90"
           }`}
-          style={{ userSelect: "none", WebkitUserSelect: "none" }}
+          style={{ 
+            userSelect: "none", 
+            WebkitUserSelect: "none",
+            fontSize: `${1.875 * sizeMultiplier}rem`, // text-3xl = 1.875rem
+          }}
         >
           {time}
         </span>
@@ -101,7 +111,11 @@ export default function CenterClock({ theme, onToggle, isRTL = false }: CenterCl
           className={`text-xs font-medium mt-0.5 ${
             theme === "dark" ? "text-white/70" : "text-black/70"
           }`}
-          style={{ userSelect: "none", WebkitUserSelect: "none" }}
+          style={{ 
+            userSelect: "none", 
+            WebkitUserSelect: "none",
+            fontSize: `${0.75 * sizeMultiplier}rem`, // text-xs = 0.75rem
+          }}
         >
           {date}
         </span>

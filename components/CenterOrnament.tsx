@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 
 interface CenterOrnamentProps {
   theme: "light" | "dark";
+  uiSize?: "normal" | "large";
 }
 
-export default function CenterOrnament({ theme }: CenterOrnamentProps) {
+export default function CenterOrnament({ theme, uiSize = "normal" }: CenterOrnamentProps) {
   const [isMobile, setIsMobile] = useState(false);
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -21,6 +23,18 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
 
   // SVG color based on theme
   const svgColor = theme === "dark" ? "#1a1a1a" : "#e5e5e5";
+  
+  // Calculate size with multiplier
+  // For mobile: 85vh/600px, for desktop: 80vw/600px
+  const baseSize = isMobile ? 85 : 80;
+  const baseMaxSize = 600;
+  const calculatedSize = isMobile ? baseSize * sizeMultiplier : baseSize * sizeMultiplier;
+  const calculatedMaxSize = baseMaxSize * sizeMultiplier;
+  
+  const width = isMobile 
+    ? `min(${calculatedSize}vh, ${calculatedMaxSize}px)`
+    : `min(${calculatedSize}vw, ${calculatedMaxSize}px)`;
+  const height = width; // Square
 
   return (
     <div
@@ -29,13 +43,15 @@ export default function CenterOrnament({ theme }: CenterOrnamentProps) {
         left: "50%",
         top: "50%",
         transform: "translate(-50%, -50%)",
+        transition: "transform 0.3s ease",
       }}
     >
       <div
         className="relative"
         style={{
-          width: isMobile ? "min(85vh, 600px)" : "min(80vw, 600px)",
-          height: isMobile ? "min(85vh, 600px)" : "min(80vw, 600px)",
+          width: width,
+          height: height,
+          transition: "width 0.3s ease, height 0.3s ease",
         }}
       >
         {/* SVG with theme color */}

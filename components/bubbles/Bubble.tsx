@@ -7,7 +7,8 @@ import type { Bubble as BubbleType } from "@/app/page";
 // Simple clock display for origin bubble when not centered (no button)
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-function OriginClockDisplay({ theme, isRTL = false }: { theme: "light" | "dark"; isRTL?: boolean }) {
+function OriginClockDisplay({ theme, isRTL = false, uiSize = "normal" }: { theme: "light" | "dark"; isRTL?: boolean; uiSize?: "normal" | "large" }) {
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
   const [time, setTime] = useState<string>("");
   const [date, setDate] = useState<string>("");
 
@@ -43,7 +44,11 @@ function OriginClockDisplay({ theme, isRTL = false }: { theme: "light" | "dark";
         className={`text-xl font-mono font-semibold tracking-wider ${
           theme === "dark" ? "text-white/90" : "text-black/90"
         }`}
-        style={{ userSelect: "none", WebkitUserSelect: "none" }}
+        style={{ 
+          userSelect: "none", 
+          WebkitUserSelect: "none",
+          fontSize: `${1.25 * sizeMultiplier}rem`, // text-xl = 1.25rem
+        }}
       >
         {time}
       </span>
@@ -51,7 +56,11 @@ function OriginClockDisplay({ theme, isRTL = false }: { theme: "light" | "dark";
         className={`text-[10px] font-medium ${
           theme === "dark" ? "text-white/70" : "text-black/70"
         }`}
-        style={{ userSelect: "none", WebkitUserSelect: "none" }}
+        style={{ 
+          userSelect: "none", 
+          WebkitUserSelect: "none",
+          fontSize: `${0.625 * sizeMultiplier}rem`, // 10px = 0.625rem
+        }}
       >
         {date}
       </span>
@@ -64,6 +73,7 @@ interface BubbleProps {
   position: { x: number; y: number };
   scale: number;
   theme: "light" | "dark";
+  uiSize?: "normal" | "large";
   isCentered: boolean;
   isOrigin: boolean;
   isIdle: boolean;
@@ -88,6 +98,7 @@ export default function Bubble({
   position,
   scale,
   theme,
+  uiSize = "normal",
   isCentered,
   isOrigin,
   isIdle,
@@ -116,7 +127,12 @@ export default function Bubble({
     : (hasSubBubbles && isCentered && parentBubble) 
       ? parentBubble.icon // Parent bubble icon when index 0
       : bubble.icon; // Regular bubble icon
-  const size = isCentered ? 280 : 120 * scale;
+  
+  // Apply size multiplier based on uiSize
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
+  const baseCenteredSize = 280;
+  const baseNormalSize = 120;
+  const size = isCentered ? baseCenteredSize * sizeMultiplier : baseNormalSize * scale * sizeMultiplier;
   const borderRadius = "50%"; // Always circle
 
   // Base opacity based on visibility rules
@@ -254,12 +270,13 @@ export default function Bubble({
                 theme={theme} 
                 onToggle={onThemeToggle} 
                 isRTL={isRTL}
+                uiSize={uiSize}
               />
           )}
         </div>
       ) : (
           // When NOT centered: simple time and date display (no button)
-          <OriginClockDisplay theme={theme} isRTL={isRTL} />
+          <OriginClockDisplay theme={theme} isRTL={isRTL} uiSize={uiSize} />
         )
       ) : (
         // Other bubbles: icon with title when centered or spotlighted
@@ -286,6 +303,7 @@ export default function Bubble({
                   msUserSelect: "none",
                   WebkitTouchCallout: "none",
                   pointerEvents: "auto",
+                  fontSize: `${3 * sizeMultiplier}rem`, // text-5xl = 3rem, scale by multiplier
                 }}
               >
                 {displayIcon}
@@ -298,6 +316,7 @@ export default function Bubble({
                 style={{
                   lineHeight: "1.3",
                   display: "block",
+                  fontSize: `${1.125 * sizeMultiplier}rem`, // text-lg = 1.125rem
                 }}
           >
                 {displayTitle}
@@ -311,6 +330,7 @@ export default function Bubble({
                   style={{
                     marginTop: "-4px",
                     marginBottom: "2px",
+                    fontSize: `${0.75 * sizeMultiplier}rem`, // text-xs = 0.75rem
                   }}
                 >
                   {subBubbleIndex} / {subBubblesCount}
@@ -325,8 +345,9 @@ export default function Bubble({
                   style={{
                     lineHeight: "1.5",
                     display: "block",
-                    maxWidth: "220px",
+                    maxWidth: `${220 * sizeMultiplier}px`,
                     marginTop: "2px",
+                    fontSize: `${0.875 * sizeMultiplier}rem`, // text-sm = 0.875rem
                   }}
                 >
                   {displayAiText}
@@ -350,6 +371,7 @@ export default function Bubble({
                   msUserSelect: "none",
                   WebkitTouchCallout: "none",
                   pointerEvents: "auto",
+                  fontSize: `${1.5 * sizeMultiplier}rem`, // text-2xl = 1.5rem
                 }}
               >
                 {bubble.icon}
@@ -365,9 +387,10 @@ export default function Bubble({
                     transition: "opacity 0.2s ease-out",
                     lineHeight: "1.3",
                     display: "block",
+                    fontSize: `${0.6875 * sizeMultiplier}rem`, // 11px = 0.6875rem
                   }}
             >
-              {displayTitle}
+                {displayTitle}
             </span>
               )}
             </>

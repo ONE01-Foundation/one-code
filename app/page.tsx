@@ -159,7 +159,7 @@ const createBubble = (item: any, i: number): Bubble => {
 };
 
 // Create bubbles with dynamic Settings sub-bubbles
-const createBubblesWithDynamicSettings = (theme: "light" | "dark", isRTL: boolean): Bubble[] => {
+const createBubblesWithDynamicSettings = (theme: "light" | "dark", isRTL: boolean, uiSize: "normal" | "large"): Bubble[] => {
   const bubblesData = [...MOCK_BUBBLES_DATA];
   
   // Find Settings bubble and update its sub-bubbles dynamically
@@ -184,6 +184,15 @@ const createBubblesWithDynamicSettings = (theme: "light" | "dark", isRTL: boolea
         value: 1, 
         actionType: "open" as const 
       },
+      { 
+        icon: uiSize === "large" ? "🔍" : "🔎", 
+        title: "Size", 
+        titleRTL: "גודל", 
+        aiText: uiSize === "large" ? "Switch to normal size" : "Switch to larger size", 
+        aiTextRTL: uiSize === "large" ? "עבור לגודל רגיל" : "עבור לגודל גדול יותר", 
+        value: 2, 
+        actionType: "open" as const 
+      },
     ];
   }
   
@@ -196,11 +205,12 @@ export default function Home() {
   // Initialize with a safe default - will be updated on client-side mount
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [autoTheme, setAutoTheme] = useState(true);
-  const [bubbles, setBubbles] = useState<Bubble[]>(() => createBubblesWithDynamicSettings("dark", false));
+  const [bubbles, setBubbles] = useState<Bubble[]>(() => createBubblesWithDynamicSettings("dark", false, "normal"));
   const [centeredBubble, setCenteredBubble] = useState<Bubble | null>(bubbles[0]);
   const [mode, setMode] = useState<"private" | "global">("private");
   const [targetBubble, setTargetBubble] = useState<Bubble | null>(null);
   const [isRTL, setIsRTL] = useState(false);
+  const [uiSize, setUiSize] = useState<"normal" | "large">("normal"); // UI size state
   const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
   const [hoveredBubbleId, setHoveredBubbleId] = useState<string | null>(null);
   const [isSettingsMode, setIsSettingsMode] = useState(false);
@@ -214,6 +224,7 @@ export default function Home() {
   const settingsBubbles: Bubble[] = [
     { id: "settings-theme", title: isRTL ? "ערכת נושא" : "Theme", icon: theme === "dark" ? "🌙" : "☀️", value: 0, actionType: "open", aiText: isRTL ? "החלף בין מצב כהה ובהיר" : "Toggle dark and light mode" },
     { id: "settings-language", title: isRTL ? "שפה" : "Language", icon: isRTL ? "🇮🇱" : "🇺🇸", value: 1, actionType: "open", aiText: isRTL ? "שנה את שפת הממשק" : "Change interface language" },
+    { id: "settings-size", title: isRTL ? "גודל" : "Size", icon: uiSize === "large" ? "🔍" : "🔎", value: 2, actionType: "open", aiText: uiSize === "large" ? (isRTL ? "עבור לגודל רגיל" : "Switch to normal size") : (isRTL ? "עבור לגודל גדול יותר" : "Switch to larger size") },
   ];
 
   // Dashboard bubbles with live metrics
@@ -283,9 +294,9 @@ export default function Home() {
     setIsRTL(isHebrew);
   }, []);
 
-  // Update bubbles when theme or RTL changes to update Settings sub-bubble emojis
+  // Update bubbles when theme, RTL, or size changes to update Settings sub-bubble emojis
   useEffect(() => {
-    const newBubbles = createBubblesWithDynamicSettings(theme, isRTL);
+    const newBubbles = createBubblesWithDynamicSettings(theme, isRTL, uiSize);
     setBubbles(newBubbles);
     
     // Update centered bubble's sub-bubbles if it's the Settings bubble
@@ -303,7 +314,7 @@ export default function Home() {
         });
       }
     }
-  }, [theme, isRTL]);
+  }, [theme, isRTL, uiSize]);
 
   const handleThemeToggle = useCallback(() => {
     setAutoTheme(false); // Disable auto theme when manually toggled
@@ -325,7 +336,7 @@ export default function Home() {
   }, []);
 
   const handleSettingsBubbleClick = useCallback((bubble: Bubble) => {
-    // Handle Settings sub-bubble clicks (Theme/Language)
+    // Handle Settings sub-bubble clicks (Theme/Language/Size)
     if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
       // Toggle theme and disable auto theme (set to manual mode)
       setAutoTheme(false);
@@ -333,6 +344,9 @@ export default function Home() {
     } else if (bubble.title === "Language" || bubble.title === "שפה") {
       // Toggle language/RTL
       setIsRTL((prev) => !prev);
+    } else if (bubble.title === "Size" || bubble.title === "גודל") {
+      // Toggle UI size
+      setUiSize((prev) => prev === "normal" ? "large" : "normal");
     }
   }, [handleThemeToggle]);
 
@@ -577,7 +591,7 @@ export default function Home() {
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Layer 1: Fixed centered ornament background */}
-      <CenterOrnament theme={theme} />
+      <CenterOrnament theme={theme} uiSize={uiSize} />
 
       {/* Layer 2: Bubble grid (draggable) */}
       <BubbleField
@@ -597,12 +611,14 @@ export default function Home() {
         mode={mode}
         onHoveredBubbleChange={setHoveredBubbleId}
         onBubbleClick={(bubble) => {
-          // Handle Settings sub-bubble clicks when they are centered (Theme/Language)
+          // Handle Settings sub-bubble clicks when they are centered (Theme/Language/Size)
           if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
             setAutoTheme(false);
             handleThemeToggle();
           } else if (bubble.title === "Language" || bubble.title === "שפה") {
             setIsRTL((prev) => !prev);
+          } else if (bubble.title === "Size" || bubble.title === "גודל") {
+            setUiSize((prev) => prev === "normal" ? "large" : "normal");
           } else if (centeredBubble && centeredBubble.title === "Settings" && bubble.title) {
             // Fallback for when Settings bubble is centered but sub-bubble not yet active
             if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
@@ -610,6 +626,8 @@ export default function Home() {
               handleThemeToggle();
             } else if (bubble.title === "Language" || bubble.title === "שפה") {
               setIsRTL((prev) => !prev);
+            } else if (bubble.title === "Size" || bubble.title === "גודל") {
+              setUiSize((prev) => prev === "normal" ? "large" : "normal");
             }
           } else if (isSettingsMode) {
             handleSettingsBubbleClick(bubble);

@@ -7,6 +7,7 @@ import type { Bubble as BubbleType } from "@/app/page";
 interface BubbleFieldProps {
   bubbles: BubbleType[];
   theme: "light" | "dark";
+  uiSize?: "normal" | "large";
   onCenteredBubbleChange: (bubble: BubbleType | null) => void;
   originBubble: BubbleType;
   targetBubble: BubbleType | null;
@@ -51,6 +52,7 @@ function seededRandom(seed: number): number {
 export default function BubbleField({
   bubbles,
   theme,
+  uiSize = "normal",
   onCenteredBubbleChange,
   originBubble,
   targetBubble,
@@ -1171,6 +1173,7 @@ export default function BubbleField({
             position={{ x: screenX, y: screenY }}
             scale={scale}
             theme={theme}
+            uiSize={uiSize}
             isCentered={distance < 80}
             isOrigin={isOrigin}
             isIdle={isIdle}
