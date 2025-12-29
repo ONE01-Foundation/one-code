@@ -259,7 +259,8 @@ span[style*="text-2xl"] {
   pointer-events: auto;
 }
 
-/* iOS keyboard autocomplete/suggestions - allow to show */
+/* iOS keyboard - attempt to hide accessory bar and suggestions */
+/* Note: The iOS keyboard accessory bar is a system UI element and cannot be fully hidden via web APIs */
 input {
   -webkit-appearance: none;
   -webkit-user-select: text;
@@ -267,18 +268,27 @@ input {
 
 input::-webkit-contacts-auto-fill-button,
 input::-webkit-credentials-auto-fill-button {
-  visibility: hidden;
+  visibility: hidden !important;
   display: none !important;
-  pointer-events: none;
-  height: 0;
-  width: 0;
-  margin: 0;
-  padding: 0;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
 }
 
-/* Hide password manager autofill suggestions on iOS (but keep keyboard accessory bar) */
-input::-webkit-credentials-auto-fill-button {
-  display: none !important;
+/* Attempt to hide iOS keyboard accessory bar using experimental approaches */
+/* These may not work as the accessory bar is rendered outside the web view */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"],
+  input[type="search"],
+  input:not([type]),
+  input[inputmode="text"] {
+    -webkit-appearance: none;
+    -webkit-user-select: text;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 @supports (-webkit-touch-callout: none) {

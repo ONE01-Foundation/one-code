@@ -379,7 +379,9 @@ export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onMode
               marginLeft: `${5 * sizeMultiplier}px`,
               marginRight: `${5 * sizeMultiplier}px`,
               fontSize: `${1 * sizeMultiplier}rem`, // text-base = 1rem
-            }}
+              caretColor: theme === "dark" ? "#ffffff" : "#000000",
+              WebkitAppearance: "none",
+            } as React.CSSProperties}
             dir={isRTL ? "rtl" : "ltr"}
             inputMode="text"
             autoComplete="off"
