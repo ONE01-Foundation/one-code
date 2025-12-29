@@ -96,20 +96,34 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
               width: `${48 * sizeMultiplier}px`,
               height: `${48 * sizeMultiplier}px`,
               borderRadius: "50%",
-              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-              border: theme === "dark" ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(0,0,0,0.2)",
+              backgroundColor: "transparent", // Match main background
             }}
           >
-            <span
-              style={{
-                fontSize: `${24 * sizeMultiplier}px`,
-                userSelect: "none",
-                WebkitUserSelect: "none",
-                lineHeight: "1",
-              }}
-            >
-              {activeProfile.avatar}
-            </span>
+            {activeProfile.id === "default" ? (
+              <img
+                src="/user-icon.svg"
+                alt="User"
+                width={24 * sizeMultiplier}
+                height={24 * sizeMultiplier}
+                style={{
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  pointerEvents: "none",
+                  filter: theme === "dark" ? "brightness(0) invert(1)" : "none",
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  fontSize: `${24 * sizeMultiplier}px`,
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  lineHeight: "1",
+                }}
+              >
+                {activeProfile.avatar}
+              </span>
+            )}
           </div>
         )}
         
