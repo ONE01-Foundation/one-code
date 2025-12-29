@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from "react";
 
 interface InputBarProps {
   theme: "light" | "dark";
+  uiSize?: "normal" | "large";
   isRTL: boolean;
   mode: "private" | "global";
   onModeChange: (mode: "private" | "global") => void;
   isOriginCentered: boolean;
   centeredBubbleTitle?: string | null;
-  onOpenSettings?: () => void;
   onSendMessage?: (message: string) => void; // Handler for sending messages to AI
 }
 
@@ -17,7 +17,8 @@ const PLACEHOLDER_WORDS_EN = ["Think", "Feel", "Do", "Now?"];
 const PLACEHOLDER_WORDS_HE = ["חשוב", "הרגש", "עשה", "עכשיו?"];
 const LONG_IDLE_TIME = 30000; // 30 seconds of idle before hint cycle restarts
 
-export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCentered, centeredBubbleTitle, onOpenSettings, onSendMessage }: InputBarProps) {
+export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onModeChange, isOriginCentered, centeredBubbleTitle, onSendMessage }: InputBarProps) {
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
   const PLACEHOLDER_WORDS = isRTL ? PLACEHOLDER_WORDS_HE : PLACEHOLDER_WORDS_EN;
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [showModeText, setShowModeText] = useState(false);
@@ -87,97 +88,6 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
       return () => clearInterval(idleCheck);
     }
   }, [isFocused, inputValue, hasInteracted]);
-
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isLongPressRef = useRef(false);
-  const hasTriggeredLongPressRef = useRef(false);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-      }
-    };
-  }, []);
-
-  const handleModeToggleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    isLongPressRef.current = false;
-    hasTriggeredLongPressRef.current = false;
-    
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true;
-      hasTriggeredLongPressRef.current = true;
-      if (onOpenSettings) {
-        onOpenSettings();
-      }
-    }, 500); // 500ms long press
-  };
-
-  const handleModeToggleMouseUp = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    
-    // Only trigger toggle if it wasn't a long press
-    if (!hasTriggeredLongPressRef.current && !isLongPressRef.current) {
-      handleModeToggle();
-    }
-    
-    // Reset flags after a short delay
-    setTimeout(() => {
-      isLongPressRef.current = false;
-      hasTriggeredLongPressRef.current = false;
-    }, 100);
-  };
-
-  const handleModeToggleMouseLeave = (e: React.MouseEvent) => {
-    // Clear long press timer on mouse leave but don't toggle
-    // This prevents toggle when mouse leaves button area
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    // Reset flags to prevent toggle on mouseUp if user returns
-    isLongPressRef.current = false;
-    hasTriggeredLongPressRef.current = false;
-  };
-
-  const handleModeToggleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    isLongPressRef.current = false;
-    hasTriggeredLongPressRef.current = false;
-    
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true;
-      hasTriggeredLongPressRef.current = true;
-      if (onOpenSettings) {
-        onOpenSettings();
-      }
-    }, 500); // 500ms long press
-  };
-
-  const handleModeToggleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    
-    // Only trigger toggle if it wasn't a long press
-    if (!hasTriggeredLongPressRef.current && !isLongPressRef.current) {
-      handleModeToggle();
-    }
-    
-    // Reset flags after a short delay
-    setTimeout(() => {
-      isLongPressRef.current = false;
-      hasTriggeredLongPressRef.current = false;
-    }, 100);
-  };
 
   const handleModeToggle = () => {
     setHasInteracted(true);
@@ -334,7 +244,7 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
       const width = inputGhostRef.current.offsetWidth;
       setInputWidth(Math.max(80, Math.min(300, width + 20)));
     }
-  }, [inputValue, displayText, isFocused, isRTL]);
+  }, [inputValue, displayText, isFocused, isRTL, sizeMultiplier]);
 
   return (
     <div
@@ -356,39 +266,39 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
         style={{
           gap: "0px",
           width: "fit-content", // No expansion - keep original width
-          minWidth: "152px",
+          minWidth: `${152 * sizeMultiplier}px`,
           maxWidth: "calc(100vw - 40px)",
-          height: "45px",
+          height: `${45 * sizeMultiplier}px`,
           paddingTop: "0px",
           paddingBottom: "0px",
-          paddingLeft: "5px",
-          paddingRight: "5px",
+          paddingLeft: `${5 * sizeMultiplier}px`,
+          paddingRight: `${5 * sizeMultiplier}px`,
         }}
       >
         {/* Mode toggle button (when origin centered) or Create button (when other bubble centered) */}
         {isOriginCentered ? (
           <button
-            onMouseDown={handleModeToggleMouseDown}
-            onMouseUp={handleModeToggleMouseUp}
-            onMouseLeave={handleModeToggleMouseLeave}
-            onTouchStart={handleModeToggleTouchStart}
-            onTouchEnd={handleModeToggleTouchEnd}
+            onClick={handleModeToggle}
             onContextMenu={(e) => e.preventDefault()}
             className={`
-              w-8 h-8 rounded-full flex items-center justify-center
+              rounded-full flex items-center justify-center
               transition-all duration-200 flex-shrink-0
               ${isLight
                 ? "bg-black/10 hover:bg-black/20"
                 : "bg-white/10 hover:bg-white/20"
               }
             `}
+            style={{
+              width: `${32 * sizeMultiplier}px`,
+              height: `${32 * sizeMultiplier}px`,
+            }}
             aria-label={mode === "private" ? (isRTL ? "פרטי" : "Private") : (isRTL ? "גלובלי" : "Global")}
           >
             <img
               src={mode === "private" ? "/private-icon.svg" : "/global-icon.svg"}
               alt={mode === "private" ? (isRTL ? "פרטי" : "Private") : (isRTL ? "גלובלי" : "Global")}
-              width={22}
-              height={22}
+              width={22 * sizeMultiplier}
+              height={22 * sizeMultiplier}
               draggable="false"
               className={isLight ? "opacity-70" : "opacity-70 brightness-0 invert"}
             />
@@ -398,20 +308,24 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             onClick={handleCreateClick}
             onContextMenu={(e) => e.preventDefault()}
             className={`
-              w-8 h-8 rounded-full flex items-center justify-center
+              rounded-full flex items-center justify-center
               transition-all duration-200 flex-shrink-0
               ${isLight
                 ? "bg-black/10 hover:bg-black/20"
                 : "bg-white/10 hover:bg-white/20"
               }
             `}
+            style={{
+              width: `${32 * sizeMultiplier}px`,
+              height: `${32 * sizeMultiplier}px`,
+            }}
             aria-label="Create"
           >
             <img
               src="/Create-icon.svg"
               alt="Create"
-              width={22}
-              height={22}
+              width={22 * sizeMultiplier}
+              height={22 * sizeMultiplier}
               draggable="false"
               className={isLight ? "opacity-70" : "opacity-70 brightness-0 invert"}
             />
@@ -427,7 +341,7 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
               visibility: "hidden",
               position: "absolute",
               whiteSpace: "nowrap",
-              fontSize: "1rem",
+              fontSize: `${1 * sizeMultiplier}rem`,
               fontWeight: 200,
               padding: "0 2px",
               pointerEvents: "none",
@@ -454,16 +368,17 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
             }}
             className={`
               bg-transparent border-none outline-none w-full
-              text-base font-extralight
+              font-extralight
               ${isLight ? "text-black/70" : "text-white/70"}
             `}
             style={{
               fontWeight: 200,
               textAlign: isRTL ? "right" : "left",
-              minWidth: "80px",
-              width: `${inputWidth}px`,
-              marginLeft: "5px",
-              marginRight: "5px",
+              minWidth: `${80 * sizeMultiplier}px`,
+              width: `${inputWidth * sizeMultiplier}px`,
+              marginLeft: `${5 * sizeMultiplier}px`,
+              marginRight: `${5 * sizeMultiplier}px`,
+              fontSize: `${1 * sizeMultiplier}rem`, // text-base = 1rem
             }}
             dir={isRTL ? "rtl" : "ltr"}
             inputMode="text"
@@ -493,12 +408,13 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
               style={{ pointerEvents: "auto" }}
             >
               <span
-                className={`${isNowQuestion ? 'text-base font-light transition-opacity duration-500' : 'text-base'} ${isLight ? (isNowQuestion ? "text-black/30" : "text-black") : (isNowQuestion ? "text-white/30" : "text-white")}`}
+                className={`${isNowQuestion ? 'font-light transition-opacity duration-500' : ''} ${isLight ? (isNowQuestion ? "text-black/30" : "text-black") : (isNowQuestion ? "text-white/30" : "text-white")}`}
                 style={{ 
                   fontWeight: isNowQuestion ? 300 : wordStyles.fontWeight,
                   opacity: isNowQuestion ? undefined : wordStyles.opacity,
                   display: "inline-block",
                   minWidth: "fit-content",
+                  fontSize: `${1 * sizeMultiplier}rem`, // text-base = 1rem
                 }}
                 dir={isRTL ? "rtl" : "ltr"}
               >
@@ -573,17 +489,21 @@ export default function InputBar({ theme, isRTL, mode, onModeChange, isOriginCen
               onClick={handleMicClick}
               onContextMenu={(e) => e.preventDefault()}
               className={`
-                w-8 h-8 flex items-center justify-center
+                flex items-center justify-center
                 transition-all duration-200 flex-shrink-0
                 bg-transparent border-none outline-none
               `}
+              style={{
+                width: `${32 * sizeMultiplier}px`,
+                height: `${32 * sizeMultiplier}px`,
+              }}
               aria-label="Voice input"
             >
               <img
                 src="/microphone-icon.svg"
                 alt="Microphone"
-                width={22}
-                height={22}
+                width={22 * sizeMultiplier}
+                height={22 * sizeMultiplier}
                 draggable="false"
                 className={`${isFocused 
                   ? "opacity-70" 

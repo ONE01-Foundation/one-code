@@ -4,13 +4,15 @@ import { useState, useEffect, useRef } from "react";
 
 interface TopBarProps {
   theme: "light" | "dark";
+  uiSize?: "normal" | "large";
   aiText: string | null;
   isRTL: boolean;
   isTransitioning?: boolean;
   onTap?: () => void; // Handler for tap to open chat
 }
 
-export default function TopBar({ theme, aiText, isRTL, isTransitioning = false, onTap }: TopBarProps) {
+export default function TopBar({ theme, uiSize = "normal", aiText, isRTL, isTransitioning = false, onTap }: TopBarProps) {
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
   const [displayWords, setDisplayWords] = useState<string[]>([]);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
@@ -150,17 +152,18 @@ export default function TopBar({ theme, aiText, isRTL, isTransitioning = false, 
         <div className="w-full pointer-events-none">
         {displayWords.length > 0 && (
           <p
-            className={`text-base md:text-lg lg:text-xl font-normal ${
+            className={`font-normal ${
               theme === "dark" ? "text-white/60" : "text-black/60"
             }`}
             style={{
               lineHeight: "1.5",
               textAlign: "center",
-              maxHeight: "3em", // Max 2 rows (1.5 * 2)
+              maxHeight: `${3 * sizeMultiplier}em`, // Max 2 rows (1.5 * 2)
               overflow: "hidden",
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
+              fontSize: `${1.125 * sizeMultiplier}rem`, // Base size with multiplier (between text-base and text-lg)
             }}
           >
             {(() => {

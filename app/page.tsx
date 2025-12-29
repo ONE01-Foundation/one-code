@@ -213,19 +213,12 @@ export default function Home() {
   const [uiSize, setUiSize] = useState<"normal" | "large">("normal"); // UI size state
   const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
   const [hoveredBubbleId, setHoveredBubbleId] = useState<string | null>(null);
-  const [isSettingsMode, setIsSettingsMode] = useState(false);
   const [isDashboardMode, setIsDashboardMode] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({}); // Chat history per bubble ID
   const [currentAIText, setCurrentAIText] = useState<string | null>(null); // Current AI response for TopBar
   const messageIdCounterRef = useRef(0); // Counter to ensure unique message IDs
 
-  // Settings bubbles - update icons dynamically based on current state
-  const settingsBubbles: Bubble[] = [
-    { id: "settings-theme", title: isRTL ? "ערכת נושא" : "Theme", icon: theme === "dark" ? "🌙" : "☀️", value: 0, actionType: "open", aiText: isRTL ? "החלף בין מצב כהה ובהיר" : "Toggle dark and light mode" },
-    { id: "settings-language", title: isRTL ? "שפה" : "Language", icon: isRTL ? "🇮🇱" : "🇺🇸", value: 1, actionType: "open", aiText: isRTL ? "שנה את שפת הממשק" : "Change interface language" },
-    { id: "settings-size", title: isRTL ? "גודל" : "Size", icon: uiSize === "large" ? "🔍" : "🔎", value: 2, actionType: "open", aiText: uiSize === "large" ? (isRTL ? "עבור לגודל רגיל" : "Switch to normal size") : (isRTL ? "עבור לגודל גדול יותר" : "Switch to larger size") },
-  ];
 
   // Dashboard bubbles with live metrics
   const dashboardBubbles: Bubble[] = [
@@ -335,20 +328,6 @@ export default function Home() {
     }, 300);
   }, []);
 
-  const handleSettingsBubbleClick = useCallback((bubble: Bubble) => {
-    // Handle Settings sub-bubble clicks (Theme/Language/Size)
-    if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
-      // Toggle theme and disable auto theme (set to manual mode)
-      setAutoTheme(false);
-      handleThemeToggle();
-    } else if (bubble.title === "Language" || bubble.title === "שפה") {
-      // Toggle language/RTL
-      setIsRTL((prev) => !prev);
-    } else if (bubble.title === "Size" || bubble.title === "גודל") {
-      // Toggle UI size
-      setUiSize((prev) => prev === "normal" ? "large" : "normal");
-    }
-  }, [handleThemeToggle]);
 
   const handleCenteredBubbleChange = useCallback((bubble: Bubble | null) => {
     setCenteredBubble(bubble);
@@ -359,11 +338,7 @@ export default function Home() {
   }, [targetBubble]);
 
   const handleBackToHome = useCallback(() => {
-    if (isSettingsMode) {
-      // Exit settings mode
-      setIsSettingsMode(false);
-      setCenteredBubble(originBubble);
-    } else if (isDashboardMode) {
+    if (isDashboardMode) {
       // Exit dashboard mode
       setIsDashboardMode(false);
       setCenteredBubble(originBubble);
@@ -371,7 +346,7 @@ export default function Home() {
     // Trigger smooth centering of origin bubble
     setTargetBubble(originBubble);
     }
-  }, [originBubble, isSettingsMode, isDashboardMode]);
+  }, [originBubble, isDashboardMode]);
 
   const handleOpenDashboard = useCallback(() => {
     setIsDashboardMode(true);
@@ -381,13 +356,6 @@ export default function Home() {
     }
   }, [dashboardBubbles]);
 
-  const handleOpenSettings = useCallback(() => {
-    setIsSettingsMode(true);
-    // Center first settings bubble
-    if (settingsBubbles.length > 0) {
-      setTargetBubble(settingsBubbles[0]);
-    }
-  }, [settingsBubbles]);
 
   // Get current bubble ID for chat context
   const getCurrentBubbleId = useCallback(() => {
@@ -594,59 +562,50 @@ export default function Home() {
       <CenterOrnament theme={theme} uiSize={uiSize} />
 
       {/* Layer 2: Bubble grid (draggable) */}
-      <BubbleField
-        bubbles={
-          isSettingsMode ? settingsBubbles : 
-          isDashboardMode ? dashboardBubbles : 
-          bubbles
-        }
-        theme={theme}
-        onCenteredBubbleChange={handleCenteredBubbleChange}
-        originBubble={originBubble}
-        targetBubble={targetBubble}
-        onThemeToggle={handleThemeToggle}
-        onOpenSettings={handleOpenSettings}
-        centeredBubble={centeredBubble}
-        isRTL={isRTL}
-        mode={mode}
-        onHoveredBubbleChange={setHoveredBubbleId}
-        onBubbleClick={(bubble) => {
-          // Handle Settings sub-bubble clicks when they are centered (Theme/Language/Size)
-          if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
-            setAutoTheme(false);
-            handleThemeToggle();
-          } else if (bubble.title === "Language" || bubble.title === "שפה") {
-            setIsRTL((prev) => !prev);
-          } else if (bubble.title === "Size" || bubble.title === "גודל") {
-            setUiSize((prev) => prev === "normal" ? "large" : "normal");
-          } else if (centeredBubble && centeredBubble.title === "Settings" && bubble.title) {
-            // Fallback for when Settings bubble is centered but sub-bubble not yet active
-            if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
-              setAutoTheme(false);
-              handleThemeToggle();
-            } else if (bubble.title === "Language" || bubble.title === "שפה") {
-              setIsRTL((prev) => !prev);
-            } else if (bubble.title === "Size" || bubble.title === "גודל") {
-              setUiSize((prev) => prev === "normal" ? "large" : "normal");
-            }
-          } else if (isSettingsMode) {
-            handleSettingsBubbleClick(bubble);
-          }
-        }}
-      />
+       <BubbleField
+         bubbles={
+           isDashboardMode ? dashboardBubbles : 
+           bubbles
+         }
+         theme={theme}
+         uiSize={uiSize}
+         onCenteredBubbleChange={handleCenteredBubbleChange}
+         originBubble={originBubble}
+         targetBubble={targetBubble}
+         onThemeToggle={handleThemeToggle}
+         centeredBubble={centeredBubble}
+         isRTL={isRTL}
+         mode={mode}
+         onHoveredBubbleChange={setHoveredBubbleId}
+         onBubbleClick={(bubble) => {
+           // Handle Settings sub-bubble clicks when Settings bubble is centered (Theme/Language/Size)
+           if (centeredBubble && (centeredBubble.id === "settings" || centeredBubble.title === "Settings" || centeredBubble.title === "הגדרות")) {
+             if (bubble.title === "Theme" || bubble.title === "ערכת נושא") {
+               setAutoTheme(false);
+               handleThemeToggle();
+             } else if (bubble.title === "Language" || bubble.title === "שפה") {
+               setIsRTL((prev) => !prev);
+             } else if (bubble.title === "Size" || bubble.title === "גודל") {
+               setUiSize((prev) => prev === "normal" ? "large" : "normal");
+             }
+           }
+         }}
+       />
 
-      {/* Layer 3: Top overlay bar - always present */}
-      <TopBar
-        theme={theme}
-        aiText={isChatOpen ? null : currentAIText} // Only show real AI responses, not predefined bubble text
-        isRTL={isRTL}
-        isTransitioning={isThemeTransitioning}
-        onTap={handleOpenChat}
-      />
+       {/* Layer 3: Top overlay bar - always present */}
+       <TopBar
+         theme={theme}
+         uiSize={uiSize}
+         aiText={isChatOpen ? null : currentAIText} // Only show real AI responses, not predefined bubble text
+         isRTL={isRTL}
+         isTransitioning={isThemeTransitioning}
+         onTap={handleOpenChat}
+       />
 
       {/* Layer 4: Bottom overlay - always present, action button only when needed */}
       <BottomBar
         theme={theme}
+        uiSize={uiSize}
         onBackToHome={handleBackToHome}
         onOpenDashboard={handleOpenDashboard}
         isRTL={isRTL}
@@ -654,16 +613,16 @@ export default function Home() {
         isTransitioning={isThemeTransitioning}
       />
 
-      <InputBar
-        theme={theme}
-        isRTL={isRTL}
-        mode={mode}
-        onModeChange={setMode}
-        isOriginCentered={isOriginBubbleCentered}
-        centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
-        onOpenSettings={handleOpenSettings}
-        onSendMessage={handleSendMessage}
-      />
+       <InputBar
+         theme={theme}
+         uiSize={uiSize}
+         isRTL={isRTL}
+         mode={mode}
+         onModeChange={setMode}
+         isOriginCentered={isOriginBubbleCentered}
+         centeredBubbleTitle={!isOriginBubbleCentered && centeredBubble ? (isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title) : null}
+         onSendMessage={handleSendMessage}
+       />
 
       {/* AI Chat Interface - Overlay from topbar */}
       <AIChat
@@ -684,22 +643,23 @@ export default function Home() {
         >
           <button
             className={`
-              px-8 py-3
               transition-all duration-300 pointer-events-auto
               text-white
               hover:scale-105
               active:scale-95
             `}
-            onClick={() => {
-              // Regular click - navigate back to origin
-              if (!isSettingsMode) {
-                setCenteredBubble(originBubble);
-              }
-            }}
+             onClick={() => {
+               // Regular click - navigate back to origin
+               setCenteredBubble(originBubble);
+             }}
             style={{
-              minWidth: "120px",
-              width: "180px",
-              height: "72px",
+              minWidth: `${120 * (uiSize === "large" ? 1.25 : 1.0)}px`,
+              width: `${180 * (uiSize === "large" ? 1.25 : 1.0)}px`,
+              height: `${72 * (uiSize === "large" ? 1.25 : 1.0)}px`,
+              paddingLeft: `${32 * (uiSize === "large" ? 1.25 : 1.0)}px`,
+              paddingRight: `${32 * (uiSize === "large" ? 1.25 : 1.0)}px`,
+              paddingTop: `${12 * (uiSize === "large" ? 1.25 : 1.0)}px`,
+              paddingBottom: `${12 * (uiSize === "large" ? 1.25 : 1.0)}px`,
               backgroundImage: "url(/preview-button-bg.svg)",
               backgroundSize: "cover",
               backgroundPosition: "center",
@@ -707,7 +667,7 @@ export default function Home() {
               border: "none",
             }}
           >
-            <span className="text-sm font-medium whitespace-nowrap">
+            <span className="font-medium whitespace-nowrap" style={{ fontSize: `${0.875 * (uiSize === "large" ? 1.25 : 1.0)}rem` }}>
               {isRTL && centeredBubble.titleRTL ? centeredBubble.titleRTL : centeredBubble.title}
             </span>
           </button>

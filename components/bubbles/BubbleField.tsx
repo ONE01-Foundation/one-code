@@ -12,7 +12,6 @@ interface BubbleFieldProps {
   originBubble: BubbleType;
   targetBubble: BubbleType | null;
   onThemeToggle: () => void;
-  onOpenSettings?: () => void;
   centeredBubble: BubbleType | null;
   isRTL?: boolean;
   mode: "private" | "global";
@@ -57,7 +56,6 @@ export default function BubbleField({
   originBubble,
   targetBubble,
   onThemeToggle,
-  onOpenSettings,
   centeredBubble,
   isRTL = false,
   mode,

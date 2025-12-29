@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 
 interface BottomBarProps {
   theme: "light" | "dark";
+  uiSize?: "normal" | "large";
   onBackToHome: () => void;
   onOpenDashboard?: () => void;
   isRTL: boolean;
@@ -24,12 +25,14 @@ const useIsPWA = () => {
 
 export default function BottomBar({
   theme,
+  uiSize = "normal",
   onBackToHome,
   onOpenDashboard,
   isRTL,
   showActionButton = false,
   isTransitioning = false,
 }: BottomBarProps) {
+  const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
@@ -181,7 +184,7 @@ export default function BottomBar({
             title="Back to Home"
           >
             {isExpanded && (
-              <span className="text-sm font-medium transition-all duration-300">
+              <span className="font-medium transition-all duration-300" style={{ fontSize: `${0.875 * sizeMultiplier}rem` }}>
                 Home
               </span>
             )}
@@ -221,10 +224,11 @@ export default function BottomBar({
               onOpenDashboard();
             }
           }}
-          className={`text-xs font-normal transition-opacity duration-200 hover:opacity-100 cursor-pointer bg-transparent border-none ${
+          className={`font-normal transition-opacity duration-200 hover:opacity-100 cursor-pointer bg-transparent border-none ${
             theme === "dark" ? "text-white/40 hover:text-white/60" : "text-black/40 hover:text-black/60"
           }`}
           style={{
+            fontSize: `${0.75 * sizeMultiplier}rem`,
             // Larger clickable area but not visible - padding increases touch target
             padding: isMobile ? "20px" : "8px", // Bigger padding on mobile for easier tapping
             margin: "-20px", // Negative margin to keep visual size the same
