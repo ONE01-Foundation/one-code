@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import CenterClock from "./CenterClock";
-import type { Bubble as BubbleType } from "@/app/page";
+import type { Bubble as BubbleType, Profile } from "@/app/page";
 
 // Simple clock display for origin bubble when not centered (no button)
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -91,6 +91,8 @@ interface BubbleProps {
   subBubblesCount?: number; // Total count of sub-bubbles
   parentBubble?: BubbleType; // Parent bubble when showing sub-bubble content
   subBubbles?: BubbleType[]; // Sub-bubbles array
+  activeProfile?: Profile | null; // Active profile for origin bubble
+  profiles?: Profile[]; // Profiles array for origin bubble
 }
 
 export default function Bubble({
@@ -116,6 +118,8 @@ export default function Bubble({
   subBubblesCount = 0,
   parentBubble,
   subBubbles,
+  activeProfile = null,
+  profiles = [],
 }: BubbleProps) {
   // Use RTL title and aiText if available and RTL is enabled
   const displayTitle = isRTL && bubble.titleRTL ? bubble.titleRTL : bubble.title;
@@ -271,6 +275,8 @@ export default function Bubble({
                 onToggle={onThemeToggle} 
                 isRTL={isRTL}
                 uiSize={uiSize}
+                activeProfile={activeProfile}
+                profiles={profiles}
               />
           )}
         </div>

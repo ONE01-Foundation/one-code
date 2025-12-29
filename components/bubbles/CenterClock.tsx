@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import type { Profile } from "@/app/page";
 
 interface CenterClockProps {
   theme: "light" | "dark";
   onToggle?: () => void; // Made optional since we're removing the click handler
   isRTL?: boolean;
   uiSize?: "normal" | "large";
+  activeProfile?: Profile | null;
+  profiles?: Profile[];
 }
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -29,12 +32,17 @@ const AI_TEXT_PLACEHOLDERS_HE = [
   "לאן אתה רוצה ללכת",
 ];
 
-export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "normal" }: CenterClockProps) {
+export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "normal", activeProfile = null, profiles = [] }: CenterClockProps) {
   const AI_TEXT_PLACEHOLDERS = isRTL ? AI_TEXT_PLACEHOLDERS_HE : AI_TEXT_PLACEHOLDERS_EN;
   const [time, setTime] = useState<string>("");
   const [date, setDate] = useState<string>("");
   const [aiTextIndex, setAiTextIndex] = useState(0);
   const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
+  
+  // Use profile AI text if available, otherwise use placeholder cycling
+  const displayAiText = activeProfile 
+    ? (isRTL && activeProfile.aiTextRTL ? activeProfile.aiTextRTL : activeProfile.aiText)
+    : AI_TEXT_PLACEHOLDERS[aiTextIndex];
 
   useEffect(() => {
     const updateTime = () => {
@@ -62,14 +70,16 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
     return () => clearInterval(interval);
   }, [isRTL]);
 
-  // Cycle through AI text placeholders every few seconds
+  // Cycle through AI text placeholders every few seconds (only if no active profile)
   useEffect(() => {
+    if (activeProfile) return; // Don't cycle if profile is active
+    
     const interval = setInterval(() => {
       setAiTextIndex((prev) => (prev + 1) % AI_TEXT_PLACEHOLDERS.length);
     }, 4000); // Change every 4 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [activeProfile]);
 
 
   return (
@@ -78,9 +88,34 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
       style={{ userSelect: "none", WebkitUserSelect: "none" }}
     >
       <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none" }}>
+        {/* Profile avatar in circle - above AI text */}
+        {activeProfile && (
+          <div
+            className="flex items-center justify-center mb-3"
+            style={{
+              width: `${48 * sizeMultiplier}px`,
+              height: `${48 * sizeMultiplier}px`,
+              borderRadius: "50%",
+              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+              border: theme === "dark" ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(0,0,0,0.2)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: `${24 * sizeMultiplier}px`,
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                lineHeight: "1",
+              }}
+            >
+              {activeProfile.avatar}
+            </span>
+          </div>
+        )}
+        
         {/* AI text placeholder with low opacity - at top, bigger, more margin */}
         <span 
-          className={`text-base font-light transition-opacity duration-500 mb-3 ${
+          className={`text-base font-light transition-opacity duration-500 ${activeProfile ? "mb-2" : "mb-3"} ${
             theme === "dark" ? "text-white/30" : "text-black/30"
           }`}
           style={{ 
@@ -89,7 +124,7 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
             fontSize: `${1 * sizeMultiplier}rem`, // text-base = 1rem
           }}
         >
-          {AI_TEXT_PLACEHOLDERS[aiTextIndex]}
+          {displayAiText}
         </span>
         
         {/* Time - made bigger */}

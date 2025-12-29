@@ -23,6 +23,15 @@ export type Bubble = {
   subBubbles?: Bubble[]; // Sub-bubbles that appear horizontally when parent is centered
 };
 
+export type Profile = {
+  id: string;
+  name: string;
+  nameRTL?: string; // Hebrew name for RTL support
+  avatar: string; // Emoji or icon for profile
+  aiText: string;
+  aiTextRTL?: string; // Hebrew AI text for RTL support
+};
+
 const MOCK_BUBBLES_DATA = [
   { 
     icon: "🏠", 
@@ -218,7 +227,27 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({}); // Chat history per bubble ID
   const [currentAIText, setCurrentAIText] = useState<string | null>(null); // Current AI response for TopBar
   const messageIdCounterRef = useRef(0); // Counter to ensure unique message IDs
-
+  const [activeProfileIndex, setActiveProfileIndex] = useState<number>(0); // Active profile index (0 = default, 1 = create new)
+  
+  // Profiles for origin bubble
+  const profiles: Profile[] = [
+    {
+      id: "default",
+      name: "Personal",
+      nameRTL: "אישי",
+      avatar: "👤",
+      aiText: "What matters",
+      aiTextRTL: "מה חשוב",
+    },
+    {
+      id: "create",
+      name: "Create Profile",
+      nameRTL: "צור פרופיל",
+      avatar: "➕",
+      aiText: "For professionals and organizations",
+      aiTextRTL: "למקצוענים וארגונים",
+    },
+  ];
 
   // Dashboard bubbles with live metrics
   const dashboardBubbles: Bubble[] = [
@@ -577,6 +606,9 @@ export default function Home() {
          isRTL={isRTL}
          mode={mode}
          onHoveredBubbleChange={setHoveredBubbleId}
+         activeProfileIndex={activeProfileIndex}
+         onProfileChange={setActiveProfileIndex}
+         profiles={profiles}
          onBubbleClick={(bubble) => {
            // Handle Settings sub-bubble clicks when Settings bubble is centered (Theme/Language/Size)
            if (centeredBubble && (centeredBubble.id === "settings" || centeredBubble.title === "Settings" || centeredBubble.title === "הגדרות")) {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Bubble from "./Bubble";
-import type { Bubble as BubbleType } from "@/app/page";
+import type { Bubble as BubbleType, Profile } from "@/app/page";
 
 interface BubbleFieldProps {
   bubbles: BubbleType[];
@@ -16,6 +16,9 @@ interface BubbleFieldProps {
   isRTL?: boolean;
   mode: "private" | "global";
   onHoveredBubbleChange?: (bubbleId: string | null) => void;
+  activeProfileIndex?: number;
+  onProfileChange?: (index: number) => void;
+  profiles?: Profile[];
   onBubbleClick?: (bubble: BubbleType) => void;
 }
 
@@ -60,6 +63,9 @@ export default function BubbleField({
   isRTL = false,
   mode,
   onHoveredBubbleChange,
+  activeProfileIndex = 0,
+  onProfileChange,
+  profiles = [],
   onBubbleClick,
 }: BubbleFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -989,6 +995,8 @@ export default function BubbleField({
       
       // Check if centered bubble has sub-bubbles
       const hasSubBubbles = centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0;
+      const isOriginCentered = centeredBubble?.id === originBubble.id;
+      const hasProfiles = isOriginCentered && profiles.length > 0;
       
       // More free scrolling - prioritize the stronger direction with lower threshold
       const absDeltaX = Math.abs(deltaX);
@@ -999,25 +1007,35 @@ export default function BubbleField({
       if (isPrimarilyVertical && absDeltaY > minSwipeDistance) {
         // Vertical swipe - always navigate parent bubbles
         navigateToBubble(deltaY > 0 ? "up" : "down");
-      } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance && hasSubBubbles) {
-        // Horizontal swipe - navigate between sub-bubbles
-        // Swipe right (deltaX > 0) should go to previous sub-bubble in LTR (opposite of before)
-        // Swipe right (deltaX > 0) should go to next sub-bubble in RTL (opposite)
-        // Swipe left (deltaX < 0) should go to next in LTR, previous in RTL
-        const swipeDirection = deltaX < 0 ? "left" : "right";
-        // In LTR: swipe right = previous (left), swipe left = next (right) - OPPOSITE
-        // In RTL: swipe right = next (right), swipe left = previous (left) - OPPOSITE
-        const navigationDirection = isRTL ? (swipeDirection === "right" ? "right" : "left") : (swipeDirection === "right" ? "left" : "right");
-        
-        // Highlight the OPPOSITE arrow - when swiping left, highlight right arrow (where you're going)
-        // When swiping right, highlight left arrow (where you're going)
-        // This gives visual feedback that you're moving towards that direction
-        const highlightDirection = swipeDirection === "left" ? "right" : "left";
-        setHighlightedArrow(highlightDirection);
-        
-        navigateSubBubbles(navigationDirection);
-        // Clear highlight after animation
-        setTimeout(() => setHighlightedArrow(null), 300);
+      } else if (isPrimarilyHorizontal && absDeltaX > minSwipeDistance) {
+        if (hasSubBubbles) {
+          // Horizontal swipe - navigate between sub-bubbles
+          // Swipe right (deltaX > 0) should go to previous sub-bubble in LTR (opposite of before)
+          // Swipe right (deltaX > 0) should go to next sub-bubble in RTL (opposite)
+          // Swipe left (deltaX < 0) should go to next in LTR, previous in RTL
+          const swipeDirection = deltaX < 0 ? "left" : "right";
+          // In LTR: swipe right = previous (left), swipe left = next (right) - OPPOSITE
+          // In RTL: swipe right = next (right), swipe left = previous (left) - OPPOSITE
+          const navigationDirection = isRTL ? (swipeDirection === "right" ? "right" : "left") : (swipeDirection === "right" ? "left" : "right");
+          
+          // Highlight the OPPOSITE arrow - when swiping left, highlight right arrow (where you're going)
+          // When swiping right, highlight left arrow (where you're going)
+          // This gives visual feedback that you're moving towards that direction
+          const highlightDirection = swipeDirection === "left" ? "right" : "left";
+          setHighlightedArrow(highlightDirection);
+          
+          navigateSubBubbles(navigationDirection);
+          // Clear highlight after animation
+          setTimeout(() => setHighlightedArrow(null), 300);
+        } else if (hasProfiles && onProfileChange) {
+          // Horizontal swipe on origin bubble - navigate between profiles
+          const swipeDirection = deltaX < 0 ? "left" : "right";
+          const navigationDirection = isRTL ? (swipeDirection === "right" ? "right" : "left") : (swipeDirection === "right" ? "left" : "right");
+          const newIndex = navigationDirection === "right" 
+            ? (activeProfileIndex + 1) % profiles.length 
+            : activeProfileIndex === 0 ? profiles.length - 1 : activeProfileIndex - 1;
+          onProfileChange(newIndex);
+        }
       }
     }
     
@@ -1053,10 +1071,12 @@ export default function BubbleField({
     
     // Check if centered bubble has sub-bubbles
     const hasSubBubbles = centeredBubble?.subBubbles && centeredBubble.subBubbles.length > 0;
+    const isOriginCentered = centeredBubble?.id === originBubble.id;
+    const hasProfiles = isOriginCentered && profiles.length > 0;
     
-    // Horizontal scroll for sub-bubbles, vertical scroll for parent bubbles
-    if (hasSubBubbles && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      // Horizontal scroll - navigate sub-bubbles
+    // Horizontal scroll for sub-bubbles or profiles, vertical scroll for parent bubbles
+    if ((hasSubBubbles || hasProfiles) && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      // Horizontal scroll - navigate sub-bubbles or profiles
       const now = Date.now();
       if (now - lastScrollTime.current < 300) return;
       lastScrollTime.current = now;
@@ -1066,12 +1086,21 @@ export default function BubbleField({
       }
       
       scrollTimeoutRef.current = setTimeout(() => {
-        // Horizontal scroll - account for RTL (OPPOSITE behavior)
-        // Scroll right (deltaX > 0) should go to previous sub-bubble in LTR (opposite)
-        // Scroll right (deltaX > 0) should go to next sub-bubble in RTL (opposite)
-        const scrollDirection = e.deltaX < 0 ? "left" : "right";
-        const navigationDirection = isRTL ? (scrollDirection === "right" ? "right" : "left") : (scrollDirection === "right" ? "left" : "right");
-        navigateSubBubbles(navigationDirection);
+        if (hasSubBubbles) {
+          // Horizontal scroll - account for RTL (OPPOSITE behavior)
+          // Scroll right (deltaX > 0) should go to previous sub-bubble in LTR (opposite)
+          // Scroll right (deltaX > 0) should go to next sub-bubble in RTL (opposite)
+          const scrollDirection = e.deltaX < 0 ? "left" : "right";
+          const navigationDirection = isRTL ? (scrollDirection === "right" ? "right" : "left") : (scrollDirection === "right" ? "left" : "right");
+          navigateSubBubbles(navigationDirection);
+        } else if (hasProfiles && onProfileChange) {
+          const scrollDirection = e.deltaX < 0 ? "left" : "right";
+          const navigationDirection = isRTL ? (scrollDirection === "right" ? "right" : "left") : (scrollDirection === "right" ? "left" : "right");
+          const newIndex = navigationDirection === "right" 
+            ? (activeProfileIndex + 1) % profiles.length 
+            : activeProfileIndex === 0 ? profiles.length - 1 : activeProfileIndex - 1;
+          onProfileChange(newIndex);
+        }
       }, 50);
     } else {
       // Vertical scroll - navigate parent bubbles
@@ -1200,6 +1229,8 @@ export default function BubbleField({
             subBubblesCount={bubble.subBubbles?.length || 0}
             parentBubble={isCenteredBubble ? bubble : undefined}
             subBubbles={isCenteredBubble ? bubble.subBubbles : undefined}
+            activeProfile={isOrigin && isCenteredBubble && profiles.length > 0 ? profiles[activeProfileIndex] : null}
+            profiles={isOrigin && isCenteredBubble ? profiles : []}
           />
         );
         })}
