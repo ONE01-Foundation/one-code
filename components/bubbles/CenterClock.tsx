@@ -93,18 +93,18 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
           <div
             className="flex items-center justify-center mb-3"
             style={{
-              width: `${48 * sizeMultiplier}px`,
-              height: `${48 * sizeMultiplier}px`,
+              width: `${56 * sizeMultiplier}px`,
+              height: `${56 * sizeMultiplier}px`,
               borderRadius: "50%",
-              backgroundColor: "transparent", // Match main background
+              backgroundColor: theme === "dark" ? "#000000" : "#FFFFFF",
             }}
           >
             {activeProfile.id === "default" ? (
               <img
                 src="/user-icon.svg"
                 alt="User"
-                width={24 * sizeMultiplier}
-                height={24 * sizeMultiplier}
+                width={32 * sizeMultiplier}
+                height={32 * sizeMultiplier}
                 style={{
                   userSelect: "none",
                   WebkitUserSelect: "none",
@@ -113,16 +113,18 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                 }}
               />
             ) : (
-              <span
+              <img
+                src="/Create-icon.svg"
+                alt="Create Profile"
+                width={32 * sizeMultiplier}
+                height={32 * sizeMultiplier}
                 style={{
-                  fontSize: `${24 * sizeMultiplier}px`,
                   userSelect: "none",
                   WebkitUserSelect: "none",
-                  lineHeight: "1",
+                  pointerEvents: "none",
+                  filter: theme === "dark" ? "brightness(0) invert(1)" : "none",
                 }}
-              >
-                {activeProfile.avatar}
-              </span>
+              />
             )}
           </div>
         )}

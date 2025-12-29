@@ -268,7 +268,7 @@ export default function Bubble({
         // Origin bubble: show clock + date (always, whether centered or not)
         isCentered ? (
           // When centered: full clock with theme toggle button
-        <div className="flex flex-col items-center gap-0.5 relative" style={{ marginTop: "-30px" }}>
+        <div className="flex flex-col items-center gap-0.5 relative" style={{ marginTop: "-40px" }}>
           {showClock && onThemeToggle && (
               <CenterClock 
                 theme={theme} 
