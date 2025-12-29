@@ -40,6 +40,10 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
   const [date, setDate] = useState<string>("");
   const [aiTextIndex, setAiTextIndex] = useState(0);
   const sizeMultiplier = uiSize === "large" ? 1.25 : 1.0;
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef(false);
   
   // Use profile AI text if available, otherwise use placeholder cycling
   const displayAiText = activeProfile 
