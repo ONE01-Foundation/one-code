@@ -93,6 +93,8 @@ interface BubbleProps {
   subBubbles?: BubbleType[]; // Sub-bubbles array
   activeProfile?: Profile | null; // Active profile for origin bubble
   profiles?: Profile[]; // Profiles array for origin bubble
+  onProfileChange?: (index: number) => void; // Handler to change profile
+  activeProfileIndex?: number; // Current active profile index
 }
 
 export default function Bubble({
@@ -277,6 +279,8 @@ export default function Bubble({
                 uiSize={uiSize}
                 activeProfile={activeProfile}
                 profiles={profiles}
+                onProfileChange={onProfileChange}
+                activeProfileIndex={activeProfileIndex}
               />
           )}
         </div>

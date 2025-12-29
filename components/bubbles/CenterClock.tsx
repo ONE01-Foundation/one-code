@@ -10,6 +10,8 @@ interface CenterClockProps {
   uiSize?: "normal" | "large";
   activeProfile?: Profile | null;
   profiles?: Profile[];
+  onProfileChange?: (index: number) => void; // Handler to change profile on tap
+  activeProfileIndex?: number; // Current active profile index
 }
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -32,7 +34,7 @@ const AI_TEXT_PLACEHOLDERS_HE = [
   "לאן אתה רוצה ללכת",
 ];
 
-export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "normal", activeProfile = null, profiles = [] }: CenterClockProps) {
+export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "normal", activeProfile = null, profiles = [], onProfileChange, activeProfileIndex = 0 }: CenterClockProps) {
   const AI_TEXT_PLACEHOLDERS = isRTL ? AI_TEXT_PLACEHOLDERS_HE : AI_TEXT_PLACEHOLDERS_EN;
   const [time, setTime] = useState<string>("");
   const [date, setDate] = useState<string>("");
@@ -91,12 +93,25 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
         {/* Profile avatar in circle - above AI text */}
         {activeProfile && (
           <div
-            className="flex items-center justify-center mb-3"
+            className="flex items-center justify-center mb-3 cursor-pointer"
+            onClick={() => {
+              if (onProfileChange && profiles.length > 0) {
+                const newIndex = (activeProfileIndex + 1) % profiles.length;
+                onProfileChange(newIndex);
+              }
+            }}
             style={{
               width: `${56 * sizeMultiplier}px`,
               height: `${56 * sizeMultiplier}px`,
               borderRadius: "50%",
               backgroundColor: theme === "dark" ? "#000000" : "#FFFFFF",
+              transition: "opacity 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = "0.8";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = "1";
             }}
           >
             {activeProfile.id === "default" ? (

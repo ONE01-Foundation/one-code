@@ -1231,6 +1231,8 @@ export default function BubbleField({
             subBubbles={isCenteredBubble ? bubble.subBubbles : undefined}
             activeProfile={isOrigin && isCenteredBubble && profiles.length > 0 ? profiles[activeProfileIndex] : null}
             profiles={isOrigin && isCenteredBubble ? profiles : []}
+            onProfileChange={isOrigin && isCenteredBubble ? onProfileChange : undefined}
+            activeProfileIndex={isOrigin && isCenteredBubble ? activeProfileIndex : 0}
           />
         );
         })}
