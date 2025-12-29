@@ -111,7 +111,11 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                 ? "bg-black/20 backdrop-blur-sm border border-white/10"
                 : "bg-white/20 backdrop-blur-sm border border-black/10"
             }`}
-            onClick={() => {
+            onClick={(e) => {
+              // Don't trigger profile change if clicking on file input
+              if (e.target === fileInputRef.current || (fileInputRef.current && fileInputRef.current.contains(e.target as Node))) {
+                return;
+              }
               if (!isLongPressRef.current && onProfileChange && profiles.length > 0) {
                 const newIndex = (activeProfileIndex + 1) % profiles.length;
                 onProfileChange(newIndex);
@@ -225,13 +229,15 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 style={{ 
                   position: "absolute",
                   opacity: 0,
-                  width: "1px",
-                  height: "1px",
-                  pointerEvents: "none",
+                  width: "100%",
+                  height: "100%",
+                  top: 0,
+                  left: 0,
+                  cursor: "pointer",
+                  zIndex: 10,
                 }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -247,6 +253,10 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                   }
                   // Reset input so same file can be selected again
                   e.target.value = "";
+                }}
+                onClick={(e) => {
+                  // Allow click events on the input
+                  e.stopPropagation();
                 }}
               />
             )}
