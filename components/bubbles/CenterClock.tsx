@@ -102,22 +102,62 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
       className="bg-transparent border-none outline-none p-0 select-none"
       style={{ userSelect: "none", WebkitUserSelect: "none" }}
     >
-      <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none" }}>
+      <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none", marginTop: "-15px" }}>
         {/* Profile avatar in circle - above AI text */}
         {activeProfile && (
           <div
-            className="flex items-center justify-center mb-3 cursor-pointer"
+            className={`flex items-center justify-center mb-3 cursor-pointer relative ${
+              theme === "dark" 
+                ? "bg-black/20 backdrop-blur-sm border border-white/10"
+                : "bg-white/20 backdrop-blur-sm border border-black/10"
+            }`}
             onClick={() => {
-              if (onProfileChange && profiles.length > 0) {
+              if (!isLongPressRef.current && onProfileChange && profiles.length > 0) {
                 const newIndex = (activeProfileIndex + 1) % profiles.length;
                 onProfileChange(newIndex);
+              }
+              isLongPressRef.current = false;
+            }}
+            onMouseDown={(e) => {
+              if (activeProfile.id === "default") {
+                isLongPressRef.current = false;
+                longPressTimerRef.current = setTimeout(() => {
+                  isLongPressRef.current = true;
+                  fileInputRef.current?.click();
+                }, 500) as NodeJS.Timeout;
+              }
+            }}
+            onMouseUp={() => {
+              if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+              }
+            }}
+            onMouseLeave={() => {
+              if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+              }
+            }}
+            onTouchStart={(e) => {
+              if (activeProfile.id === "default") {
+                isLongPressRef.current = false;
+                longPressTimerRef.current = setTimeout(() => {
+                  isLongPressRef.current = true;
+                  fileInputRef.current?.click();
+                }, 500) as NodeJS.Timeout;
+              }
+            }}
+            onTouchEnd={() => {
+              if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
               }
             }}
             style={{
               width: `${56 * sizeMultiplier}px`,
               height: `${56 * sizeMultiplier}px`,
               borderRadius: "50%",
-              backgroundColor: theme === "dark" ? "#000000" : "#FFFFFF",
               transition: "opacity 0.2s ease",
             }}
             onMouseEnter={(e) => {
@@ -127,30 +167,76 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
               e.currentTarget.style.opacity = "1";
             }}
           >
-            {activeProfile.id === "default" ? (
-              <img
-                src="/user-icon.svg"
-                alt="User"
-                width={32 * sizeMultiplier}
-                height={32 * sizeMultiplier}
-                style={{
-                  userSelect: "none",
-                  WebkitUserSelect: "none",
-                  pointerEvents: "none",
-                  filter: theme === "dark" ? "brightness(0) invert(1)" : "none",
-                }}
-              />
-            ) : (
-              <img
-                src="/Create-icon.svg"
-                alt="Create Profile"
-                width={32 * sizeMultiplier}
-                height={32 * sizeMultiplier}
-                style={{
-                  userSelect: "none",
-                  WebkitUserSelect: "none",
-                  pointerEvents: "none",
-                  filter: theme === "dark" ? "brightness(0) invert(1)" : "none",
+            {/* Inner circle with icon or image */}
+            <div
+              style={{
+                width: `${44 * sizeMultiplier}px`,
+                height: `${44 * sizeMultiplier}px`,
+                borderRadius: "50%",
+                backgroundColor: theme === "dark" ? "#000000" : "#FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+            >
+              {profileImage ? (
+                <img
+                  src={profileImage}
+                  alt="Profile"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    pointerEvents: "none",
+                  }}
+                />
+              ) : activeProfile.id === "default" ? (
+                <img
+                  src="/user-icon.svg"
+                  alt="User"
+                  width={28 * sizeMultiplier}
+                  height={28 * sizeMultiplier}
+                  style={{
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    pointerEvents: "none",
+                    filter: theme === "dark" ? "brightness(0) invert(1)" : "none",
+                  }}
+                />
+              ) : (
+                <img
+                  src="/Create-icon.svg"
+                  alt="Create Profile"
+                  width={28 * sizeMultiplier}
+                  height={28 * sizeMultiplier}
+                  style={{
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    pointerEvents: "none",
+                    filter: theme === "dark" ? "brightness(0) invert(1)" : "none",
+                  }}
+                />
+              )}
+            </div>
+            {/* Hidden file input for image upload */}
+            {activeProfile.id === "default" && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setProfileImage(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
                 }}
               />
             )}
