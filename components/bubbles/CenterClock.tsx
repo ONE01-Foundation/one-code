@@ -87,6 +87,15 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
     return () => clearInterval(interval);
   }, [activeProfile]);
 
+  // Cleanup long press timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
 
   return (
     <div
