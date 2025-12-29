@@ -162,11 +162,21 @@ export default function InputBar({ theme, uiSize = "normal", isRTL, mode, onMode
           // Update base text with final transcript
           if (finalTranscript) {
             baseTextRef.current = baseTextRef.current + (baseTextRef.current ? " " : "") + finalTranscript.trim() + " ";
-            setInputValue(baseTextRef.current);
+            const newValue = baseTextRef.current;
+            setInputValue(newValue);
+            // Force input field update
+            if (inputRef.current) {
+              inputRef.current.value = newValue;
+            }
           }
           // Update display with base text + interim transcript
           else if (interimTranscript) {
-            setInputValue(baseTextRef.current + (baseTextRef.current ? " " : "") + interimTranscript);
+            const displayValue = baseTextRef.current + (baseTextRef.current ? " " : "") + interimTranscript;
+            setInputValue(displayValue);
+            // Force input field update
+            if (inputRef.current) {
+              inputRef.current.value = displayValue;
+            }
           }
         };
 

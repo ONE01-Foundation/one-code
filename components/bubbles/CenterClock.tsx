@@ -102,7 +102,7 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
       className="bg-transparent border-none outline-none p-0 select-none"
       style={{ userSelect: "none", WebkitUserSelect: "none" }}
     >
-      <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none", marginTop: "-25px" }}>
+      <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none", marginTop: "-10px" }}>
         {/* Profile avatar in circle - above AI text */}
         {activeProfile && (
           <div
@@ -156,8 +156,8 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
               }
             }}
             style={{
-              width: `${56 * sizeMultiplier}px`,
-              height: `${56 * sizeMultiplier}px`,
+              width: `${64 * sizeMultiplier}px`,
+              height: `${64 * sizeMultiplier}px`,
               borderRadius: "50%",
               transition: "opacity 0.2s ease",
             }}
@@ -168,8 +168,8 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
             {/* Inner circle with icon or image */}
             <div
               style={{
-                width: `${44 * sizeMultiplier}px`,
-                height: `${44 * sizeMultiplier}px`,
+                width: `${52 * sizeMultiplier}px`,
+                height: `${52 * sizeMultiplier}px`,
                 borderRadius: "50%",
                 backgroundColor: theme === "dark" ? "#000000" : "#FFFFFF",
                 display: "flex",
@@ -225,7 +225,14 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: "none" }}
+                capture="environment"
+                style={{ 
+                  position: "absolute",
+                  opacity: 0,
+                  width: "1px",
+                  height: "1px",
+                  pointerEvents: "none",
+                }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -233,8 +240,13 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
                     reader.onloadend = () => {
                       setProfileImage(reader.result as string);
                     };
+                    reader.onerror = () => {
+                      console.error("Error reading file");
+                    };
                     reader.readAsDataURL(file);
                   }
+                  // Reset input so same file can be selected again
+                  e.target.value = "";
                 }}
               />
             )}
