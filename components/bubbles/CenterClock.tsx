@@ -17,7 +17,7 @@ interface CenterClockProps {
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 const AI_TEXT_PLACEHOLDERS_EN = [
-  "What matters",
+  "One is now",
   "Where are you",
   "What's next",
   "How do you feel",
@@ -26,7 +26,7 @@ const AI_TEXT_PLACEHOLDERS_EN = [
 ];
 
 const AI_TEXT_PLACEHOLDERS_HE = [
-  "מה חשוב",
+  "אחד זה עכשיו",
   "איפה אתה",
   "מה הלאה",
   "איך אתה מרגיש",
@@ -102,11 +102,11 @@ export default function CenterClock({ theme, onToggle, isRTL = false, uiSize = "
       className="bg-transparent border-none outline-none p-0 select-none"
       style={{ userSelect: "none", WebkitUserSelect: "none" }}
     >
-      <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none", marginTop: "-15px" }}>
+      <div className="flex flex-col items-center" style={{ userSelect: "none", WebkitUserSelect: "none", marginTop: "-25px" }}>
         {/* Profile avatar in circle - above AI text */}
         {activeProfile && (
           <div
-            className={`flex items-center justify-center mb-3 cursor-pointer relative ${
+            className={`flex items-center justify-center mb-1 cursor-pointer relative ${
               theme === "dark" 
                 ? "bg-black/20 backdrop-blur-sm border border-white/10"
                 : "bg-white/20 backdrop-blur-sm border border-black/10"
