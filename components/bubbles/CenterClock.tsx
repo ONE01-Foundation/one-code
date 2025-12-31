@@ -18,7 +18,7 @@ const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמי
 
 const AI_TEXT_PLACEHOLDERS_EN = [
   "One is now",
-  "Where are you",
+  "One is now",
   "What's next",
   "How do you feel",
   "What do you need",

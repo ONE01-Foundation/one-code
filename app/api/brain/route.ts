@@ -142,7 +142,35 @@ export async function POST(req: Request) {
 
     const reply = completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response.";
 
-    return NextResponse.json({ reply });
+    // Try to extract structured data from AI response (backward compatible)
+    let suggestedCard = null;
+    let actions = null;
+
+    // Look for JSON structure in the response (AI may include structured data)
+    try {
+      // Check if response contains JSON structure (common patterns)
+      const jsonMatch = reply.match(/\{[\s\S]*"suggestedCard"[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.suggestedCard) {
+          suggestedCard = parsed.suggestedCard;
+        }
+        if (parsed.actions) {
+          actions = parsed.actions;
+        }
+      }
+    } catch (parseError) {
+      // Parsing failed - continue with text-only response (backward compatible)
+      // This is expected if AI doesn't return structured data
+    }
+
+    // Always return reply (backward compatible)
+    // Include suggestedCard and actions only if they exist
+    return NextResponse.json({
+      reply,
+      ...(suggestedCard && { suggestedCard }),
+      ...(actions && { actions }),
+    });
   } catch (err) {
     console.error("Brain API error:", err);
     return NextResponse.json(

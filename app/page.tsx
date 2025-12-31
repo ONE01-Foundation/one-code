@@ -8,6 +8,7 @@ import InputBar from "@/components/bubbles/InputBar";
 import AIChat, { ChatMessage } from "@/components/bubbles/AIChat";
 import CenterOrnament from "@/components/CenterOrnament";
 import FaviconUpdater from "@/components/FaviconUpdater";
+import PWAIconUpdater from "@/components/PWAIconUpdater";
 import PWAInstaller from "@/components/PWAInstaller";
 import ThemeColorMeta from "@/components/ThemeColorMeta";
 
@@ -41,14 +42,14 @@ const MOCK_BUBBLES_DATA = [
     aiTextRTL: "ברוכים הבאים הביתה שם הכל מתחיל"
   },
   { 
-    icon: "❤️", 
+    icon: "🫀", 
     title: "Health", 
     titleRTL: "בריאות",
     aiText: "Track your wellness and maintain a healthy lifestyle",
     aiTextRTL: "עקוב אחרי הרווחה שלך ושמור על אורח חיים בריא",
     subBubbles: [
-      { icon: "🏋️", title: "Fitness", titleRTL: "כושר", aiText: "Track workouts and stay active", aiTextRTL: "עקוב אחרי אימונים והישאר פעיל", value: 0, actionType: "view" as const },
-      { icon: "🥗", title: "Nutrition", titleRTL: "תזונה", aiText: "Monitor your diet and meal planning", aiTextRTL: "עקוב אחרי התזונה ותכנון ארוחות", value: 1, actionType: "view" as const },
+      { icon: "💪", title: "Fitness", titleRTL: "כושר", aiText: "Track workouts and stay active", aiTextRTL: "עקוב אחרי אימונים והישאר פעיל", value: 0, actionType: "view" as const },
+      { icon: "🍎", title: "Nutrition", titleRTL: "תזונה", aiText: "Monitor your diet and meal planning", aiTextRTL: "עקוב אחרי התזונה ותכנון ארוחות", value: 1, actionType: "view" as const },
       { icon: "🧘", title: "Mental Health", titleRTL: "בריאות נפשית", aiText: "Practice mindfulness and relaxation", aiTextRTL: "תרגל מיינדפולנס ורגיעה", value: 2, actionType: "view" as const },
       { icon: "😴", title: "Sleep", titleRTL: "שינה", aiText: "Monitor sleep patterns and quality", aiTextRTL: "עקוב אחרי דפוסי השינה ואיכותה", value: 3, actionType: "view" as const },
       { icon: "💊", title: "Medications", titleRTL: "תרופות", aiText: "Manage prescriptions and reminders", aiTextRTL: "נהל מרשמים ותזכורות", value: 4, actionType: "edit" as const },
@@ -506,6 +507,34 @@ export default function Home() {
       const data = await response.json();
       const aiResponse = data.reply || "I apologize, but I couldn't generate a response.";
 
+      // Persist card if suggested (non-blocking, fire and forget)
+      if (data.suggestedCard) {
+        // Get or create session ID
+        const sessionId = (() => {
+          if (typeof window === "undefined") return "";
+          const key = "one_session_id";
+          let sid = localStorage.getItem(key);
+          if (!sid) {
+            sid = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem(key, sid);
+          }
+          return sid;
+        })();
+
+        // Call ingestion API (non-blocking - errors ignored)
+        fetch("/api/cards/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            bubbleId,
+            userMessage: message,
+            aiResponse,
+            suggestedCard: data.suggestedCard,
+          }),
+        }).catch((err) => console.error("Card ingestion failed (non-fatal):", err));
+      }
+
       // Update AI message with response (word-by-word animation)
       const words = aiResponse.split(" ");
       
@@ -575,6 +604,7 @@ export default function Home() {
       <>
       <ThemeColorMeta theme={theme} />
       <FaviconUpdater theme={theme} isRTL={isRTL} />
+      <PWAIconUpdater theme={theme} />
     <div
       className="fixed inset-0 overflow-hidden"
       style={{

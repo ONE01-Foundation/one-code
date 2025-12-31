@@ -29,8 +29,8 @@ export const metadata: Metadata = {
       { url: "/favicon-dark.ico", type: "image/x-icon", sizes: "32x32", media: "(prefers-color-scheme: dark)" },
     ],
     apple: [
-      { url: "/favicon.ico", type: "image/x-icon", sizes: "180x180" },
-      { url: "/favicon-dark.ico", type: "image/x-icon", sizes: "180x180" },
+      { url: "/icon-180x180.png", type: "image/png", sizes: "180x180" },
+      { url: "/icon-dark-180x180.png", type: "image/png", sizes: "180x180", media: "(prefers-color-scheme: dark)" },
     ],
   },
 };

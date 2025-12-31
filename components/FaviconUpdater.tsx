@@ -16,9 +16,10 @@ export default function FaviconUpdater({ theme, isRTL = false }: FaviconUpdaterP
     const cacheBuster = `?v=${Date.now()}`;
     const faviconUrl = `${faviconPath}${cacheBuster}`;
     
-    // Function to remove all existing favicon links
+    // Function to remove all existing favicon links (but not apple-touch-icon - handled by PWAIconUpdater for mobile)
     const removeAllIcons = () => {
-      const existingIcons = document.querySelectorAll("link[rel*='icon'], link[rel='apple-touch-icon']");
+      // Only remove browser favicon links, not PWA icons (apple-touch-icon is handled by PWAIconUpdater)
+      const existingIcons = document.querySelectorAll("link[rel='icon'], link[rel='shortcut icon']");
       existingIcons.forEach((icon) => icon.remove());
     };
     
@@ -44,12 +45,8 @@ export default function FaviconUpdater({ theme, isRTL = false }: FaviconUpdaterP
       shortcutLink.setAttribute("sizes", "32x32");
       document.head.appendChild(shortcutLink);
       
-      // Create apple-touch-icon for iOS PWA with proper size
-      const appleTouchIcon = document.createElement("link");
-      appleTouchIcon.rel = "apple-touch-icon";
-      appleTouchIcon.href = faviconUrl;
-      appleTouchIcon.setAttribute("sizes", "180x180");
-      document.head.appendChild(appleTouchIcon);
+      // Note: apple-touch-icon is now handled by PWAIconUpdater component
+      // This component only handles browser favicon
       
       // Also update the favicon by directly accessing the link element
       // This forces the browser to reload even if cached
@@ -71,32 +68,36 @@ export default function FaviconUpdater({ theme, isRTL = false }: FaviconUpdaterP
       img.src = faviconUrl;
     }, 10);
     
-    // Update manifest.json name based on RTL
+    // Update manifest.json name based on RTL (icons handled by PWAIconUpdater)
     const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
     if (manifestLink) {
       const manifestUrl = manifestLink.href.split('?')[0];
-      // Force reload manifest
-      manifestLink.href = `${manifestUrl}?v=${Date.now()}`;
       
       // Update manifest content with RTL-aware name
-      fetch(manifestLink.href)
+      fetch(`${manifestUrl}?v=${Date.now()}`)
         .then(res => res.json())
         .then(manifest => {
           // Update name based on RTL
           manifest.name = isRTL ? "אחד" : "ONE";
           manifest.short_name = isRTL ? "אחד" : "ONE";
           
-          // Update icons in manifest to use current theme icon
-          if (manifest.icons && manifest.icons.length > 0) {
-            manifest.icons.forEach((icon: any) => {
-              icon.src = faviconPath;
-            });
-          }
+          // Note: Icons are updated by PWAIconUpdater component
           
           // Create a blob URL for the updated manifest
-          const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+          const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
           const newManifestUrl = URL.createObjectURL(blob);
-          manifestLink.href = newManifestUrl;
+          
+          // Only update if changed
+          if (manifestLink.href !== newManifestUrl) {
+            const oldUrl = manifestLink.href;
+            manifestLink.href = newManifestUrl;
+            // Clean up old blob URL after a delay
+            setTimeout(() => {
+              if (oldUrl.startsWith("blob:")) {
+                URL.revokeObjectURL(oldUrl);
+              }
+            }, 1000);
+          }
         })
         .catch(() => {
           // Manifest update failed, but that's okay
